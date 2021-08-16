@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::{convert, fmt};
+use std::{cmp, convert, fmt};
 
 /// Type data.
 #[derive(Hash, PartialEq, Eq)]
@@ -15,19 +15,9 @@ pub enum TypeData {
   Function(Option<Type>, Vec<Type>),
 }
 
-/// Types in Koopa.
-#[derive(Hash, PartialEq, Eq, Clone)]
-pub struct Type(Rc<TypeData>);
-
-impl convert::AsRef<TypeData> for Type {
-  fn as_ref(&self) -> &TypeData {
-    self.0.as_ref()
-  }
-}
-
-impl fmt::Display for Type {
+impl fmt::Display for TypeData {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self.as_ref() {
+    match self {
       TypeData::Int32 => write!(f, "i32"),
       TypeData::Array(t, len) => write!(f, "{}[{}]", t, len),
       TypeData::Pointer(t) => write!(f, "{}*", t),
@@ -46,6 +36,28 @@ impl fmt::Display for Type {
         write!(f, ")")
       }
     }
+  }
+}
+
+/// Types in Koopa.
+#[derive(Hash, Clone, Eq)]
+pub struct Type(Rc<TypeData>);
+
+impl cmp::PartialEq for Type {
+  fn eq(&self, other: &Self) -> bool {
+    Rc::ptr_eq(&self.0, &other.0)
+  }
+}
+
+impl convert::AsRef<TypeData> for Type {
+  fn as_ref(&self) -> &TypeData {
+    self.0.as_ref()
+  }
+}
+
+impl fmt::Display for Type {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", self.0)
   }
 }
 
