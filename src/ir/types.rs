@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::{cmp, convert, fmt};
 
 /// Type data.
-#[derive(Hash, PartialEq, Eq)]
+#[derive(Hash, Clone, PartialEq, Eq)]
 pub enum TypeData {
   /// 32-bit integer.
   Int32,
@@ -75,11 +75,11 @@ impl TypeFactory {
 
   /// Gets a specific type.
   pub fn get_type(&mut self, type_data: TypeData) -> Type {
-    self
-      .types
-      .get(&type_data)
-      .cloned()
-      .unwrap_or_else(|| Type(Rc::new(type_data)))
+    self.types.get(&type_data).cloned().unwrap_or_else(|| {
+      let k = Type(Rc::new(type_data.clone()));
+      self.types.insert(type_data, k.clone());
+      k
+    })
   }
 
   /// Gets an `i32` type.
