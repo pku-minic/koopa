@@ -81,6 +81,7 @@ pub struct Use {
 impl Use {
   /// Creates a new `Rc` of `Use`.
   pub fn new(value: NodeRc, user: NodeRef) -> Rc<Self> {
+    debug_assert!(user.upgrade().unwrap().is_user(), "`user` is not a `User`!");
     let u = Rc::new(Use {
       link: LinkedListLink::new(),
       value: value,
