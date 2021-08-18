@@ -26,7 +26,7 @@ pub trait Value {
 /// User in Koopa IR.
 ///
 /// A user can use other values.
-pub trait User {
+pub trait User: Value {
   /// Gets the operands of the current value.
   fn operands(&self) -> &[Rc<Use>];
 }
@@ -126,6 +126,7 @@ impl Drop for Use {
 }
 
 /// Implements `Value` trait for the specific type.
+#[macro_export]
 macro_rules! impl_value {
   ($name:ident, $data:tt) => {
     impl $crate::ir::core::Value for $name {
@@ -149,4 +150,15 @@ macro_rules! impl_value {
   };
 }
 
-pub(crate) use impl_value;
+/// Implements `User` trait for the specific type.
+#[macro_export]
+macro_rules! impl_user {
+  ($name:ident, $operands:tt) => {
+    impl $crate::ir::core::User for $name {
+      #[inline]
+      fn operands(&self) -> &[Rc<Use>] {
+        &self.$operands
+      }
+    }
+  };
+}
