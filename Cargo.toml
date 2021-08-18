@@ -1,7 +1,8 @@
 [package]
-name = "libkoopa"
+name = "koopa"
 version = "0.0.1"
 edition = "2018"
 
 [dependencies]
 lazy_static = "1.4.0"
+intrusive-collections = "0.9"
