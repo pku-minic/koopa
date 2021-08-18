@@ -4,26 +4,6 @@ use crate::ir::{NodeRc, NodeRef};
 use intrusive_collections::{LinkedList, LinkedListLink};
 use std::rc::{Rc, Weak};
 
-/// Data of `Value`.
-pub struct ValueData {
-  uses: LinkedList<ValueDataAdapter>, // TODO: intrusive linked list
-  ty: Type,
-}
-
-intrusive_adapter!(
-  pub ValueDataAdapter = Weak<Use> [WeakPointerOps]:
-      Use { link: LinkedListLink }
-);
-
-impl ValueData {
-  pub fn new(ty: Type) -> Self {
-    ValueData {
-      uses: LinkedList::new(ValueDataAdapter::new()),
-      ty: ty,
-    }
-  }
-}
-
 /// Value in Koopa IR.
 ///
 /// A value can be used by other users.
@@ -41,6 +21,34 @@ pub trait Value {
 
   /// Replaces all uses of the current `Value` to another `Value`.
   fn replace_all_uses_with(&mut self, value: NodeRc);
+}
+
+/// User in Koopa IR.
+///
+/// A user can use other values.
+pub trait User {
+  /// Gets the operands of the current value.
+  fn operands(&self) -> &[Rc<Use>];
+}
+
+/// Data of `Value`s.
+pub struct ValueData {
+  uses: LinkedList<ValueDataAdapter>, // TODO: intrusive linked list
+  ty: Type,
+}
+
+intrusive_adapter! {
+  pub ValueDataAdapter = Weak<Use> [WeakPointerOps]:
+      Use { link: LinkedListLink }
+}
+
+impl ValueData {
+  pub fn new(ty: Type) -> Self {
+    ValueData {
+      uses: LinkedList::new(ValueDataAdapter::new()),
+      ty: ty,
+    }
+  }
 }
 
 impl Value for ValueData {
