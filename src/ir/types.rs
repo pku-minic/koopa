@@ -59,8 +59,8 @@ impl Type {
       .get(&type_data)
       .cloned()
       .unwrap_or_else(|| {
-        let k = Type(Rc::new(type_data.clone()));
-        TYPES.lock().unwrap().insert(type_data, k.clone());
+        let k = Type(Rc::new(type_data));
+        TYPES.lock().unwrap().insert(type_data, k);
         k
       })
   }
@@ -101,5 +101,51 @@ impl convert::AsRef<TypeData> for Type {
 impl fmt::Display for Type {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", self.0)
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn print_type() {
+    assert_eq!(format!("{}", Type::get_i32()), "i32");
+    assert_eq!(
+      format!("{}", Type::get_array(Type::get_i32(), 10)),
+      "i32[10]"
+    );
+    assert_eq!(
+      format!("{}", Type::get_pointer(Type::get_pointer(Type::get_i32()))),
+      "i32**"
+    );
+    assert_eq!(format!("{}", Type::get_function(None, vec![])), "()");
+    assert_eq!(
+      format!("{}", Type::get_function(None, vec![Type::get_i32()])),
+      "(i32)"
+    );
+    assert_eq!(
+      format!(
+        "{}",
+        Type::get_function(
+          Some(Type::get_i32()),
+          vec![Type::get_i32(), Type::get_i32()]
+        )
+      ),
+      "i32(i32, i32)"
+    );
+  }
+
+  #[test]
+  fn type_eq() {
+    assert_eq!(Type::get_i32(), Type::get_i32());
+    assert_eq!(
+      Type::get_array(Type::get_i32(), 6),
+      Type::get_array(Type::get_i32(), 6)
+    );
+    assert_ne!(
+      Type::get_array(Type::get_i32(), 6),
+      Type::get_array(Type::get_i32(), 7)
+    );
   }
 }
