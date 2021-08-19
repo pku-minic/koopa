@@ -11,6 +11,9 @@ pub trait Value {
   /// Gets use list of the current `Value`.
   fn uses(&self) -> &LinkedList<ValueDataAdapter>;
 
+  /// Gets the type of the current `Value`.
+  fn ty(&self) -> &Type;
+
   /// Adds use to the current `Value`.
   fn add_use(&mut self, u: Weak<Use>);
 
@@ -56,6 +59,10 @@ impl Value for ValueData {
     &self.uses
   }
 
+  fn ty(&self) -> &Type {
+    &self.ty
+  }
+
   fn add_use(&mut self, u: Weak<Use>) {
     self.uses.push_back(u);
   }
@@ -81,13 +88,16 @@ pub struct Use {
 impl Use {
   /// Creates a new `Rc` of `Use`.
   pub fn new(value: NodeRc, user: NodeRef) -> Rc<Self> {
-    debug_assert!(user.upgrade().unwrap().is_user(), "`user` is not a `User`!");
+    debug_assert!(
+      user.upgrade().unwrap().borrow().is_user(),
+      "`user` is not a `User`!"
+    );
     let u = Rc::new(Use {
       link: LinkedListLink::new(),
       value: value,
       user: user,
     });
-    value.add_use(Rc::downgrade(&u));
+    value.borrow_mut().add_use(Rc::downgrade(&u));
     u
   }
 
@@ -98,7 +108,7 @@ impl Use {
       value: self.value,
       user: self.user,
     });
-    self.value.add_use(Rc::downgrade(&u));
+    self.value.borrow_mut().add_use(Rc::downgrade(&u));
     u
   }
 
@@ -114,15 +124,15 @@ impl Use {
 
   /// Sets the value that the current use holds.
   pub fn set_value(&mut self, value: NodeRc) {
-    self.value.remove_use(Weak::from_raw(self));
+    self.value.borrow_mut().remove_use(Weak::from_raw(self));
     self.value = value;
-    self.value.add_use(Weak::from_raw(self));
+    self.value.borrow_mut().add_use(Weak::from_raw(self));
   }
 }
 
 impl Drop for Use {
   fn drop(&mut self) {
-    self.value.remove_use(Weak::from_raw(self));
+    self.value.borrow_mut().remove_use(Weak::from_raw(self));
   }
 }
 
@@ -134,6 +144,10 @@ macro_rules! impl_value {
       #[inline]
       fn uses(&self) -> &intrusive_collections::LinkedList<$crate::ir::core::ValueDataAdapter> {
         self.$data.uses()
+      }
+      #[inline]
+      fn ty(&self) -> &Type {
+        self.$data.ty()
       }
       #[inline]
       fn add_use(&mut self, u: std::rc::Weak<$crate::ir::core::Use>) {
