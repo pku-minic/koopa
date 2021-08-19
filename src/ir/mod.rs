@@ -7,8 +7,10 @@ pub mod values;
 mod utils;
 
 use self::core::{Use, Value, ValueDataAdapter};
+use self::types::Type;
 use self::values::*;
 use intrusive_collections::LinkedList;
+use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 /// Node of Koopa IR.
@@ -22,15 +24,19 @@ pub enum Node {
 /// Rc of `Node`.
 ///
 /// Used when a type has ownership of `Node`.
-pub type NodeRc = Rc<Node>;
+pub type NodeRc = Rc<RefCell<Node>>;
 
 /// Reference of `Node`.
 ///
 /// Used when a type only needs to refer to `Node`.
-pub type NodeRef = Weak<Node>;
+pub type NodeRef = Weak<RefCell<Node>>;
 
 impl Value for Node {
   fn uses(&self) -> &LinkedList<ValueDataAdapter> {
+    todo!()
+  }
+
+  fn ty(&self) -> &Type {
     todo!()
   }
 
