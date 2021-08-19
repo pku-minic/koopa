@@ -111,5 +111,4 @@ macro_rules! intrusive_adapter {
     intrusive_collections::intrusive_adapter!($($t)*);
   };
 }
-
 pub(crate) use intrusive_adapter;
