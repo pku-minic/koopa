@@ -27,13 +27,28 @@ pub type ValueRc = Rc<RefCell<Value>>;
 pub type ValueRef = Weak<RefCell<Value>>;
 
 impl Value {
-  pub(crate) fn new(ty: Type, kind: ValueKind) -> Self {
-    Value {
+  pub(crate) fn new(ty: Type, kind: ValueKind) -> ValueRc {
+    Rc::new(RefCell::new(Value {
       link: LinkedListLink::new(),
       uses: LinkedList::new(UseAdapter::new()),
       ty: ty,
       kind: kind,
-    }
+    }))
+  }
+
+  pub(crate) fn new_with_init<F>(ty: Type, kind: ValueKind, init: F) -> ValueRc
+  where
+    F: FnOnce(ValueRef, &mut ValueKind),
+  {
+    let value = Rc::new(RefCell::new(Value {
+      link: LinkedListLink::new(),
+      uses: LinkedList::new(UseAdapter::new()),
+      ty: ty,
+      kind: kind,
+    }));
+    let user = Rc::downgrade(&value);
+    init(user, &mut value.borrow_mut().kind);
+    value
   }
 
   /// Gets use list of the current `Value`.
@@ -98,6 +113,17 @@ pub enum ValueKind {
   Aggregate(Aggregate),
   Instruction(Instruction),
 }
+
+/// Unwrap a `ValueKind` without any checks.
+macro_rules! unwrap_kind {
+  ($kind:ident, $tag:ident) => {
+    match $kind {
+      ValueKind::$tag(v) => v,
+      _ => unreachable!(),
+    }
+  };
+}
+pub(crate) use unwrap_kind;
 
 /// Bidirectional reference between `Value`s and `Instruction`s.
 pub struct Use {
