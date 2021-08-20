@@ -5,6 +5,7 @@ use crate::ir::utils::{intrusive_adapter, WeakPointerOps};
 use crate::ir::values::*;
 use intrusive_collections::{LinkedList, LinkedListLink};
 use std::cell::RefCell;
+use std::mem::MaybeUninit;
 use std::rc::{Rc, Weak};
 
 /// Value in Koopa IR.
@@ -41,19 +42,19 @@ impl Value {
     }))
   }
 
-  pub(crate) fn new_with_init<F>(ty: Type, kind: ValueKind, init: F) -> ValueRc
+  pub(crate) fn new_with_init<F>(ty: Type, init: F) -> ValueRc
   where
-    F: FnOnce(ValueRef, &mut ValueKind),
+    F: FnOnce(ValueRef) -> ValueKind,
   {
     let value = Rc::new(RefCell::new(Value {
       link: LinkedListLink::new(),
       uses: LinkedList::new(UseAdapter::new()),
       ty: ty,
       bb: None,
-      kind: kind,
+      kind: unsafe { MaybeUninit::uninit().assume_init() },
     }));
     let user = Rc::downgrade(&value);
-    init(user, &mut value.borrow_mut().kind);
+    value.borrow_mut().kind = init(user);
     value
   }
 
@@ -63,14 +64,14 @@ impl Value {
   }
 
   /// Adds use to the current `Value`.
-  pub fn add_use(&mut self, u: Weak<Use>) {
+  pub fn add_use(&mut self, u: UseRef) {
     self.uses.push_back(u);
   }
 
   /// Removes the specific use `u` from the current `Value`.
   ///
   /// Undefined if `u` is not in the use list.
-  pub fn remove_use(&mut self, u: Weak<Use>) {
+  pub fn remove_use(&mut self, u: UseRef) {
     self.uses.cursor_mut_from_ptr(u.as_ptr()).remove();
   }
 
@@ -119,6 +120,11 @@ impl Value {
       ValueKind::Integer(..) | ValueKind::ZeroInit(..) | ValueKind::Undef(..) | todo!()
     )
   }
+
+  /// Checks if the current `Value` is an instruction.
+  pub fn is_inst(&self) -> bool {
+    todo!()
+  }
 }
 
 /// All supported values.
@@ -128,18 +134,8 @@ pub enum ValueKind {
   Undef(Undef),
   Aggregate(Aggregate),
   Alloc(Alloc),
+  GlobalAlloc(GlobalAlloc),
 }
-
-/// Unwrap a `ValueKind` without any checks.
-macro_rules! unwrap_kind {
-  ($kind:ident, $tag:ident) => {
-    match $kind {
-      ValueKind::$tag(v) => v,
-      _ => unreachable!(),
-    }
-  };
-}
-pub(crate) use unwrap_kind;
 
 /// Bidirectional reference between `Value`s and `Instruction`s.
 pub struct Use {
@@ -149,12 +145,22 @@ pub struct Use {
 }
 
 intrusive_adapter! {
-  UseAdapter = Weak<Use> [WeakPointerOps]: Use { link: LinkedListLink }
+  UseAdapter = UseRef [WeakPointerOps]: Use { link: LinkedListLink }
 }
+
+/// Rc of `Use`.
+///
+/// Used when a type has ownership of `Use`.
+pub type UseRc = Rc<Use>;
+
+/// Reference of `Use`.
+///
+/// Used when a type only needs to refer to `Use`.
+pub type UseRef = Weak<Use>;
 
 impl Use {
   /// Creates a new `Rc` of `Use`.
-  pub fn new(value: ValueRc, user: ValueRef) -> Rc<Self> {
+  pub fn new(value: ValueRc, user: ValueRef) -> UseRc {
     debug_assert!(
       user.upgrade().unwrap().borrow().is_user(),
       "`user` is not a `User`!"
@@ -169,7 +175,7 @@ impl Use {
   }
 
   /// Clones the current `Use` as a `Rc` of `Use`.
-  pub fn clone(&self) -> Rc<Self> {
+  pub fn clone(&self) -> UseRc {
     let u = Rc::new(Use {
       link: LinkedListLink::new(),
       value: self.value,
