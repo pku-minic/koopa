@@ -1,4 +1,5 @@
 use crate::ir::instructions::*;
+use crate::ir::structs::BasicBlockRef;
 use crate::ir::types::Type;
 use crate::ir::utils::{intrusive_adapter, WeakPointerOps};
 use crate::ir::values::*;
@@ -13,8 +14,11 @@ pub struct Value {
   link: LinkedListLink,
   uses: LinkedList<UseAdapter>,
   ty: Type,
+  bb: Option<BasicBlockRef>,
   kind: ValueKind,
 }
+
+intrusive_adapter!(pub(crate) ValueAdapter = ValueRc: Value { link: LinkedListLink });
 
 /// Rc of `Value`.
 ///
@@ -32,6 +36,7 @@ impl Value {
       link: LinkedListLink::new(),
       uses: LinkedList::new(UseAdapter::new()),
       ty: ty,
+      bb: None,
       kind: kind,
     }))
   }
@@ -44,6 +49,7 @@ impl Value {
       link: LinkedListLink::new(),
       uses: LinkedList::new(UseAdapter::new()),
       ty: ty,
+      bb: None,
       kind: kind,
     }));
     let user = Rc::downgrade(&value);
@@ -83,7 +89,17 @@ impl Value {
 
   /// Sets the type of the current `Value`.
   pub fn set_ty(&mut self, ty: Type) {
-    self.ty = ty
+    self.ty = ty;
+  }
+
+  /// Gets the parent basic block of the current `Value`.
+  pub fn bb(&self) -> &Option<BasicBlockRef> {
+    &self.bb
+  }
+
+  /// Sets the parent basic block of the current `Value`.
+  pub fn set_bb(&mut self, bb: Option<BasicBlockRef>) {
+    self.bb = bb;
   }
 
   /// Gets the kind of the current `Value`.
@@ -111,7 +127,7 @@ pub enum ValueKind {
   ZeroInit(ZeroInit),
   Undef(Undef),
   Aggregate(Aggregate),
-  Instruction(Instruction),
+  Alloc(Alloc),
 }
 
 /// Unwrap a `ValueKind` without any checks.
