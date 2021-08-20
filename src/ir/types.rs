@@ -2,11 +2,11 @@ use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Mutex;
-use std::{cmp, convert, fmt};
+use std::{cmp, fmt};
 
-/// Type data.
+/// Kind of type.
 #[derive(Hash, Clone, PartialEq, Eq)]
-pub enum TypeData {
+pub enum TypeKind {
   /// 32-bit integer.
   Int32,
   /// Array (with base type and shape).
@@ -17,13 +17,13 @@ pub enum TypeData {
   Function(Option<Type>, Vec<Type>),
 }
 
-impl fmt::Display for TypeData {
+impl fmt::Display for TypeKind {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      TypeData::Int32 => write!(f, "i32"),
-      TypeData::Array(t, len) => write!(f, "{}[{}]", t, len),
-      TypeData::Pointer(t) => write!(f, "{}*", t),
-      TypeData::Function(ret, args) => {
+      TypeKind::Int32 => write!(f, "i32"),
+      TypeKind::Array(t, len) => write!(f, "{}[{}]", t, len),
+      TypeKind::Pointer(t) => write!(f, "{}*", t),
+      TypeKind::Function(ret, args) => {
         if let Some(ret) = ret {
           write!(f, "{}", ret);
         }
@@ -43,16 +43,16 @@ impl fmt::Display for TypeData {
 
 /// Types in Koopa.
 #[derive(Hash, Clone, Eq)]
-pub struct Type(Rc<TypeData>);
+pub struct Type(Rc<TypeKind>);
 
 lazy_static! {
   /// Pool of all created types.
-  static ref TYPES: Mutex<HashMap<TypeData, Type>> = Mutex::new(HashMap::new());
+  static ref TYPES: Mutex<HashMap<TypeKind, Type>> = Mutex::new(HashMap::new());
 }
 
 impl Type {
   /// Gets a specific type.
-  pub fn get_type(type_data: TypeData) -> Type {
+  pub fn get_type(type_data: TypeKind) -> Type {
     TYPES
       .lock()
       .unwrap()
@@ -67,34 +67,33 @@ impl Type {
 
   /// Gets an `i32` type.
   pub fn get_i32() -> Type {
-    Type::get_type(TypeData::Int32)
+    Type::get_type(TypeKind::Int32)
   }
 
   /// Gets an array type.
   pub fn get_array(base: Type, len: usize) -> Type {
-    Type::get_type(TypeData::Array(base, len))
+    Type::get_type(TypeKind::Array(base, len))
   }
 
   /// Gets an pointer type.
   pub fn get_pointer(base: Type) -> Type {
-    Type::get_type(TypeData::Pointer(base))
+    Type::get_type(TypeKind::Pointer(base))
   }
 
   /// Gets an function type.
   pub fn get_function(ret: Option<Type>, args: Vec<Type>) -> Type {
-    Type::get_type(TypeData::Function(ret, args))
+    Type::get_type(TypeKind::Function(ret, args))
+  }
+
+  /// Gets the kind of the current `Type`.
+  pub fn kind(&self) -> &TypeKind {
+    &self.0
   }
 }
 
 impl cmp::PartialEq for Type {
   fn eq(&self, other: &Self) -> bool {
     Rc::ptr_eq(&self.0, &other.0)
-  }
-}
-
-impl convert::AsRef<TypeData> for Type {
-  fn as_ref(&self) -> &TypeData {
-    self.0.as_ref()
   }
 }
 
