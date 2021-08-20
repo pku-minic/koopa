@@ -9,25 +9,25 @@ use std::{cmp, fmt};
 pub enum TypeKind {
   /// 32-bit integer.
   Int32,
+  /// Unit (void).
+  Unit,
   /// Array (with base type and shape).
   Array(Type, usize),
   /// Pointer (with base type).
   Pointer(Type),
-  /// Function (with optional return type and parameter types).
-  Function(Option<Type>, Vec<Type>),
+  /// Function (with return type and parameter types).
+  Function(Type, Vec<Type>),
 }
 
 impl fmt::Display for TypeKind {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       TypeKind::Int32 => write!(f, "i32"),
+      TypeKind::Unit => write!(f, "unit"),
       TypeKind::Array(t, len) => write!(f, "{}[{}]", t, len),
       TypeKind::Pointer(t) => write!(f, "{}*", t),
       TypeKind::Function(ret, args) => {
-        if let Some(ret) = ret {
-          write!(f, "{}", ret);
-        }
-        write!(f, "(");
+        write!(f, "{}(", ret);
         args.iter().fold(true, |first, t| {
           if !first {
             write!(f, ", ");
@@ -70,6 +70,11 @@ impl Type {
     Type::get_type(TypeKind::Int32)
   }
 
+  /// Gets an `unit` type.
+  pub fn get_unit() -> Type {
+    Type::get_type(TypeKind::Unit)
+  }
+
   /// Gets an array type.
   pub fn get_array(base: Type, len: usize) -> Type {
     Type::get_type(TypeKind::Array(base, len))
@@ -81,7 +86,7 @@ impl Type {
   }
 
   /// Gets an function type.
-  pub fn get_function(ret: Option<Type>, args: Vec<Type>) -> Type {
+  pub fn get_function(ret: Type, args: Vec<Type>) -> Type {
     Type::get_type(TypeKind::Function(ret, args))
   }
 
@@ -110,6 +115,7 @@ mod test {
   #[test]
   fn print_type() {
     assert_eq!(format!("{}", Type::get_i32()), "i32");
+    assert_eq!(format!("{}", Type::get_unit()), "unit");
     assert_eq!(
       format!("{}", Type::get_array(Type::get_i32(), 10)),
       "i32[10]"
@@ -118,18 +124,21 @@ mod test {
       format!("{}", Type::get_pointer(Type::get_pointer(Type::get_i32()))),
       "i32**"
     );
-    assert_eq!(format!("{}", Type::get_function(None, vec![])), "()");
     assert_eq!(
-      format!("{}", Type::get_function(None, vec![Type::get_i32()])),
-      "(i32)"
+      format!("{}", Type::get_function(Type::get_unit(), vec![])),
+      "unit()"
     );
     assert_eq!(
       format!(
         "{}",
-        Type::get_function(
-          Some(Type::get_i32()),
-          vec![Type::get_i32(), Type::get_i32()]
-        )
+        Type::get_function(Type::get_unit(), vec![Type::get_i32()])
+      ),
+      "unit(i32)"
+    );
+    assert_eq!(
+      format!(
+        "{}",
+        Type::get_function(Type::get_i32(), vec![Type::get_i32(), Type::get_i32()])
       ),
       "i32(i32, i32)"
     );
