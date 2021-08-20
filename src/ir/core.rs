@@ -77,7 +77,10 @@ impl Value {
 
   /// Replaces all uses of the current `Value` to another `Value`.
   pub fn replace_all_uses_with(&mut self, value: ValueRc) {
-    debug_assert!(!std::ptr::eq(value.as_ptr(), self), "`value` ");
+    debug_assert!(
+      !std::ptr::eq(value.as_ptr(), self),
+      "`value` can not be the same as `self`!"
+    );
     while let Some(u) = self.uses.front_mut().get() {
       u.set_value(value);
     }
@@ -115,9 +118,13 @@ impl Value {
 
   /// Checks if the current `Value` is a user.
   pub fn is_user(&self) -> bool {
+    todo!();
     !matches!(
       self.kind,
-      ValueKind::Integer(..) | ValueKind::ZeroInit(..) | ValueKind::Undef(..) | todo!()
+      ValueKind::Integer(..)
+        | ValueKind::ZeroInit(..)
+        | ValueKind::Undef(..)
+        | ValueKind::Alloc(..)
     )
   }
 
@@ -135,6 +142,11 @@ pub enum ValueKind {
   Aggregate(Aggregate),
   Alloc(Alloc),
   GlobalAlloc(GlobalAlloc),
+  Load(Load),
+  Store(Store),
+  GetPtr(GetPtr),
+  Binary(Binary),
+  Unary(Unary),
 }
 
 /// Bidirectional reference between `Value`s and `Instruction`s.

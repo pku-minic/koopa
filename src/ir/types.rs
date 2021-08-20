@@ -1,7 +1,6 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
-use std::rc::Rc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::{cmp, fmt};
 
 /// Kind of type.
@@ -43,7 +42,7 @@ impl fmt::Display for TypeKind {
 
 /// Types in Koopa.
 #[derive(Hash, Clone, Eq)]
-pub struct Type(Rc<TypeKind>);
+pub struct Type(Arc<TypeKind>);
 
 lazy_static! {
   /// Pool of all created types.
@@ -59,7 +58,7 @@ impl Type {
       .get(&type_data)
       .cloned()
       .unwrap_or_else(|| {
-        let k = Type(Rc::new(type_data));
+        let k = Type(Arc::new(type_data));
         TYPES.lock().unwrap().insert(type_data, k);
         k
       })
@@ -77,6 +76,7 @@ impl Type {
 
   /// Gets an array type.
   pub fn get_array(base: Type, len: usize) -> Type {
+    debug_assert!(len != 0, "`len` can not be zero!");
     Type::get_type(TypeKind::Array(base, len))
   }
 
@@ -98,11 +98,17 @@ impl Type {
 
 impl cmp::PartialEq for Type {
   fn eq(&self, other: &Self) -> bool {
-    Rc::ptr_eq(&self.0, &other.0)
+    Arc::ptr_eq(&self.0, &other.0)
   }
 }
 
 impl fmt::Display for Type {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", self.0)
+  }
+}
+
+impl fmt::Debug for Type {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", self.0)
   }

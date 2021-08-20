@@ -7,9 +7,9 @@ pub struct Integer {
 }
 
 impl Integer {
-  todo!("pool");
+  // TODO: pool
   /// Creates an integer constant with value `value`.
-  /// 
+  ///
   /// The type of the created integer constant will be `i32`.
   pub fn new(value: i32) -> ValueRc {
     Value::new(
@@ -28,9 +28,9 @@ impl Integer {
 pub struct ZeroInit;
 
 impl ZeroInit {
-  todo!("pool");
+  // TODO: pool
   /// Creates a zero initializer.
-  /// 
+  ///
   /// The type of the created zero initializer will be `ty`.
   pub fn new(ty: Type) -> ValueRc {
     Value::new(ty, ValueKind::ZeroInit(ZeroInit))
@@ -41,9 +41,9 @@ impl ZeroInit {
 pub struct Undef;
 
 impl Undef {
-  todo!("pool");
+  // TODO: pool
   /// Creates a undefined value.
-  /// 
+  ///
   /// The type of the created undefined value will be `ty`.
   pub fn new(ty: Type) -> ValueRc {
     Value::new(ty, ValueKind::Undef(Undef))
@@ -60,7 +60,7 @@ pub struct Aggregate {
 impl Aggregate {
   /// Creates an aggregate with elements `elems`.
   ///
-  /// The type of the created aggregate will be `(elems[0])[elems.len]`.
+  /// The type of the created aggregate will be `(elems[0].ty)[elems.len]`.
   pub fn new(elems: Vec<ValueRc>) -> ValueRc {
     // element list should not be empty
     debug_assert!(!elems.is_empty(), "`elem` is empty!");

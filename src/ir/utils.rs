@@ -38,7 +38,7 @@ unsafe impl<T: ?Sized> PointerOps for WeakPointerOps<Weak<T>> {
   }
 
   #[inline]
-  unsafe fn into_raw(&self, ptr: Weak<T>) -> *const T {
+  fn into_raw(&self, ptr: Weak<T>) -> *const T {
     ptr.into_raw()
   }
 }
