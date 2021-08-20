@@ -72,14 +72,15 @@ impl Aggregate {
       "type mismatch in `elem`!"
     );
     // create value
-    Value::new_with_init(
-      Type::get_array(*elems[0].borrow().ty(), elems.len()),
-      |user| {
-        ValueKind::Aggregate(Aggregate {
-          elems: elems.into_iter().map(|e| Use::new(e, user)).collect(),
-        })
-      },
-    )
+    let ty = Type::get_array(elems[0].borrow().ty().clone(), elems.len());
+    Value::new_with_init(ty, |user| {
+      ValueKind::Aggregate(Aggregate {
+        elems: elems
+          .into_iter()
+          .map(|e| Use::new(e, user.clone()))
+          .collect(),
+      })
+    })
   }
 
   /// Gets the elements in aggregate.

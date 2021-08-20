@@ -26,14 +26,15 @@ impl fmt::Display for TypeKind {
       TypeKind::Array(t, len) => write!(f, "{}[{}]", t, len),
       TypeKind::Pointer(t) => write!(f, "{}*", t),
       TypeKind::Function(ret, args) => {
-        write!(f, "{}(", ret);
-        args.iter().fold(true, |first, t| {
+        write!(f, "{}(", ret)?;
+        let mut first = true;
+        for arg in args.iter() {
           if !first {
-            write!(f, ", ");
+            write!(f, ", ")?;
           }
-          write!(f, "{}", t);
-          false
-        });
+          write!(f, "{}", arg)?;
+          first = false;
+        }
         write!(f, ")")
       }
     }
@@ -52,16 +53,12 @@ lazy_static! {
 impl Type {
   /// Gets a specific type.
   pub fn get_type(type_data: TypeKind) -> Type {
-    TYPES
-      .lock()
-      .unwrap()
-      .get(&type_data)
-      .cloned()
-      .unwrap_or_else(|| {
-        let k = Type(Arc::new(type_data));
-        TYPES.lock().unwrap().insert(type_data, k);
-        k
-      })
+    let mut types = TYPES.lock().unwrap();
+    types.get(&type_data).cloned().unwrap_or_else(|| {
+      let k = Type(Arc::new(type_data.clone()));
+      types.insert(type_data, k.clone());
+      k
+    })
   }
 
   /// Gets an `i32` type.

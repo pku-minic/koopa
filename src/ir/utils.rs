@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::rc::Weak;
 
 /// `PointerOps` that implements `Weak<T>`.
-pub(crate) struct WeakPointerOps<T>(PhantomData<T>);
+pub struct WeakPointerOps<T>(PhantomData<T>);
 
 impl<T> WeakPointerOps<T> {
   #[inline]
