@@ -1,93 +1,118 @@
+use crate::ir::instructions::*;
 use crate::ir::types::Type;
 use crate::ir::utils::{intrusive_adapter, WeakPointerOps};
-use crate::ir::{NodeRc, NodeRef};
+use crate::ir::values::*;
 use intrusive_collections::{LinkedList, LinkedListLink};
+use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 /// Value in Koopa IR.
 ///
 /// A value can be used by other users.
-pub trait Value {
-  /// Gets use list of the current `Value`.
-  fn uses(&self) -> &LinkedList<ValueDataAdapter>;
+pub struct Value {
+  link: LinkedListLink,
+  uses: LinkedList<UseAdapter>,
+  ty: Type,
+  kind: ValueKind,
+}
 
-  /// Gets the type of the current `Value`.
-  fn ty(&self) -> &Type;
+/// Rc of `Value`.
+///
+/// Used when a type has ownership of `Value`.
+pub type ValueRc = Rc<RefCell<Value>>;
+
+/// Reference of `Value`.
+///
+/// Used when a type only needs to refer to `Value`.
+pub type ValueRef = Weak<RefCell<Value>>;
+
+impl Value {
+  pub(crate) fn new(ty: Type, kind: ValueKind) -> Self {
+    Value {
+      link: LinkedListLink::new(),
+      uses: LinkedList::new(UseAdapter::new()),
+      ty: ty,
+      kind: kind,
+    }
+  }
+
+  /// Gets use list of the current `Value`.
+  pub fn uses(&self) -> &LinkedList<UseAdapter> {
+    &self.uses
+  }
 
   /// Adds use to the current `Value`.
-  fn add_use(&mut self, u: Weak<Use>);
+  pub fn add_use(&mut self, u: Weak<Use>) {
+    self.uses.push_back(u);
+  }
 
   /// Removes the specific use `u` from the current `Value`.
   ///
   /// Undefined if `u` is not in the use list.
-  fn remove_use(&mut self, u: Weak<Use>);
-
-  /// Replaces all uses of the current `Value` to another `Value`.
-  fn replace_all_uses_with(&mut self, value: NodeRc);
-}
-
-/// User in Koopa IR.
-///
-/// A user can use other values.
-pub trait User: Value {
-  /// Gets the operands of the current value.
-  fn operands(&self) -> &[Rc<Use>];
-}
-
-/// Data of `Value`s.
-pub struct ValueData {
-  uses: LinkedList<ValueDataAdapter>, // TODO: intrusive linked list
-  ty: Type,
-}
-
-intrusive_adapter! {
-  pub ValueDataAdapter = Weak<Use> [WeakPointerOps]:
-      Use { link: LinkedListLink }
-}
-
-impl ValueData {
-  pub fn new(ty: Type) -> Self {
-    ValueData {
-      uses: LinkedList::new(ValueDataAdapter::new()),
-      ty: ty,
-    }
-  }
-}
-
-impl Value for ValueData {
-  fn uses(&self) -> &LinkedList<ValueDataAdapter> {
-    &self.uses
-  }
-
-  fn ty(&self) -> &Type {
-    &self.ty
-  }
-
-  fn add_use(&mut self, u: Weak<Use>) {
-    self.uses.push_back(u);
-  }
-
-  fn remove_use(&mut self, u: Weak<Use>) {
+  pub fn remove_use(&mut self, u: Weak<Use>) {
     self.uses.cursor_mut_from_ptr(u.as_ptr()).remove();
   }
 
-  fn replace_all_uses_with(&mut self, value: NodeRc) {
+  /// Replaces all uses of the current `Value` to another `Value`.
+  pub fn replace_all_uses_with(&mut self, value: ValueRc) {
+    debug_assert!(!std::ptr::eq(value.as_ptr(), self), "`value` ");
     while let Some(u) = self.uses.front_mut().get() {
       u.set_value(value);
     }
   }
+
+  /// Gets the type of the current `Value`.
+  pub fn ty(&self) -> &Type {
+    &self.ty
+  }
+
+  /// Sets the type of the current `Value`.
+  pub fn set_ty(&mut self, ty: Type) {
+    self.ty = ty
+  }
+
+  /// Gets the kind of the current `Value`.
+  pub fn kind(&self) -> &ValueKind {
+    &self.kind
+  }
+
+  /// Gets the mutable kind of the current `Value`.
+  pub fn kind_mut(&mut self) -> &mut ValueKind {
+    &mut self.kind
+  }
+
+  /// Checks if the current `Value` is a user.
+  pub fn is_user(&self) -> bool {
+    !matches!(
+      self.kind,
+      ValueKind::Integer(..) | ValueKind::ZeroInit(..) | ValueKind::Undef(..) | todo!()
+    )
+  }
+}
+
+/// All supported values.
+pub enum ValueKind {
+  Integer(Integer),
+  ZeroInit(ZeroInit),
+  Undef(Undef),
+  Aggregate(Aggregate),
+  Instruction(Instruction),
 }
 
 /// Bidirectional reference between `Value`s and `Instruction`s.
 pub struct Use {
   link: LinkedListLink,
-  value: NodeRc,
-  user: NodeRef,
+  value: ValueRc,
+  user: ValueRef,
+}
+
+intrusive_adapter! {
+  UseAdapter = Weak<Use> [WeakPointerOps]: Use { link: LinkedListLink }
 }
 
 impl Use {
   /// Creates a new `Rc` of `Use`.
-  pub fn new(value: NodeRc, user: NodeRef) -> Rc<Self> {
+  pub fn new(value: ValueRc, user: ValueRef) -> Rc<Self> {
     debug_assert!(
       user.upgrade().unwrap().borrow().is_user(),
       "`user` is not a `User`!"
@@ -113,17 +138,17 @@ impl Use {
   }
 
   /// Gets the value that the current use holds.
-  pub fn value(&self) -> &NodeRc {
+  pub fn value(&self) -> &ValueRc {
     &self.value
   }
 
   /// Gets the user that the current use holds.
-  pub fn user(&self) -> &NodeRef {
+  pub fn user(&self) -> &ValueRef {
     &self.user
   }
 
   /// Sets the value that the current use holds.
-  pub fn set_value(&mut self, value: NodeRc) {
+  pub fn set_value(&mut self, value: ValueRc) {
     self.value.borrow_mut().remove_use(Weak::from_raw(self));
     self.value = value;
     self.value.borrow_mut().add_use(Weak::from_raw(self));
@@ -134,46 +159,4 @@ impl Drop for Use {
   fn drop(&mut self) {
     self.value.borrow_mut().remove_use(Weak::from_raw(self));
   }
-}
-
-/// Implements `Value` trait for the specific type.
-#[macro_export]
-macro_rules! impl_value {
-  ($name:ident, $data:tt) => {
-    impl $crate::ir::core::Value for $name {
-      #[inline]
-      fn uses(&self) -> &intrusive_collections::LinkedList<$crate::ir::core::ValueDataAdapter> {
-        self.$data.uses()
-      }
-      #[inline]
-      fn ty(&self) -> &Type {
-        self.$data.ty()
-      }
-      #[inline]
-      fn add_use(&mut self, u: std::rc::Weak<$crate::ir::core::Use>) {
-        self.$data.add_use(u);
-      }
-      #[inline]
-      fn remove_use(&mut self, u: std::rc::Weak<$crate::ir::core::Use>) {
-        self.$data.remove_use(u);
-      }
-      #[inline]
-      fn replace_all_uses_with(&mut self, value: $crate::ir::NodeRc) {
-        self.$data.replace_all_uses_with(value);
-      }
-    }
-  };
-}
-
-/// Implements `User` trait for the specific type.
-#[macro_export]
-macro_rules! impl_user {
-  ($name:ident, $operands:tt) => {
-    impl $crate::ir::core::User for $name {
-      #[inline]
-      fn operands(&self) -> &[Rc<Use>] {
-        &self.$operands
-      }
-    }
-  };
 }
