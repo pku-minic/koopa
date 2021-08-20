@@ -1,6 +1,5 @@
-use crate::ir::core::{unwrap_kind, Use, Value, ValueKind, ValueRc};
+use crate::ir::core::{Use, UseRc, Value, ValueKind, ValueRc};
 use crate::ir::types::Type;
-use std::rc::Rc;
 
 /// Integer constant.
 pub struct Integer {
@@ -9,6 +8,9 @@ pub struct Integer {
 
 impl Integer {
   todo!("pool");
+  /// Creates an integer constant with value `value`.
+  /// 
+  /// The type of the created integer constant will be `i32`.
   pub fn new(value: i32) -> ValueRc {
     Value::new(
       Type::get_i32(),
@@ -27,6 +29,9 @@ pub struct ZeroInit;
 
 impl ZeroInit {
   todo!("pool");
+  /// Creates a zero initializer.
+  /// 
+  /// The type of the created zero initializer will be `ty`.
   pub fn new(ty: Type) -> ValueRc {
     Value::new(ty, ValueKind::ZeroInit(ZeroInit))
   }
@@ -37,6 +42,9 @@ pub struct Undef;
 
 impl Undef {
   todo!("pool");
+  /// Creates a undefined value.
+  /// 
+  /// The type of the created undefined value will be `ty`.
   pub fn new(ty: Type) -> ValueRc {
     Value::new(ty, ValueKind::Undef(Undef))
   }
@@ -46,10 +54,13 @@ impl Undef {
 ///
 /// This 'value' is actually an user.
 pub struct Aggregate {
-  elems: Vec<Rc<Use>>,
+  elems: Vec<UseRc>,
 }
 
 impl Aggregate {
+  /// Creates an aggregate with elements `elems`.
+  ///
+  /// The type of the created aggregate will be `(elems[0])[elems.len]`.
   pub fn new(elems: Vec<ValueRc>) -> ValueRc {
     // element list should not be empty
     debug_assert!(!elems.is_empty(), "`elem` is empty!");
@@ -62,11 +73,17 @@ impl Aggregate {
     );
     // create value
     Value::new_with_init(
-      *elems[0].borrow().ty(),
-      ValueKind::Aggregate(Aggregate { elems: vec![] }),
-      |user, kind| {
-        unwrap_kind!(kind, Aggregate).elems = elems.into_iter().map(|e| Use::new(e, user)).collect()
+      Type::get_array(*elems[0].borrow().ty(), elems.len()),
+      |user| {
+        ValueKind::Aggregate(Aggregate {
+          elems: elems.into_iter().map(|e| Use::new(e, user)).collect(),
+        })
       },
     )
+  }
+
+  /// Gets the elements in aggregate.
+  pub fn elems(&self) -> &[UseRc] {
+    &self.elems
   }
 }
