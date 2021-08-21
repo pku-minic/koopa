@@ -4,7 +4,7 @@ use crate::ir::types::Type;
 use crate::ir::utils::{intrusive_adapter, WeakPointerOps};
 use crate::ir::values::*;
 use intrusive_collections::{LinkedList, LinkedListLink};
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell, RefMut};
 use std::mem::MaybeUninit;
 use std::rc::{Rc, Weak};
 
@@ -13,10 +13,7 @@ use std::rc::{Rc, Weak};
 /// A value can be used by other users.
 pub struct Value {
   link: LinkedListLink,
-  uses: LinkedList<UseAdapter>,
-  ty: Type,
-  bb: Option<BasicBlockRef>,
-  kind: ValueKind,
+  inner: RefCell<ValueInner>,
 }
 
 intrusive_adapter!(pub(crate) ValueAdapter = ValueRc: Value { link: LinkedListLink });
@@ -24,40 +21,61 @@ intrusive_adapter!(pub(crate) ValueAdapter = ValueRc: Value { link: LinkedListLi
 /// Rc of `Value`.
 ///
 /// Used when a type has ownership of `Value`.
-pub type ValueRc = Rc<RefCell<Value>>;
+pub type ValueRc = Rc<Value>;
 
 /// Reference of `Value`.
 ///
 /// Used when a type only needs to refer to `Value`.
-pub type ValueRef = Weak<RefCell<Value>>;
+pub type ValueRef = Weak<Value>;
 
 impl Value {
   pub(crate) fn new(ty: Type, kind: ValueKind) -> ValueRc {
-    Rc::new(RefCell::new(Value {
+    Rc::new(Value {
       link: LinkedListLink::new(),
-      uses: LinkedList::new(UseAdapter::new()),
-      ty: ty,
-      bb: None,
-      kind: kind,
-    }))
+      inner: RefCell::new(ValueInner {
+        uses: LinkedList::new(UseAdapter::new()),
+        ty: ty,
+        bb: None,
+        kind: kind,
+      }),
+    })
   }
 
   pub(crate) fn new_with_init<F>(ty: Type, init: F) -> ValueRc
   where
     F: FnOnce(ValueRef) -> ValueKind,
   {
-    let value = Rc::new(RefCell::new(Value {
+    let value = Rc::new(Value {
       link: LinkedListLink::new(),
-      uses: LinkedList::new(UseAdapter::new()),
-      ty: ty,
-      bb: None,
-      kind: unsafe { MaybeUninit::uninit().assume_init() },
-    }));
+      inner: RefCell::new(ValueInner {
+        uses: LinkedList::new(UseAdapter::new()),
+        ty: ty,
+        bb: None,
+        kind: unsafe { MaybeUninit::uninit().assume_init() },
+      }),
+    });
     let user = Rc::downgrade(&value);
     value.borrow_mut().kind = init(user);
     value
   }
 
+  pub fn borrow(&self) -> Ref<'_, ValueInner> {
+    self.inner.borrow()
+  }
+
+  pub fn borrow_mut(&self) -> RefMut<'_, ValueInner> {
+    self.inner.borrow_mut()
+  }
+}
+
+pub struct ValueInner {
+  uses: LinkedList<UseAdapter>,
+  ty: Type,
+  bb: Option<BasicBlockRef>,
+  kind: ValueKind,
+}
+
+impl ValueInner {
   /// Gets use list of the current `Value`.
   pub fn uses(&self) -> &LinkedList<UseAdapter> {
     &self.uses
@@ -72,17 +90,22 @@ impl Value {
   ///
   /// Undefined if `u` is not in the use list.
   pub fn remove_use(&mut self, u: UseRef) {
-    self.uses.cursor_mut_from_ptr(u.as_ptr()).remove();
+    unsafe {
+      self.uses.cursor_mut_from_ptr(u.as_ptr()).remove();
+    }
   }
 
   /// Replaces all uses of the current `Value` to another `Value`.
   pub fn replace_all_uses_with(&mut self, value: ValueRc) {
     debug_assert!(
-      !std::ptr::eq(value.as_ptr(), self),
+      !std::ptr::eq(&value.borrow().uses, &self.uses),
       "`value` can not be the same as `self`!"
     );
-    while let Some(u) = self.uses.front_mut().get() {
-      u.set_value(value);
+    while let Some(u) = self.uses.front().clone_pointer() {
+      // TODO: Use with RefCell
+      Rc::get_mut(&mut u.upgrade().unwrap())
+        .unwrap()
+        .set_value(value.clone());
     }
   }
 
@@ -119,13 +142,13 @@ impl Value {
   /// Checks if the current `Value` is a user.
   pub fn is_user(&self) -> bool {
     todo!();
-    !matches!(
-      self.kind,
-      ValueKind::Integer(..)
-        | ValueKind::ZeroInit(..)
-        | ValueKind::Undef(..)
-        | ValueKind::Alloc(..)
-    )
+    // !matches!(
+    //   self.kind,
+    //   ValueKind::Integer(..)
+    //     | ValueKind::ZeroInit(..)
+    //     | ValueKind::Undef(..)
+    //     | ValueKind::Alloc(..)
+    // )
   }
 
   /// Checks if the current `Value` is an instruction.
@@ -157,7 +180,7 @@ pub struct Use {
 }
 
 intrusive_adapter! {
-  UseAdapter = UseRef [WeakPointerOps]: Use { link: LinkedListLink }
+  pub UseAdapter = UseRef [WeakPointerOps]: Use { link: LinkedListLink }
 }
 
 /// Rc of `Use`.
@@ -179,7 +202,7 @@ impl Use {
     );
     let u = Rc::new(Use {
       link: LinkedListLink::new(),
-      value: value,
+      value: value.clone(),
       user: user,
     });
     value.borrow_mut().add_use(Rc::downgrade(&u));
@@ -190,8 +213,8 @@ impl Use {
   pub fn clone(&self) -> UseRc {
     let u = Rc::new(Use {
       link: LinkedListLink::new(),
-      value: self.value,
-      user: self.user,
+      value: self.value.clone(),
+      user: self.user.clone(),
     });
     self.value.borrow_mut().add_use(Rc::downgrade(&u));
     u
@@ -209,14 +232,23 @@ impl Use {
 
   /// Sets the value that the current use holds.
   pub fn set_value(&mut self, value: ValueRc) {
-    self.value.borrow_mut().remove_use(Weak::from_raw(self));
+    self
+      .value
+      .borrow_mut()
+      .remove_use(unsafe { Weak::from_raw(self) });
     self.value = value;
-    self.value.borrow_mut().add_use(Weak::from_raw(self));
+    self
+      .value
+      .borrow_mut()
+      .add_use(unsafe { Weak::from_raw(self) });
   }
 }
 
 impl Drop for Use {
   fn drop(&mut self) {
-    self.value.borrow_mut().remove_use(Weak::from_raw(self));
+    self
+      .value
+      .borrow_mut()
+      .remove_use(unsafe { Weak::from_raw(self) });
   }
 }
