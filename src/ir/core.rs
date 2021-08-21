@@ -166,6 +166,12 @@ pub enum ValueKind {
   GetPtr(GetPtr),
   Binary(Binary),
   Unary(Unary),
+  Branch(Branch),
+  Jump(Jump),
+  Call(Call),
+  Return(Return),
+  ArgRef(ArgRef),
+  Phi(Phi),
 }
 
 /// Bidirectional reference between `Value`s and `Instruction`s.
