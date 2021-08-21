@@ -3,5 +3,3 @@ pub mod instructions;
 pub mod structs;
 pub mod types;
 pub mod values;
-
-mod utils;
