@@ -4,7 +4,7 @@ use crate::ir::types::Type;
 use crate::ir::utils::{intrusive_adapter, WeakPointerOps};
 use crate::ir::values::*;
 use intrusive_collections::{LinkedList, LinkedListLink};
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::mem::MaybeUninit;
 use std::rc::{Rc, Weak};
 
@@ -89,9 +89,9 @@ impl ValueInner {
   /// Removes the specific use `u` from the current `Value`.
   ///
   /// Undefined if `u` is not in the use list.
-  fn remove_use(&mut self, u: UseRef) {
+  fn remove_use(&mut self, u: &Use) {
     unsafe {
-      self.uses.cursor_mut_from_ptr(u.as_ptr()).remove();
+      self.uses.cursor_mut_from_ptr(u).remove();
     }
   }
 
@@ -102,10 +102,7 @@ impl ValueInner {
       "`value` can not be the same as `self`!"
     );
     while let Some(u) = self.uses.front().clone_pointer() {
-      // TODO: Use with RefCell
-      Rc::get_mut(&mut u.upgrade().unwrap())
-        .unwrap()
-        .set_value(value.clone());
+      u.upgrade().unwrap().set_value(value.clone());
     }
   }
 
@@ -175,7 +172,7 @@ pub enum ValueKind {
 /// Bidirectional reference between `Value`s and `Instruction`s.
 pub struct Use {
   link: LinkedListLink,
-  value: ValueRc,
+  value: Cell<Option<ValueRc>>,
   user: ValueRef,
 }
 
@@ -202,16 +199,18 @@ impl Use {
     );
     let u = Rc::new(Use {
       link: LinkedListLink::new(),
-      value: value.clone(),
+      value: Cell::new(Some(value.clone())),
       user: user,
     });
     value.borrow_mut().add_use(Rc::downgrade(&u));
     u
   }
 
-  /// Gets the value that the current use holds.
-  pub fn value(&self) -> &ValueRc {
-    &self.value
+  /// Gets the clone of value that the current use holds.
+  pub fn value(&self) -> ValueRc {
+    let v = self.value.take();
+    self.value.set(v.clone());
+    v.unwrap()
   }
 
   /// Gets the user that the current use holds.
@@ -220,24 +219,17 @@ impl Use {
   }
 
   /// Sets the value that the current use holds.
-  pub fn set_value(&mut self, value: ValueRc) {
-    self
-      .value
-      .borrow_mut()
-      .remove_use(unsafe { Weak::from_raw(self) });
-    self.value = value;
-    self
-      .value
-      .borrow_mut()
-      .add_use(unsafe { Weak::from_raw(self) });
+  pub fn set_value(&self, value: ValueRc) {
+    let old_val = self.value.replace(Some(value.clone())).unwrap();
+    old_val.borrow_mut().remove_use(self);
+    value.borrow_mut().add_use(unsafe { Weak::from_raw(self) });
   }
 }
 
 impl Drop for Use {
   fn drop(&mut self) {
-    self
-      .value
-      .borrow_mut()
-      .remove_use(unsafe { Weak::from_raw(self) });
+    let s = &*self;
+    let value = s.value.take().unwrap();
+    value.borrow_mut().remove_use(s);
   }
 }
