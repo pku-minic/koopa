@@ -82,14 +82,14 @@ impl ValueInner {
   }
 
   /// Adds use to the current `Value`.
-  pub fn add_use(&mut self, u: UseRef) {
+  fn add_use(&mut self, u: UseRef) {
     self.uses.push_back(u);
   }
 
   /// Removes the specific use `u` from the current `Value`.
   ///
   /// Undefined if `u` is not in the use list.
-  pub fn remove_use(&mut self, u: UseRef) {
+  fn remove_use(&mut self, u: UseRef) {
     unsafe {
       self.uses.cursor_mut_from_ptr(u.as_ptr()).remove();
     }
@@ -206,17 +206,6 @@ impl Use {
       user: user,
     });
     value.borrow_mut().add_use(Rc::downgrade(&u));
-    u
-  }
-
-  /// Clones the current `Use` as a `Rc` of `Use`.
-  pub fn clone(&self) -> UseRc {
-    let u = Rc::new(Use {
-      link: LinkedListLink::new(),
-      value: self.value.clone(),
-      user: self.user.clone(),
-    });
-    self.value.borrow_mut().add_use(Rc::downgrade(&u));
     u
   }
 
