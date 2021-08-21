@@ -1,9 +1,8 @@
 use crate::ir::instructions::*;
 use crate::ir::structs::BasicBlockRef;
 use crate::ir::types::Type;
-use crate::ir::utils::{intrusive_adapter, WeakPointerOps};
 use crate::ir::values::*;
-use intrusive_collections::{LinkedList, LinkedListLink};
+use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::mem::MaybeUninit;
 use std::rc::{Rc, Weak};
@@ -102,7 +101,7 @@ impl ValueInner {
       "`value` can not be the same as `self`!"
     );
     while let Some(u) = self.uses.front().clone_pointer() {
-      u.upgrade().unwrap().set_value(value.clone());
+      u.as_ref().set_value(value.clone());
     }
   }
 
@@ -176,34 +175,34 @@ pub struct Use {
   user: ValueRef,
 }
 
-intrusive_adapter! {
-  pub UseAdapter = UseRef [WeakPointerOps]: Use { link: LinkedListLink }
-}
+intrusive_adapter!(pub UseAdapter = UseRef: Use { link: LinkedListLink });
 
-/// Rc of `Use`.
+/// Box of `Use`.
 ///
 /// Used when a type has ownership of `Use`.
-pub type UseRc = Rc<Use>;
+pub type UseBox = Box<Use>;
 
 /// Reference of `Use`.
 ///
 /// Used when a type only needs to refer to `Use`.
-pub type UseRef = Weak<Use>;
+pub type UseRef = UnsafeRef<Use>;
 
 impl Use {
   /// Creates a new `Rc` of `Use`.
-  pub fn new(value: ValueRc, user: ValueRef) -> UseRc {
+  pub fn new(value: ValueRc, user: ValueRef) -> UseBox {
     debug_assert!(
       user.upgrade().unwrap().borrow().is_user(),
       "`user` is not a `User`!"
     );
-    let u = Rc::new(Use {
+    let use_ptr = Box::into_raw(Box::new(Use {
       link: LinkedListLink::new(),
       value: Cell::new(Some(value.clone())),
       user: user,
-    });
-    value.borrow_mut().add_use(Rc::downgrade(&u));
-    u
+    }));
+    unsafe {
+      value.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr));
+      Box::from_raw(use_ptr)
+    }
   }
 
   /// Gets the clone of value that the current use holds.
@@ -222,7 +221,9 @@ impl Use {
   pub fn set_value(&self, value: ValueRc) {
     let old_val = self.value.replace(Some(value.clone())).unwrap();
     old_val.borrow_mut().remove_use(self);
-    value.borrow_mut().add_use(unsafe { Weak::from_raw(self) });
+    value
+      .borrow_mut()
+      .add_use(unsafe { UnsafeRef::from_raw(self) });
   }
 }
 

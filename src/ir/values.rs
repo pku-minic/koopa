@@ -1,4 +1,4 @@
-use crate::ir::core::{Use, UseRc, Value, ValueKind, ValueRc};
+use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
 use crate::ir::types::Type;
 
 /// Integer constant.
@@ -54,7 +54,7 @@ impl Undef {
 ///
 /// This 'value' is actually an user.
 pub struct Aggregate {
-  elems: Vec<UseRc>,
+  elems: Vec<UseBox>,
 }
 
 impl Aggregate {
@@ -84,7 +84,7 @@ impl Aggregate {
   }
 
   /// Gets the elements in aggregate.
-  pub fn elems(&self) -> &[UseRc] {
+  pub fn elems(&self) -> &[UseBox] {
     &self.elems
   }
 }
