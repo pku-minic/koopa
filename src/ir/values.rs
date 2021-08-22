@@ -74,13 +74,11 @@ impl Aggregate {
     debug_assert!(!elems.is_empty(), "`elems` must not be empty!");
     // check if all elements have the same type
     debug_assert!(
-      elems
-        .windows(2)
-        .all(|e| e[0].borrow().ty() == e[1].borrow().ty()),
+      elems.windows(2).all(|e| e[0].ty() == e[1].ty()),
       "type mismatch in `elems`!"
     );
     // check base type
-    let base = elems[0].borrow().ty().clone();
+    let base = elems[0].ty().clone();
     debug_assert!(
       !matches!(base.kind(), TypeKind::Unit),
       "base type must not be `unit`!"

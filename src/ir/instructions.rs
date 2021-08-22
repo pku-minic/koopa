@@ -28,7 +28,7 @@ impl GlobalAlloc {
   ///
   /// The type of the created allocation will be `(init.ty)*`.
   pub fn new(init: ValueRc) -> ValueRc {
-    let ty = Type::get_pointer(init.borrow().ty().clone());
+    let ty = Type::get_pointer(init.ty().clone());
     Value::new_with_init(ty, |user| {
       ValueKind::GlobalAlloc(GlobalAlloc {
         init: Use::new(Some(init), user),
@@ -53,7 +53,7 @@ impl Load {
   /// The type of `src` must be some kind of pointer (`ty*`),
   /// and the type of the created load will be `ty`.
   pub fn new(src: ValueRc) -> ValueRc {
-    let ty = match src.borrow().ty().kind() {
+    let ty = match src.ty().kind() {
       TypeKind::Pointer(ty) => ty.clone(),
       _ => panic!("expected a pointer type!"),
     };
@@ -80,7 +80,7 @@ impl Store {
   /// Creates a memory store with value `value` and destination `dest`.
   pub fn new(value: ValueRc, dest: ValueRc) -> ValueRc {
     debug_assert!(
-      &Type::get_pointer(value.borrow().ty().clone()) == dest.borrow().ty(),
+      &Type::get_pointer(value.ty().clone()) == dest.ty(),
       "the type of `dest` must be the pointer of `value`'s type!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
@@ -115,11 +115,11 @@ impl GetPtr {
   /// The type of the created `GetPtr` will be the dereference of `src`'s type.
   pub fn new(src: ValueRc, index: ValueRc, step: Option<usize>) -> ValueRc {
     debug_assert!(
-      matches!(index.borrow().ty().kind(), TypeKind::Int32),
+      matches!(index.ty().kind(), TypeKind::Int32),
       "``index` must be an integer!"
     );
     debug_assert!(step != Some(0), "`step` can not be zero");
-    let ty = match src.borrow().ty().kind() {
+    let ty = match src.ty().kind() {
       TypeKind::Array(ty, _) => ty.clone(),
       TypeKind::Pointer(ty) => ty.clone(),
       _ => panic!("`src` must be an array or a pointer!"),
@@ -157,28 +157,16 @@ pub struct Binary {
 }
 
 /// Supported binary operators.
+#[rustfmt::skip]
 pub enum BinaryOp {
   // comparison
-  NotEq,
-  Eq,
-  Gt,
-  Lt,
-  Ge,
-  Le,
+  NotEq, Eq, Gt, Lt, Ge, Le,
   // arithmetic
-  Add,
-  Sub,
-  Mul,
-  Div,
-  Mod,
+  Add, Sub, Mul, Div, Mod,
   // bitwise operations
-  And,
-  Or,
-  Xor,
+  And, Or, Xor,
   // shifting
-  Shl,
-  Shr,
-  Sar,
+  Shl, Shr, Sar,
 }
 
 impl Binary {
@@ -186,9 +174,9 @@ impl Binary {
   ///
   /// The type of the created `Binary` will be `(lhs.ty)`.
   pub fn new(op: BinaryOp, lhs: ValueRc, rhs: ValueRc) -> ValueRc {
-    let ty = lhs.borrow().ty().clone();
+    let ty = lhs.ty().clone();
     debug_assert!(
-      matches!(ty.kind(), TypeKind::Int32) && &ty == rhs.borrow().ty(),
+      matches!(ty.kind(), TypeKind::Int32) && &ty == rhs.ty(),
       "both `lhs` and `rhs` must be integer!"
     );
     Value::new_with_init(ty, |user| {
@@ -233,7 +221,7 @@ impl Unary {
   ///
   /// The type of the created `Unary` will be `(opr.ty)`.
   pub fn new(op: UnaryOp, opr: ValueRc) -> ValueRc {
-    let ty = opr.borrow().ty().clone();
+    let ty = opr.ty().clone();
     debug_assert!(
       matches!(ty.kind(), TypeKind::Int32),
       "`opr` must be integer!"
@@ -269,7 +257,7 @@ impl Branch {
   /// The type of `cond` must be integer.
   pub fn new(cond: ValueRc, true_bb: BasicBlockRef, false_bb: BasicBlockRef) -> ValueRc {
     debug_assert!(
-      matches!(cond.borrow().ty().kind(), TypeKind::Int32),
+      matches!(cond.ty().kind(), TypeKind::Int32),
       "`cond` must be integer!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
@@ -331,10 +319,7 @@ impl Call {
     let ty = match callee.upgrade().unwrap().ty().kind() {
       TypeKind::Function(ret, params) => {
         debug_assert!(
-          params
-            .iter()
-            .zip(args.iter())
-            .all(|v| v.0 == v.1.borrow().ty()),
+          params.iter().zip(args.iter()).all(|v| v.0 == v.1.ty()),
           "argument type mismatch"
         );
         ret.clone()
@@ -374,7 +359,7 @@ impl Return {
     debug_assert!(
       value
         .as_ref()
-        .map_or(true, |v| matches!(v.borrow().ty().kind(), TypeKind::Unit)),
+        .map_or(true, |v| matches!(v.ty().kind(), TypeKind::Unit)),
       "the type of `value` must not be `unit`!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
@@ -402,13 +387,11 @@ impl Phi {
     debug_assert!(!oprs.is_empty(), "`oprs` must not be empty!");
     // check if all operands have the same type
     debug_assert!(
-      oprs
-        .windows(2)
-        .all(|v| v[0].0.borrow().ty() == v[1].0.borrow().ty()),
+      oprs.windows(2).all(|v| v[0].0.ty() == v[1].0.ty()),
       "type mismatch in `oprs`!"
     );
     // check value type
-    let ty = oprs[0].0.borrow().ty().clone();
+    let ty = oprs[0].0.ty().clone();
     debug_assert!(
       !matches!(ty.kind(), TypeKind::Unit),
       "value type must not be `unit`!"

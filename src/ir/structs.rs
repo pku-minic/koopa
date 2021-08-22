@@ -60,7 +60,7 @@ impl Function {
       params
         .iter()
         .map(|p| {
-          let ty = p.borrow().ty().clone();
+          let ty = p.ty().clone();
           debug_assert!(
             !matches!(ty.kind(), TypeKind::Unit),
             "parameter type must not be `unit`!"
