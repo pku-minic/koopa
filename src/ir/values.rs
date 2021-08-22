@@ -1,5 +1,7 @@
 use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
 use crate::ir::types::{Type, TypeKind};
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 /// Integer constant.
 pub struct Integer {
@@ -7,15 +9,26 @@ pub struct Integer {
 }
 
 impl Integer {
-  // TODO: pool
+  thread_local! {
+    /// Pool of all created integer constants.
+    static POOL: RefCell<HashMap<i32, ValueRc>> = RefCell::new(HashMap::new());
+  }
+
   /// Creates an integer constant with value `value`.
   ///
   /// The type of the created integer constant will be `i32`.
   pub fn new(value: i32) -> ValueRc {
-    Value::new(
-      Type::get_i32(),
-      ValueKind::Integer(Integer { value: value }),
-    )
+    Self::POOL.with(|pool| {
+      let mut pool = pool.borrow_mut();
+      pool.get(&value).cloned().unwrap_or_else(|| {
+        let v = Value::new(
+          Type::get_i32(),
+          ValueKind::Integer(Integer { value: value }),
+        );
+        pool.insert(value, v.clone());
+        v
+      })
+    })
   }
 
   /// Gets the integer value.
@@ -28,7 +41,11 @@ impl Integer {
 pub struct ZeroInit;
 
 impl ZeroInit {
-  // TODO: pool
+  thread_local! {
+    /// Pool of all created zero initializers.
+    static POOL: RefCell<HashMap<Type, ValueRc>> = RefCell::new(HashMap::new());
+  }
+
   /// Creates a zero initializer.
   ///
   /// The type of the created zero initializer will be `ty`.
@@ -37,7 +54,14 @@ impl ZeroInit {
       !matches!(ty.kind(), TypeKind::Unit),
       "`ty` can not be unit!"
     );
-    Value::new(ty, ValueKind::ZeroInit(ZeroInit))
+    Self::POOL.with(|pool| {
+      let mut pool = pool.borrow_mut();
+      pool.get(&ty).cloned().unwrap_or_else(|| {
+        let v = Value::new(ty.clone(), ValueKind::ZeroInit(ZeroInit));
+        pool.insert(ty, v.clone());
+        v
+      })
+    })
   }
 }
 
@@ -45,7 +69,11 @@ impl ZeroInit {
 pub struct Undef;
 
 impl Undef {
-  // TODO: pool
+  thread_local! {
+    /// Pool of all created undefined values.
+    static POOL: RefCell<HashMap<Type, ValueRc>> = RefCell::new(HashMap::new());
+  }
+
   /// Creates a undefined value.
   ///
   /// The type of the created undefined value will be `ty`.
@@ -54,7 +82,14 @@ impl Undef {
       !matches!(ty.kind(), TypeKind::Unit),
       "`ty` can not be unit!"
     );
-    Value::new(ty, ValueKind::Undef(Undef))
+    Self::POOL.with(|pool| {
+      let mut pool = pool.borrow_mut();
+      pool.get(&ty).cloned().unwrap_or_else(|| {
+        let v = Value::new(ty.clone(), ValueKind::Undef(Undef));
+        pool.insert(ty, v.clone());
+        v
+      })
+    })
   }
 }
 
