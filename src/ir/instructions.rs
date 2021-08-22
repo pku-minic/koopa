@@ -260,8 +260,7 @@ impl Unary {
 /// Branching.
 pub struct Branch {
   cond: UseBox,
-  true_bb: BasicBlockRef,
-  false_bb: BasicBlockRef,
+  targets: [BasicBlockRef; 2],
 }
 
 impl Branch {
@@ -276,8 +275,7 @@ impl Branch {
     Value::new_with_init(Type::get_unit(), |user| {
       ValueKind::Branch(Branch {
         cond: Use::new(Some(cond), user),
-        true_bb: true_bb,
-        false_bb: false_bb,
+        targets: [true_bb, false_bb],
       })
     })
   }
@@ -289,12 +287,16 @@ impl Branch {
 
   /// Gets the true target basic block.
   pub fn true_bb(&self) -> &BasicBlockRef {
-    &self.true_bb
+    &self.targets[0]
   }
 
   /// Gets the false target basic block.
   pub fn false_bb(&self) -> &BasicBlockRef {
-    &self.false_bb
+    &self.targets[1]
+  }
+  /// Gets the target basic blocks.
+  pub fn targets(&self) -> &[BasicBlockRef] {
+    &self.targets
   }
 }
 
@@ -326,7 +328,28 @@ impl Call {
   ///
   /// The type of created call will be the return type of function `callee`.
   pub fn new(callee: FunctionRef, args: Vec<ValueRc>) -> ValueRc {
-    todo!("check argument type & get return type")
+    let ty = match callee.upgrade().unwrap().ty().kind() {
+      TypeKind::Function(ret, params) => {
+        debug_assert!(
+          params
+            .iter()
+            .zip(args.iter())
+            .all(|v| v.0 == v.1.borrow().ty()),
+          "argument type mismatch"
+        );
+        ret.clone()
+      }
+      _ => panic!("expected a function type"),
+    };
+    Value::new_with_init(ty, |user| {
+      ValueKind::Call(Call {
+        callee: callee,
+        args: args
+          .into_iter()
+          .map(|a| Use::new(Some(a), user.clone()))
+          .collect(),
+      })
+    })
   }
 
   /// Gets the callee.
@@ -342,18 +365,66 @@ impl Call {
 
 /// Function return.
 pub struct Return {
-  value: Option<UseBox>,
+  value: UseBox,
 }
 
 impl Return {
-  //
+  /// Creates a new return instruction.
+  pub fn new(value: Option<ValueRc>) -> ValueRc {
+    debug_assert!(
+      value
+        .as_ref()
+        .map_or(true, |v| matches!(v.borrow().ty().kind(), TypeKind::Unit)),
+      "the type of `value` must not be `unit`!"
+    );
+    Value::new_with_init(Type::get_unit(), |user| {
+      ValueKind::Return(Return {
+        value: Use::new(value, user),
+      })
+    })
+  }
+
+  /// Gets the return value.
+  pub fn value(&self) -> &UseBox {
+    &self.value
+  }
 }
 
 /// Phi function.
 pub struct Phi {
-  //
+  oprs: Vec<(UseBox, BasicBlockRef)>,
 }
 
 impl Phi {
-  //
+  /// Creates a new phi function.
+  pub fn new(oprs: Vec<(ValueRc, BasicBlockRef)>) -> ValueRc {
+    // operand list should not be empty
+    debug_assert!(!oprs.is_empty(), "`oprs` must not be empty!");
+    // check if all operands have the same type
+    debug_assert!(
+      oprs
+        .windows(2)
+        .all(|v| v[0].0.borrow().ty() == v[1].0.borrow().ty()),
+      "type mismatch in `oprs`!"
+    );
+    // check value type
+    let ty = oprs[0].0.borrow().ty().clone();
+    debug_assert!(
+      !matches!(ty.kind(), TypeKind::Unit),
+      "value type must not be `unit`!"
+    );
+    Value::new_with_init(ty, |user| {
+      ValueKind::Phi(Phi {
+        oprs: oprs
+          .into_iter()
+          .map(|v| (Use::new(Some(v.0), user.clone()), v.1))
+          .collect(),
+      })
+    })
+  }
+
+  /// Gets the operands (incoming values and incoming basic blocks).
+  pub fn oprs(&self) -> &[(UseBox, BasicBlockRef)] {
+    &self.oprs
+  }
 }
