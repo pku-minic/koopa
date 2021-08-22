@@ -10,7 +10,23 @@ pub struct Program {
 }
 
 impl Program {
-  //
+  /// Creates a new IR program.
+  pub fn new() -> Self {
+    Program {
+      vars: LinkedList::default(),
+      funcs: LinkedList::default(),
+    }
+  }
+
+  /// Gets the global variables.
+  pub fn vars(&self) -> &LinkedList<ValueAdapter> {
+    &self.vars
+  }
+
+  /// Gets the function definitions.
+  pub fn funcs(&self) -> &LinkedList<FunctionAdapter> {
+    &self.funcs
+  }
 }
 
 /// Represents a function.
@@ -23,7 +39,7 @@ pub struct Function {
 }
 
 intrusive_adapter! {
-  FunctionAdapter = FunctionRc: Function { link: LinkedListLink }
+  pub FunctionAdapter = FunctionRc: Function { link: LinkedListLink }
 }
 
 /// Rc of `Function`.
@@ -37,7 +53,36 @@ pub type FunctionRc = Rc<Function>;
 pub type FunctionRef = Weak<Function>;
 
 impl Function {
-  //
+  /// Creates a new function.
+  pub fn new(ty: Type, name: String, params: Vec<ValueRc>) -> FunctionRc {
+    Rc::new(Function {
+      link: LinkedListLink::new(),
+      ty: ty,
+      name: name,
+      params: params,
+      bbs: LinkedList::new(BasicBlockAdapter::new()),
+    })
+  }
+
+  /// Gets the type of the current function.
+  pub fn ty(&self) -> &Type {
+    &self.ty
+  }
+
+  /// Gets the function name.
+  pub fn name(&self) -> &str {
+    &self.name
+  }
+
+  /// Gets the parameter list.
+  pub fn params(&self) -> &[ValueRc] {
+    &self.params
+  }
+
+  /// Gets the basic block list.
+  pub fn bbs(&self) -> &LinkedList<BasicBlockAdapter> {
+    &self.bbs
+  }
 }
 
 /// Represents a basic block.
@@ -48,7 +93,7 @@ pub struct BasicBlock {
 }
 
 intrusive_adapter! {
-  BasicBlockAdapter = BasicBlockRc: BasicBlock { link: LinkedListLink }
+  pub BasicBlockAdapter = BasicBlockRc: BasicBlock { link: LinkedListLink }
 }
 
 /// Rc of `BasicBlock`.
@@ -62,5 +107,27 @@ pub type BasicBlockRc = Rc<BasicBlock>;
 pub type BasicBlockRef = Weak<BasicBlock>;
 
 impl BasicBlock {
-  //
+  /// Creates a new basic block.
+  pub fn new() -> BasicBlockRc {
+    Rc::new(BasicBlock {
+      link: LinkedListLink::new(),
+      preds: vec![],
+      insts: LinkedList::new(ValueAdapter::new()),
+    })
+  }
+
+  /// Gets the predecessor list.
+  pub fn preds(&self) -> &[BasicBlockRef] {
+    &self.preds
+  }
+
+  /// Gets the successors list.
+  pub fn succs(&self) -> &[BasicBlockRef] {
+    todo!()
+  }
+
+  /// Gets the instruction list.
+  pub fn insts(&self) -> &LinkedList<ValueAdapter> {
+    &self.insts
+  }
 }
