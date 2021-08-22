@@ -34,6 +34,7 @@ impl Value {
       link: LinkedListLink::new(),
       ty: ty,
       inner: RefCell::new(ValueInner {
+        name: None,
         uses: LinkedList::new(UseAdapter::new()),
         bb: None,
         kind: kind,
@@ -49,6 +50,7 @@ impl Value {
       link: LinkedListLink::new(),
       ty: ty,
       inner: RefCell::new(ValueInner {
+        name: None,
         uses: LinkedList::new(UseAdapter::new()),
         bb: None,
         kind: unsafe { MaybeUninit::uninit().assume_init() },
@@ -65,14 +67,14 @@ impl Value {
   }
 
   /// Immutably borrows the current value.
-  /// 
+  ///
   /// Panics if the value is currently mutably borrowed.
   pub fn borrow(&self) -> Ref<'_, ValueInner> {
     self.inner.borrow()
   }
 
   /// Mutably borrows the wrapped value.
-  /// 
+  ///
   /// Panics if the value is currently borrowed.
   pub fn borrow_mut(&self) -> RefMut<'_, ValueInner> {
     self.inner.borrow_mut()
@@ -80,12 +82,23 @@ impl Value {
 }
 
 pub struct ValueInner {
+  name: Option<String>,
   uses: LinkedList<UseAdapter>,
   bb: Option<BasicBlockRef>,
   kind: ValueKind,
 }
 
 impl ValueInner {
+  /// Gets the name of the current `Value`
+  pub fn name(&self) -> &Option<String> {
+    &self.name
+  }
+
+  /// Sets the name of the current `Value`
+  pub fn set_name(&mut self, name: Option<String>) {
+    self.name = name;
+  }
+
   /// Gets use list of the current `Value`.
   pub fn uses(&self) -> &LinkedList<UseAdapter> {
     &self.uses
