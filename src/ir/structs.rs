@@ -102,6 +102,7 @@ impl Function {
 /// Represents a basic block.
 pub struct BasicBlock {
   link: LinkedListLink,
+  name: Option<String>,
   preds: Vec<BasicBlockRef>,
   insts: LinkedList<ValueAdapter>,
 }
@@ -122,12 +123,18 @@ pub type BasicBlockRef = Weak<BasicBlock>;
 
 impl BasicBlock {
   /// Creates a new basic block.
-  pub fn new() -> BasicBlockRc {
+  pub fn new(name: Option<String>) -> BasicBlockRc {
     Rc::new(BasicBlock {
       link: LinkedListLink::new(),
+      name: name,
       preds: vec![],
       insts: LinkedList::new(ValueAdapter::new()),
     })
+  }
+
+  /// Gets the name.
+  pub fn name(&self) -> &Option<String> {
+    &self.name
   }
 
   /// Gets the predecessor list.
