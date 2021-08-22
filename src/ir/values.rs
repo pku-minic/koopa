@@ -71,19 +71,19 @@ impl Aggregate {
   /// The type of the created aggregate will be `(elems[0].ty)[elems.len]`.
   pub fn new(elems: Vec<ValueRc>) -> ValueRc {
     // element list should not be empty
-    debug_assert!(!elems.is_empty(), "`elem` is empty!");
+    debug_assert!(!elems.is_empty(), "`elems` must not be empty!");
     // check if all elements have the same type
     debug_assert!(
       elems
         .windows(2)
         .all(|e| e[0].borrow().ty() == e[1].borrow().ty()),
-      "type mismatch in `elem`!"
+      "type mismatch in `elems`!"
     );
     // check base type
     let base = elems[0].borrow().ty().clone();
     debug_assert!(
       !matches!(base.kind(), TypeKind::Unit),
-      "base type must not be unit!"
+      "base type must not be `unit`!"
     );
     // create value
     let ty = Type::get_array(base, elems.len());
