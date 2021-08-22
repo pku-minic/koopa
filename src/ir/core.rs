@@ -15,7 +15,7 @@ pub struct Value {
   inner: RefCell<ValueInner>,
 }
 
-intrusive_adapter!(pub(crate) ValueAdapter = ValueRc: Value { link: LinkedListLink });
+intrusive_adapter!(pub ValueAdapter = ValueRc: Value { link: LinkedListLink });
 
 /// Rc of `Value`.
 ///
