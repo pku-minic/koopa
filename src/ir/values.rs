@@ -1,5 +1,5 @@
 use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
-use crate::ir::types::Type;
+use crate::ir::types::{Type, TypeKind};
 
 /// Integer constant.
 pub struct Integer {
@@ -33,6 +33,10 @@ impl ZeroInit {
   ///
   /// The type of the created zero initializer will be `ty`.
   pub fn new(ty: Type) -> ValueRc {
+    debug_assert!(
+      !matches!(ty.kind(), TypeKind::Unit),
+      "`ty` can not be unit!"
+    );
     Value::new(ty, ValueKind::ZeroInit(ZeroInit))
   }
 }
@@ -46,6 +50,10 @@ impl Undef {
   ///
   /// The type of the created undefined value will be `ty`.
   pub fn new(ty: Type) -> ValueRc {
+    debug_assert!(
+      !matches!(ty.kind(), TypeKind::Unit),
+      "`ty` can not be unit!"
+    );
     Value::new(ty, ValueKind::Undef(Undef))
   }
 }
@@ -71,8 +79,14 @@ impl Aggregate {
         .all(|e| e[0].borrow().ty() == e[1].borrow().ty()),
       "type mismatch in `elem`!"
     );
+    // check base type
+    let base = elems[0].borrow().ty().clone();
+    debug_assert!(
+      !matches!(base.kind(), TypeKind::Unit),
+      "base type must not be unit!"
+    );
     // create value
-    let ty = Type::get_array(elems[0].borrow().ty().clone(), elems.len());
+    let ty = Type::get_array(base, elems.len());
     Value::new_with_init(ty, |user| {
       ValueKind::Aggregate(Aggregate {
         elems: elems
@@ -86,5 +100,28 @@ impl Aggregate {
   /// Gets the elements in aggregate.
   pub fn elems(&self) -> &[UseBox] {
     &self.elems
+  }
+}
+
+/// Function argument reference.
+pub struct ArgRef {
+  index: usize,
+}
+
+impl ArgRef {
+  /// Creates a argument reference with index `index`.
+  ///
+  /// The type of the created argument reference will be `ty`.
+  pub fn new(ty: Type, index: usize) -> ValueRc {
+    debug_assert!(
+      !matches!(ty.kind(), TypeKind::Unit),
+      "`ty` can not be unit!"
+    );
+    Value::new(ty, ValueKind::ArgRef(ArgRef { index: index }))
+  }
+
+  /// Gets the index.
+  pub fn index(&self) -> usize {
+    self.index
   }
 }
