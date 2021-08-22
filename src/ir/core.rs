@@ -12,6 +12,7 @@ use std::rc::{Rc, Weak};
 /// A value can be used by other users.
 pub struct Value {
   link: LinkedListLink,
+  ty: Type,
   inner: RefCell<ValueInner>,
 }
 
@@ -31,9 +32,9 @@ impl Value {
   pub(crate) fn new(ty: Type, kind: ValueKind) -> ValueRc {
     Rc::new(Value {
       link: LinkedListLink::new(),
+      ty: ty,
       inner: RefCell::new(ValueInner {
         uses: LinkedList::new(UseAdapter::new()),
-        ty: ty,
         bb: None,
         kind: kind,
       }),
@@ -46,9 +47,9 @@ impl Value {
   {
     let value = Rc::new(Value {
       link: LinkedListLink::new(),
+      ty: ty,
       inner: RefCell::new(ValueInner {
         uses: LinkedList::new(UseAdapter::new()),
-        ty: ty,
         bb: None,
         kind: unsafe { MaybeUninit::uninit().assume_init() },
       }),
@@ -58,10 +59,21 @@ impl Value {
     value
   }
 
+  /// Gets the type of the current `Value`.
+  pub fn ty(&self) -> &Type {
+    &self.ty
+  }
+
+  /// Immutably borrows the current value.
+  /// 
+  /// Panics if the value is currently mutably borrowed.
   pub fn borrow(&self) -> Ref<'_, ValueInner> {
     self.inner.borrow()
   }
 
+  /// Mutably borrows the wrapped value.
+  /// 
+  /// Panics if the value is currently borrowed.
   pub fn borrow_mut(&self) -> RefMut<'_, ValueInner> {
     self.inner.borrow_mut()
   }
@@ -69,7 +81,6 @@ impl Value {
 
 pub struct ValueInner {
   uses: LinkedList<UseAdapter>,
-  ty: Type,
   bb: Option<BasicBlockRef>,
   kind: ValueKind,
 }
@@ -105,11 +116,6 @@ impl ValueInner {
     while let Some(u) = self.uses.front().clone_pointer() {
       u.as_ref().set_value(value.clone());
     }
-  }
-
-  /// Gets the type of the current `Value`.
-  pub fn ty(&self) -> &Type {
-    &self.ty
   }
 
   /// Gets the parent basic block of the current `Value`.
