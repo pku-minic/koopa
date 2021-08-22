@@ -1,4 +1,5 @@
 use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
+use crate::ir::structs::{BasicBlockRef, FunctionRef};
 use crate::ir::types::{Type, TypeKind};
 
 /// Local memory allocation.
@@ -9,6 +10,10 @@ impl Alloc {
   ///
   /// The type of the created allocation will be `ty*`.
   pub fn new(ty: Type) -> ValueRc {
+    debug_assert!(
+      !matches!(ty.kind(), TypeKind::Unit),
+      "`ty` can not be unit!"
+    );
     Value::new(Type::get_pointer(ty), ValueKind::Alloc(Alloc))
   }
 }
@@ -254,46 +259,93 @@ impl Unary {
 
 /// Branching.
 pub struct Branch {
-  //
+  cond: UseBox,
+  true_bb: BasicBlockRef,
+  false_bb: BasicBlockRef,
 }
 
 impl Branch {
-  //
+  /// Creates a conditional branch.
+  ///
+  /// The type of `cond` must be integer.
+  pub fn new(cond: ValueRc, true_bb: BasicBlockRef, false_bb: BasicBlockRef) -> ValueRc {
+    debug_assert!(
+      matches!(cond.borrow().ty().kind(), TypeKind::Int32),
+      "`cond` must be integer!"
+    );
+    Value::new_with_init(Type::get_unit(), |user| {
+      ValueKind::Branch(Branch {
+        cond: Use::new(cond, user),
+        true_bb: true_bb,
+        false_bb: false_bb,
+      })
+    })
+  }
+
+  /// Gets the branch condition.
+  pub fn cond(&self) -> &UseBox {
+    &self.cond
+  }
+
+  /// Gets the true target basic block.
+  pub fn true_bb(&self) -> &BasicBlockRef {
+    &self.true_bb
+  }
+
+  /// Gets the false target basic block.
+  pub fn false_bb(&self) -> &BasicBlockRef {
+    &self.false_bb
+  }
 }
 
 /// Jumping.
 pub struct Jump {
-  //
+  target: BasicBlockRef,
 }
 
 impl Jump {
-  //
+  /// Creates a unconditional jump.
+  pub fn new(target: BasicBlockRef) -> ValueRc {
+    Value::new(Type::get_unit(), ValueKind::Jump(Jump { target: target }))
+  }
+
+  /// Gets the target basic block.
+  pub fn target(&self) -> &BasicBlockRef {
+    &self.target
+  }
 }
 
 /// Function call.
 pub struct Call {
-  //
+  callee: FunctionRef,
+  args: Vec<UseBox>,
 }
 
 impl Call {
-  //
+  /// Creates a function call.
+  ///
+  /// The type of created call will be the return type of function `callee`.
+  pub fn new(callee: FunctionRef, args: Vec<ValueRc>) -> ValueRc {
+    todo!("check argument type & get return type")
+  }
+
+  /// Gets the callee.
+  pub fn callee(&self) -> &FunctionRef {
+    &self.callee
+  }
+
+  /// Gets the argument list.
+  pub fn args(&self) -> &[UseBox] {
+    &self.args
+  }
 }
 
 /// Function return.
 pub struct Return {
-  //
+  value: Option<UseBox>,
 }
 
 impl Return {
-  //
-}
-
-/// Function argument reference.
-pub struct ArgRef {
-  //
-}
-
-impl ArgRef {
   //
 }
 
