@@ -1,6 +1,6 @@
-use lazy_static::lazy_static;
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 use std::{cmp, fmt};
 
 /// Kind of type.
@@ -43,21 +43,23 @@ impl fmt::Display for TypeKind {
 
 /// Types in Koopa.
 #[derive(Hash, Clone, Eq)]
-pub struct Type(Arc<TypeKind>);
-
-lazy_static! {
-  /// Pool of all created types.
-  static ref TYPES: Mutex<HashMap<TypeKind, Type>> = Mutex::new(HashMap::new());
-}
+pub struct Type(Rc<TypeKind>);
 
 impl Type {
+  thread_local! {
+    /// Pool of all created types.
+    static POOL: RefCell<HashMap<TypeKind, Type>> = RefCell::new(HashMap::new());
+  }
+
   /// Gets a specific type.
   pub fn get_type(type_data: TypeKind) -> Type {
-    let mut types = TYPES.lock().unwrap();
-    types.get(&type_data).cloned().unwrap_or_else(|| {
-      let k = Type(Arc::new(type_data.clone()));
-      types.insert(type_data, k.clone());
-      k
+    Self::POOL.with(|pool| {
+      let mut pool = pool.borrow_mut();
+      pool.get(&type_data).cloned().unwrap_or_else(|| {
+        let v = Type(Rc::new(type_data.clone()));
+        pool.insert(type_data, v.clone());
+        v
+      })
     })
   }
 
@@ -95,7 +97,7 @@ impl Type {
 
 impl cmp::PartialEq for Type {
   fn eq(&self, other: &Self) -> bool {
-    Arc::ptr_eq(&self.0, &other.0)
+    Rc::ptr_eq(&self.0, &other.0)
   }
 }
 
