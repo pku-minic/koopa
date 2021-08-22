@@ -137,19 +137,27 @@ impl ValueInner {
 
   /// Checks if the current `Value` is a user.
   pub fn is_user(&self) -> bool {
-    todo!();
-    // !matches!(
-    //   self.kind,
-    //   ValueKind::Integer(..)
-    //     | ValueKind::ZeroInit(..)
-    //     | ValueKind::Undef(..)
-    //     | ValueKind::Alloc(..)
-    // )
+    !matches!(
+      self.kind,
+      ValueKind::Integer(..)
+        | ValueKind::ZeroInit(..)
+        | ValueKind::Undef(..)
+        | ValueKind::ArgRef(..)
+        | ValueKind::Alloc(..)
+        | ValueKind::Jump(..)
+    )
   }
 
   /// Checks if the current `Value` is an instruction.
   pub fn is_inst(&self) -> bool {
-    todo!()
+    !matches!(
+      self.kind,
+      ValueKind::Integer(..)
+        | ValueKind::ZeroInit(..)
+        | ValueKind::Undef(..)
+        | ValueKind::Aggregate(..)
+        | ValueKind::ArgRef(..)
+    )
   }
 }
 
@@ -159,6 +167,7 @@ pub enum ValueKind {
   ZeroInit(ZeroInit),
   Undef(Undef),
   Aggregate(Aggregate),
+  ArgRef(ArgRef),
   Alloc(Alloc),
   GlobalAlloc(GlobalAlloc),
   Load(Load),
@@ -170,7 +179,6 @@ pub enum ValueKind {
   Jump(Jump),
   Call(Call),
   Return(Return),
-  ArgRef(ArgRef),
   Phi(Phi),
 }
 
