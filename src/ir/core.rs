@@ -95,9 +95,11 @@ impl ValueInner {
   }
 
   /// Replaces all uses of the current `Value` to another `Value`.
-  pub fn replace_all_uses_with(&mut self, value: ValueRc) {
+  pub fn replace_all_uses_with(&mut self, value: Option<ValueRc>) {
     debug_assert!(
-      !std::ptr::eq(&value.borrow().uses, &self.uses),
+      value
+        .as_ref()
+        .map_or(true, |v| !std::ptr::eq(&v.borrow().uses, &self.uses)),
       "`value` can not be the same as `self`!"
     );
     while let Some(u) = self.uses.front().clone_pointer() {
@@ -108,11 +110,6 @@ impl ValueInner {
   /// Gets the type of the current `Value`.
   pub fn ty(&self) -> &Type {
     &self.ty
-  }
-
-  /// Sets the type of the current `Value`.
-  pub fn set_ty(&mut self, ty: Type) {
-    self.ty = ty;
   }
 
   /// Gets the parent basic block of the current `Value`.
@@ -203,27 +200,27 @@ pub type UseRef = UnsafeRef<Use>;
 
 impl Use {
   /// Creates a new `Rc` of `Use`.
-  pub fn new(value: ValueRc, user: ValueRef) -> UseBox {
+  pub fn new(value: Option<ValueRc>, user: ValueRef) -> UseBox {
     debug_assert!(
       user.upgrade().unwrap().borrow().is_user(),
       "`user` is not a `User`!"
     );
     let use_ptr = Box::into_raw(Box::new(Use {
       link: LinkedListLink::new(),
-      value: Cell::new(Some(value.clone())),
+      value: Cell::new(value.clone()),
       user: user,
     }));
     unsafe {
-      value.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr));
+      value.map(|val| val.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr)));
       Box::from_raw(use_ptr)
     }
   }
 
   /// Gets the clone of value that the current use holds.
-  pub fn value(&self) -> ValueRc {
+  pub fn value(&self) -> Option<ValueRc> {
     let v = self.value.take();
     self.value.set(v.clone());
-    v.unwrap()
+    v
   }
 
   /// Gets the user that the current use holds.
@@ -232,19 +229,16 @@ impl Use {
   }
 
   /// Sets the value that the current use holds.
-  pub fn set_value(&self, value: ValueRc) {
-    let old_val = self.value.replace(Some(value.clone())).unwrap();
-    old_val.borrow_mut().remove_use(self);
-    value
-      .borrow_mut()
-      .add_use(unsafe { UnsafeRef::from_raw(self) });
+  pub fn set_value(&self, value: Option<ValueRc>) {
+    let old_val = self.value.replace(value.clone());
+    old_val.map(|v| v.borrow_mut().remove_use(self));
+    value.map(|v| v.borrow_mut().add_use(unsafe { UnsafeRef::from_raw(self) }));
   }
 }
 
 impl Drop for Use {
   fn drop(&mut self) {
     let s = &*self;
-    let value = s.value.take().unwrap();
-    value.borrow_mut().remove_use(s);
+    s.value.take().map(|v| v.borrow_mut().remove_use(s));
   }
 }
