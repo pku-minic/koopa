@@ -91,7 +91,7 @@ impl Aggregate {
       ValueKind::Aggregate(Aggregate {
         elems: elems
           .into_iter()
-          .map(|e| Use::new(e, user.clone()))
+          .map(|e| Use::new(Some(e), user.clone()))
           .collect(),
       })
     })

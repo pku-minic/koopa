@@ -31,7 +31,7 @@ impl GlobalAlloc {
     let ty = Type::get_pointer(init.borrow().ty().clone());
     Value::new_with_init(ty, |user| {
       ValueKind::GlobalAlloc(GlobalAlloc {
-        init: Use::new(init, user),
+        init: Use::new(Some(init), user),
       })
     })
   }
@@ -59,7 +59,7 @@ impl Load {
     };
     Value::new_with_init(ty, |user| {
       ValueKind::Load(Load {
-        src: Use::new(src, user),
+        src: Use::new(Some(src), user),
       })
     })
   }
@@ -85,8 +85,8 @@ impl Store {
     );
     Value::new_with_init(Type::get_unit(), |user| {
       ValueKind::Store(Store {
-        value: Use::new(value, user.clone()),
-        dest: Use::new(dest, user),
+        value: Use::new(Some(value), user.clone()),
+        dest: Use::new(Some(dest), user),
       })
     })
   }
@@ -126,8 +126,8 @@ impl GetPtr {
     };
     Value::new_with_init(ty, |user| {
       ValueKind::GetPtr(GetPtr {
-        src: Use::new(src, user.clone()),
-        index: Use::new(index, user),
+        src: Use::new(Some(src), user.clone()),
+        index: Use::new(Some(index), user),
         step: step,
       })
     })
@@ -194,8 +194,8 @@ impl Binary {
     Value::new_with_init(ty, |user| {
       ValueKind::Binary(Binary {
         op: op,
-        lhs: Use::new(lhs, user.clone()),
-        rhs: Use::new(rhs, user),
+        lhs: Use::new(Some(lhs), user.clone()),
+        rhs: Use::new(Some(rhs), user),
       })
     })
   }
@@ -241,7 +241,7 @@ impl Unary {
     Value::new_with_init(ty, |user| {
       ValueKind::Unary(Unary {
         op: op,
-        opr: Use::new(opr, user),
+        opr: Use::new(Some(opr), user),
       })
     })
   }
@@ -275,7 +275,7 @@ impl Branch {
     );
     Value::new_with_init(Type::get_unit(), |user| {
       ValueKind::Branch(Branch {
-        cond: Use::new(cond, user),
+        cond: Use::new(Some(cond), user),
         true_bb: true_bb,
         false_bb: false_bb,
       })
