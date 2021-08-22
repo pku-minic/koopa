@@ -1,5 +1,5 @@
 use crate::ir::core::{ValueAdapter, ValueRc};
-use crate::ir::types::Type;
+use crate::ir::types::{Type, TypeKind};
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 use std::rc::{Rc, Weak};
 
@@ -54,7 +54,21 @@ pub type FunctionRef = Weak<Function>;
 
 impl Function {
   /// Creates a new function.
-  pub fn new(ty: Type, name: String, params: Vec<ValueRc>) -> FunctionRc {
+  pub fn new(name: String, params: Vec<ValueRc>, ret_ty: Type) -> FunctionRc {
+    let ty = Type::get_function(
+      ret_ty,
+      params
+        .iter()
+        .map(|p| {
+          let ty = p.borrow().ty().clone();
+          debug_assert!(
+            !matches!(ty.kind(), TypeKind::Unit),
+            "parameter type must not be `unit`!"
+          );
+          ty
+        })
+        .collect(),
+    );
     Rc::new(Function {
       link: LinkedListLink::new(),
       ty: ty,
