@@ -138,8 +138,11 @@ impl ValueInner {
         .map_or(true, |v| !std::ptr::eq(&v.borrow().uses, &self.uses)),
       "`value` can not be the same as `self`!"
     );
-    while let Some(u) = self.uses.front().clone_pointer() {
-      u.as_ref().set_value(value.clone());
+    while let Some(u) = self.uses.front_mut().remove() {
+      u.as_ref().value.set(value.clone());
+      if let Some(v) = value.clone() {
+        v.borrow_mut().add_use(u);
+      }
     }
   }
 
@@ -226,7 +229,7 @@ impl Use {
     }));
     unsafe {
       if let Some(val) = value {
-        val.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr))
+        val.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr));
       }
       Box::from_raw(use_ptr)
     }
@@ -248,10 +251,10 @@ impl Use {
   pub fn set_value(&self, value: Option<ValueRc>) {
     let old_val = self.value.replace(value.clone());
     if let Some(v) = old_val {
-      v.borrow_mut().remove_use(self)
+      v.borrow_mut().remove_use(self);
     }
     if let Some(v) = value {
-      v.borrow_mut().add_use(unsafe { UnsafeRef::from_raw(self) })
+      v.borrow_mut().add_use(unsafe { UnsafeRef::from_raw(self) });
     }
   }
 }
