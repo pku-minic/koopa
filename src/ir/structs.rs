@@ -74,7 +74,7 @@ impl Function {
       ty,
       name,
       params,
-      bbs: LinkedList::new(BasicBlockAdapter::new()),
+      bbs: LinkedList::default(),
     })
   }
 
@@ -128,7 +128,7 @@ impl BasicBlock {
       link: LinkedListLink::new(),
       name,
       preds: vec![],
-      insts: LinkedList::new(ValueAdapter::new()),
+      insts: LinkedList::default(),
     })
   }
 

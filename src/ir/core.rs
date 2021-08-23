@@ -35,7 +35,7 @@ impl Value {
       ty,
       inner: RefCell::new(ValueInner {
         name: None,
-        uses: LinkedList::new(UseAdapter::new()),
+        uses: LinkedList::default(),
         bb: None,
         kind,
       }),
@@ -51,7 +51,7 @@ impl Value {
       ty,
       inner: RefCell::new(ValueInner {
         name: None,
-        uses: LinkedList::new(UseAdapter::new()),
+        uses: LinkedList::default(),
         bb: None,
         kind: unsafe { MaybeUninit::uninit().assume_init() },
       }),
