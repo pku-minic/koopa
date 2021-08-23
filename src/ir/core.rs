@@ -103,7 +103,7 @@ impl Value {
     self.inner.borrow()
   }
 
-  /// Mutably borrows the wrapped value.
+  /// Mutably borrows the current value.
   ///
   /// Panics if the value is currently borrowed.
   pub fn borrow_mut(&self) -> RefMut<'_, ValueInner> {
