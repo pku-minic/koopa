@@ -17,7 +17,7 @@ impl Integer {
   /// Creates an integer constant with value `value`.
   ///
   /// The type of the created integer constant will be `i32`.
-  pub fn new(value: i32) -> ValueRc {
+  pub fn get(value: i32) -> ValueRc {
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&value).cloned().unwrap_or_else(|| {
@@ -46,7 +46,7 @@ impl ZeroInit {
   /// Creates a zero initializer.
   ///
   /// The type of the created zero initializer will be `ty`.
-  pub fn new(ty: Type) -> ValueRc {
+  pub fn get(ty: Type) -> ValueRc {
     debug_assert!(
       !matches!(ty.kind(), TypeKind::Unit),
       "`ty` can not be unit!"
@@ -74,7 +74,7 @@ impl Undef {
   /// Creates a undefined value.
   ///
   /// The type of the created undefined value will be `ty`.
-  pub fn new(ty: Type) -> ValueRc {
+  pub fn get(ty: Type) -> ValueRc {
     debug_assert!(
       !matches!(ty.kind(), TypeKind::Unit),
       "`ty` can not be unit!"
@@ -163,31 +163,31 @@ mod test {
 
   #[test]
   fn const_eq() {
-    assert!(Rc::ptr_eq(&Integer::new(10), &Integer::new(10)));
-    assert!(!Rc::ptr_eq(&Integer::new(10), &Integer::new(5)));
+    assert!(Rc::ptr_eq(&Integer::get(10), &Integer::get(10)));
+    assert!(!Rc::ptr_eq(&Integer::get(10), &Integer::get(5)));
     assert!(Rc::ptr_eq(
-      &ZeroInit::new(Type::get_i32()),
-      &ZeroInit::new(Type::get_i32())
+      &ZeroInit::get(Type::get_i32()),
+      &ZeroInit::get(Type::get_i32())
     ));
     assert!(Rc::ptr_eq(
-      &ZeroInit::new(Type::get_array(Type::get_i32(), 10)),
-      &ZeroInit::new(Type::get_array(Type::get_i32(), 10))
+      &ZeroInit::get(Type::get_array(Type::get_i32(), 10)),
+      &ZeroInit::get(Type::get_array(Type::get_i32(), 10))
     ));
     assert!(!Rc::ptr_eq(
-      &ZeroInit::new(Type::get_i32()),
-      &ZeroInit::new(Type::get_array(Type::get_i32(), 10))
+      &ZeroInit::get(Type::get_i32()),
+      &ZeroInit::get(Type::get_array(Type::get_i32(), 10))
     ));
   }
 
   #[test]
   fn aggregate_use_value() {
-    let array = Aggregate::new((0..10).map(|i| Integer::new(i)).collect());
+    let array = Aggregate::new((0..10).map(|i| Integer::get(i)).collect());
     assert_eq!(array.ty(), &Type::get_array(Type::get_i32(), 10));
     match array.borrow().kind() {
       ValueKind::Aggregate(agg) => {
         for (i, elem) in agg.elems().iter().enumerate() {
           let value = elem.value().unwrap();
-          assert!(Rc::ptr_eq(&value, &Integer::new(i as i32)));
+          assert!(Rc::ptr_eq(&value, &Integer::get(i as i32)));
           assert_eq!(elem.user().as_ptr(), Rc::as_ptr(&array));
           let v = value.borrow();
           let u = v.uses().front().get();
@@ -198,15 +198,15 @@ mod test {
       _ => unreachable!(),
     }
     drop(array);
-    for value in (0..10).map(|i| Integer::new(i)) {
+    for value in (0..10).map(|i| Integer::get(i)) {
       assert!(value.borrow().uses().is_empty());
     }
   }
 
   #[test]
   fn replace_uses() {
-    let array = Aggregate::new((0..10).map(|_| Integer::new(0)).collect());
-    Integer::new(0).borrow_mut().replace_all_uses_with(None);
+    let array = Aggregate::new((0..10).map(|_| Integer::get(0)).collect());
+    Integer::get(0).borrow_mut().replace_all_uses_with(None);
     let arr = array.borrow();
     match arr.kind() {
       ValueKind::Aggregate(agg) => assert!(agg.elems().iter().all(|e| e.value().is_none())),
