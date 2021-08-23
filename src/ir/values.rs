@@ -158,3 +158,51 @@ impl ArgRef {
     self.index
   }
 }
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use std::rc::Rc;
+
+  #[test]
+  fn const_eq() {
+    assert!(Rc::ptr_eq(&Integer::new(10), &Integer::new(10)));
+    assert!(!Rc::ptr_eq(&Integer::new(10), &Integer::new(5)));
+    assert!(Rc::ptr_eq(
+      &ZeroInit::new(Type::get_i32()),
+      &ZeroInit::new(Type::get_i32())
+    ));
+    assert!(Rc::ptr_eq(
+      &ZeroInit::new(Type::get_array(Type::get_i32(), 10)),
+      &ZeroInit::new(Type::get_array(Type::get_i32(), 10))
+    ));
+    assert!(!Rc::ptr_eq(
+      &ZeroInit::new(Type::get_i32()),
+      &ZeroInit::new(Type::get_array(Type::get_i32(), 10))
+    ));
+  }
+
+  #[test]
+  fn aggregate_use_value() {
+    let array = Aggregate::new((0..10).map(|i| Integer::new(i)).collect());
+    assert_eq!(array.ty(), &Type::get_array(Type::get_i32(), 10));
+    match array.borrow().kind() {
+      ValueKind::Aggregate(agg) => {
+        for (i, elem) in agg.elems().iter().enumerate() {
+          let value = elem.value().unwrap();
+          assert!(Rc::ptr_eq(&value, &Integer::new(i as i32)));
+          assert_eq!(elem.user().as_ptr(), Rc::as_ptr(&array));
+          let v = value.borrow();
+          let u = v.uses().front().get();
+          assert!(u.is_some());
+          assert!(std::ptr::eq(u.unwrap(), elem.as_ref()));
+        }
+      }
+      _ => unreachable!(),
+    }
+    drop(array);
+    for value in (0..10).map(|i| Integer::new(i)) {
+      assert!(value.borrow().uses().is_empty());
+    }
+  }
+}
