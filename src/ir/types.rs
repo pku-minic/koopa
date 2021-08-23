@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::{cmp, fmt};
+use std::{cmp, fmt, hash};
 
 /// Kind of type.
 #[derive(Hash, Clone, PartialEq, Eq)]
@@ -42,7 +42,7 @@ impl fmt::Display for TypeKind {
 }
 
 /// Types in Koopa.
-#[derive(Hash, Clone, Eq)]
+#[derive(Clone, Eq)]
 pub struct Type(Rc<TypeKind>);
 
 impl Type {
@@ -110,6 +110,12 @@ impl fmt::Display for Type {
 impl fmt::Debug for Type {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", self.0)
+  }
+}
+
+impl hash::Hash for Type {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    self.0.hash(state)
   }
 }
 
