@@ -183,7 +183,7 @@ mod test {
   fn aggregate_use_value() {
     let array = Aggregate::new((0..10).map(|i| Integer::get(i)).collect());
     assert_eq!(array.ty(), &Type::get_array(Type::get_i32(), 10));
-    match array.borrow().kind() {
+    match array.kind() {
       ValueKind::Aggregate(agg) => {
         for (i, elem) in agg.elems().iter().enumerate() {
           let value = elem.value().unwrap();
@@ -207,8 +207,7 @@ mod test {
   fn replace_uses() {
     let array = Aggregate::new((0..10).map(|_| Integer::get(0)).collect());
     Integer::get(0).borrow_mut().replace_all_uses_with(None);
-    let arr = array.borrow();
-    match arr.kind() {
+    match array.kind() {
       ValueKind::Aggregate(agg) => assert!(agg.elems().iter().all(|e| e.value().is_none())),
       _ => unreachable!(),
     }
