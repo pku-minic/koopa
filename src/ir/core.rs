@@ -46,20 +46,31 @@ impl Value {
   where
     F: FnOnce(ValueRef) -> ValueKind,
   {
-    let value = Rc::new(Value {
-      link: LinkedListLink::new(),
-      ty,
-      inner: RefCell::new(ValueInner {
-        name: None,
-        uses: LinkedList::default(),
-        bb: None,
-        kind: unsafe { MaybeUninit::uninit().assume_init() },
-      }),
-    });
+    // create an uninitialized `Rc`
+    let value = unsafe {
+      Rc::from_raw(Rc::into_raw(Rc::new(MaybeUninit::<Value>::uninit())) as *const Value)
+    };
+    // get kind by calling function `init`
     let user = Rc::downgrade(&value);
     let kind = init(user);
-    unsafe { ptr::write(&mut value.borrow_mut().kind, kind) };
-    value
+    // initialize the created `Rc`
+    let ptr = Rc::into_raw(value);
+    unsafe {
+      ptr::write(
+        ptr as *mut Value,
+        Value {
+          link: LinkedListLink::new(),
+          ty,
+          inner: RefCell::new(ValueInner {
+            name: None,
+            uses: LinkedList::default(),
+            bb: None,
+            kind,
+          }),
+        },
+      );
+      Rc::from_raw(ptr)
+    }
   }
 
   /// Gets the type of the current `Value`.
