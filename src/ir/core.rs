@@ -4,8 +4,8 @@ use crate::ir::types::Type;
 use crate::ir::values::*;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
 use std::cell::{Cell, Ref, RefCell, RefMut};
-use std::mem::MaybeUninit;
 use std::rc::{Rc, Weak};
+use std::{mem::MaybeUninit, ptr};
 
 /// Value in Koopa IR.
 ///
@@ -57,7 +57,8 @@ impl Value {
       }),
     });
     let user = Rc::downgrade(&value);
-    value.borrow_mut().kind = init(user);
+    let kind = init(user);
+    unsafe { ptr::write(&mut value.borrow_mut().kind, kind) };
     value
   }
 
