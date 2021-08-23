@@ -13,6 +13,7 @@ use std::{mem::MaybeUninit, ptr};
 pub struct Value {
   link: LinkedListLink,
   ty: Type,
+  kind: ValueKind,
   inner: RefCell<ValueInner>,
 }
 
@@ -33,11 +34,11 @@ impl Value {
     Rc::new(Value {
       link: LinkedListLink::new(),
       ty,
+      kind,
       inner: RefCell::new(ValueInner {
         name: None,
         uses: LinkedList::default(),
         bb: None,
-        kind,
       }),
     })
   }
@@ -61,11 +62,11 @@ impl Value {
         Value {
           link: LinkedListLink::new(),
           ty,
+          kind,
           inner: RefCell::new(ValueInner {
             name: None,
             uses: LinkedList::default(),
             bb: None,
-            kind,
           }),
         },
       );
@@ -76,6 +77,23 @@ impl Value {
   /// Gets the type of the current `Value`.
   pub fn ty(&self) -> &Type {
     &self.ty
+  }
+
+  /// Gets the kind of the current `Value`.
+  pub fn kind(&self) -> &ValueKind {
+    &self.kind
+  }
+
+  /// Checks if the current `Value` is an instruction.
+  pub fn is_inst(&self) -> bool {
+    !matches!(
+      self.kind,
+      ValueKind::Integer(..)
+        | ValueKind::ZeroInit(..)
+        | ValueKind::Undef(..)
+        | ValueKind::Aggregate(..)
+        | ValueKind::ArgRef(..)
+    )
   }
 
   /// Immutably borrows the current value.
@@ -97,7 +115,6 @@ pub struct ValueInner {
   name: Option<String>,
   uses: LinkedList<UseAdapter>,
   bb: Option<BasicBlockRef>,
-  kind: ValueKind,
 }
 
 impl ValueInner {
@@ -154,28 +171,6 @@ impl ValueInner {
   /// Sets the parent basic block of the current `Value`.
   pub fn set_bb(&mut self, bb: Option<BasicBlockRef>) {
     self.bb = bb;
-  }
-
-  /// Gets the kind of the current `Value`.
-  pub fn kind(&self) -> &ValueKind {
-    &self.kind
-  }
-
-  /// Gets the mutable kind of the current `Value`.
-  pub fn kind_mut(&mut self) -> &mut ValueKind {
-    &mut self.kind
-  }
-
-  /// Checks if the current `Value` is an instruction.
-  pub fn is_inst(&self) -> bool {
-    !matches!(
-      self.kind,
-      ValueKind::Integer(..)
-        | ValueKind::ZeroInit(..)
-        | ValueKind::Undef(..)
-        | ValueKind::Aggregate(..)
-        | ValueKind::ArgRef(..)
-    )
   }
 }
 
