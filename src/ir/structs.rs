@@ -1,7 +1,9 @@
-use crate::ir::core::{ValueAdapter, ValueRc};
+use crate::ir::core::{ValueAdapter, ValueKind, ValueRc};
 use crate::ir::types::{Type, TypeKind};
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
+use std::slice;
 
 /// Represents a program.
 pub struct Program {
@@ -27,6 +29,20 @@ impl Program {
   pub fn funcs(&self) -> &LinkedList<FunctionAdapter> {
     &self.funcs
   }
+
+  /// Adds the specific global variable to the current program.
+  pub fn add_var(&mut self, value: ValueRc) {
+    debug_assert!(
+      matches!(value.kind(), ValueKind::GlobalAlloc(..)),
+      "`value` must be a global allocation!"
+    );
+    self.vars.push_back(value);
+  }
+
+  /// Adds the specific function to the current program.
+  pub fn add_func(&mut self, func: FunctionRc) {
+    self.funcs.push_back(func);
+  }
 }
 
 /// Represents a function.
@@ -35,7 +51,7 @@ pub struct Function {
   ty: Type,
   name: String,
   params: Vec<ValueRc>,
-  bbs: LinkedList<BasicBlockAdapter>,
+  inner: RefCell<FunctionInner>,
 }
 
 intrusive_adapter! {
@@ -74,7 +90,9 @@ impl Function {
       ty,
       name,
       params,
-      bbs: LinkedList::default(),
+      inner: RefCell::new(FunctionInner {
+        bbs: LinkedList::default(),
+      }),
     })
   }
 
@@ -93,9 +111,39 @@ impl Function {
     &self.params
   }
 
+  /// Immutably borrows the current function.
+  ///
+  /// Panics if the function is currently mutably borrowed.
+  pub fn borrow(&self) -> Ref<FunctionInner> {
+    self.inner.borrow()
+  }
+
+  /// Mutably borrows the current function.
+  ///
+  /// Panics if the function is currently borrowed.
+  pub fn borrow_mut(&self) -> RefMut<FunctionInner> {
+    self.inner.borrow_mut()
+  }
+}
+
+pub struct FunctionInner {
+  bbs: LinkedList<BasicBlockAdapter>,
+}
+
+impl FunctionInner {
   /// Gets the basic block list.
   pub fn bbs(&self) -> &LinkedList<BasicBlockAdapter> {
     &self.bbs
+  }
+
+  /// Gets the mutable basic block list.
+  pub fn bbs_mut(&mut self) -> &mut LinkedList<BasicBlockAdapter> {
+    &mut self.bbs
+  }
+
+  /// Adds the specific basic block to the current function.
+  pub fn add_bb(&mut self, bb: BasicBlockRc) {
+    self.bbs.push_back(bb);
   }
 }
 
@@ -103,8 +151,7 @@ impl Function {
 pub struct BasicBlock {
   link: LinkedListLink,
   name: Option<String>,
-  preds: Vec<BasicBlockRef>,
-  insts: LinkedList<ValueAdapter>,
+  inner: RefCell<BasicBlockInner>,
 }
 
 intrusive_adapter! {
@@ -127,8 +174,10 @@ impl BasicBlock {
     Rc::new(BasicBlock {
       link: LinkedListLink::new(),
       name,
-      preds: vec![],
-      insts: LinkedList::default(),
+      inner: RefCell::new(BasicBlockInner {
+        preds: vec![],
+        insts: LinkedList::default(),
+      }),
     })
   }
 
@@ -137,18 +186,62 @@ impl BasicBlock {
     &self.name
   }
 
+  /// Immutably borrows the current basic block.
+  ///
+  /// Panics if the basic block is currently mutably borrowed.
+  pub fn borrow(&self) -> Ref<BasicBlockInner> {
+    self.inner.borrow()
+  }
+
+  /// Mutably borrows the current basic block.
+  ///
+  /// Panics if the basic block is currently borrowed.
+  pub fn borrow_mut(&self) -> RefMut<BasicBlockInner> {
+    self.inner.borrow_mut()
+  }
+}
+
+pub struct BasicBlockInner {
+  preds: Vec<BasicBlockRef>,
+  insts: LinkedList<ValueAdapter>,
+}
+
+impl BasicBlockInner {
   /// Gets the predecessor list.
   pub fn preds(&self) -> &[BasicBlockRef] {
     &self.preds
   }
 
+  /// Gets the mutable predecessor list.
+  pub fn preds_mut(&mut self) -> &Vec<BasicBlockRef> {
+    &mut self.preds
+  }
+
   /// Gets the successors list.
   pub fn succs(&self) -> &[BasicBlockRef] {
-    todo!()
+    if let Some(inst) = self.insts.back().get() {
+      match inst.kind() {
+        ValueKind::Branch(branch) => branch.targets(),
+        ValueKind::Jump(jump) => slice::from_ref(jump.target()),
+        _ => &[],
+      }
+    } else {
+      &[]
+    }
   }
 
   /// Gets the instruction list.
   pub fn insts(&self) -> &LinkedList<ValueAdapter> {
     &self.insts
+  }
+
+  /// Gets the mutable instruction list.
+  pub fn insts_mut(&mut self) -> &mut LinkedList<ValueAdapter> {
+    &mut self.insts
+  }
+
+  /// Adds the specific instruction to the current basic block.
+  pub fn add_inst(&mut self, inst: ValueRc) {
+    self.insts.push_back(inst)
   }
 }
