@@ -202,4 +202,15 @@ mod test {
       assert!(value.borrow().uses().is_empty());
     }
   }
+
+  #[test]
+  fn replace_uses() {
+    let array = Aggregate::new((0..10).map(|_| Integer::new(0)).collect());
+    Integer::new(0).borrow_mut().replace_all_uses_with(None);
+    let arr = array.borrow();
+    match arr.kind() {
+      ValueKind::Aggregate(agg) => assert!(agg.elems().iter().all(|e| e.value().is_none())),
+      _ => unreachable!(),
+    }
+  }
 }
