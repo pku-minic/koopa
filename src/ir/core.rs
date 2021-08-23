@@ -32,12 +32,12 @@ impl Value {
   pub(crate) fn new(ty: Type, kind: ValueKind) -> ValueRc {
     Rc::new(Value {
       link: LinkedListLink::new(),
-      ty: ty,
+      ty,
       inner: RefCell::new(ValueInner {
         name: None,
         uses: LinkedList::new(UseAdapter::new()),
         bb: None,
-        kind: kind,
+        kind,
       }),
     })
   }
@@ -48,7 +48,7 @@ impl Value {
   {
     let value = Rc::new(Value {
       link: LinkedListLink::new(),
-      ty: ty,
+      ty,
       inner: RefCell::new(ValueInner {
         name: None,
         uses: LinkedList::new(UseAdapter::new()),
@@ -152,19 +152,6 @@ impl ValueInner {
     &mut self.kind
   }
 
-  /// Checks if the current `Value` is a user.
-  pub fn is_user(&self) -> bool {
-    !matches!(
-      self.kind,
-      ValueKind::Integer(..)
-        | ValueKind::ZeroInit(..)
-        | ValueKind::Undef(..)
-        | ValueKind::ArgRef(..)
-        | ValueKind::Alloc(..)
-        | ValueKind::Jump(..)
-    )
-  }
-
   /// Checks if the current `Value` is an instruction.
   pub fn is_inst(&self) -> bool {
     !matches!(
@@ -221,17 +208,15 @@ pub type UseRef = UnsafeRef<Use>;
 impl Use {
   /// Creates a new `Rc` of `Use`.
   pub fn new(value: Option<ValueRc>, user: ValueRef) -> UseBox {
-    debug_assert!(
-      user.upgrade().unwrap().borrow().is_user(),
-      "`user` is not a `User`!"
-    );
     let use_ptr = Box::into_raw(Box::new(Use {
       link: LinkedListLink::new(),
       value: Cell::new(value.clone()),
-      user: user,
+      user,
     }));
     unsafe {
-      value.map(|val| val.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr)));
+      if let Some(val) = value {
+        val.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr))
+      }
       Box::from_raw(use_ptr)
     }
   }
@@ -251,14 +236,20 @@ impl Use {
   /// Sets the value that the current use holds.
   pub fn set_value(&self, value: Option<ValueRc>) {
     let old_val = self.value.replace(value.clone());
-    old_val.map(|v| v.borrow_mut().remove_use(self));
-    value.map(|v| v.borrow_mut().add_use(unsafe { UnsafeRef::from_raw(self) }));
+    if let Some(v) = old_val {
+      v.borrow_mut().remove_use(self)
+    }
+    if let Some(v) = value {
+      v.borrow_mut().add_use(unsafe { UnsafeRef::from_raw(self) })
+    }
   }
 }
 
 impl Drop for Use {
   fn drop(&mut self) {
     let s = &*self;
-    s.value.take().map(|v| v.borrow_mut().remove_use(s));
+    if let Some(v) = s.value.take() {
+      v.borrow_mut().remove_use(s)
+    }
   }
 }

@@ -21,10 +21,7 @@ impl Integer {
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&value).cloned().unwrap_or_else(|| {
-        let v = Value::new(
-          Type::get_i32(),
-          ValueKind::Integer(Integer { value: value }),
-        );
+        let v = Value::new(Type::get_i32(), ValueKind::Integer(Integer { value }));
         pool.insert(value, v.clone());
         v
       })
@@ -150,7 +147,7 @@ impl ArgRef {
       !matches!(ty.kind(), TypeKind::Unit),
       "`ty` can not be unit!"
     );
-    Value::new(ty, ValueKind::ArgRef(ArgRef { index: index }))
+    Value::new(ty, ValueKind::ArgRef(ArgRef { index }))
   }
 
   /// Gets the index.

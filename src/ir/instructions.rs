@@ -128,7 +128,7 @@ impl GetPtr {
       ValueKind::GetPtr(GetPtr {
         src: Use::new(Some(src), user.clone()),
         index: Use::new(Some(index), user),
-        step: step,
+        step,
       })
     })
   }
@@ -181,7 +181,7 @@ impl Binary {
     );
     Value::new_with_init(ty, |user| {
       ValueKind::Binary(Binary {
-        op: op,
+        op,
         lhs: Use::new(Some(lhs), user.clone()),
         rhs: Use::new(Some(rhs), user),
       })
@@ -228,7 +228,7 @@ impl Unary {
     );
     Value::new_with_init(ty, |user| {
       ValueKind::Unary(Unary {
-        op: op,
+        op,
         opr: Use::new(Some(opr), user),
       })
     })
@@ -296,7 +296,7 @@ pub struct Jump {
 impl Jump {
   /// Creates a unconditional jump.
   pub fn new(target: BasicBlockRef) -> ValueRc {
-    Value::new(Type::get_unit(), ValueKind::Jump(Jump { target: target }))
+    Value::new(Type::get_unit(), ValueKind::Jump(Jump { target }))
   }
 
   /// Gets the target basic block.
@@ -328,7 +328,7 @@ impl Call {
     };
     Value::new_with_init(ty, |user| {
       ValueKind::Call(Call {
-        callee: callee,
+        callee,
         args: args
           .into_iter()
           .map(|a| Use::new(Some(a), user.clone()))

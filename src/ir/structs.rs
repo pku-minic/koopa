@@ -71,9 +71,9 @@ impl Function {
     );
     Rc::new(Function {
       link: LinkedListLink::new(),
-      ty: ty,
-      name: name,
-      params: params,
+      ty,
+      name,
+      params,
       bbs: LinkedList::new(BasicBlockAdapter::new()),
     })
   }
@@ -126,7 +126,7 @@ impl BasicBlock {
   pub fn new(name: Option<String>) -> BasicBlockRc {
     Rc::new(BasicBlock {
       link: LinkedListLink::new(),
-      name: name,
+      name,
       preds: vec![],
       insts: LinkedList::new(ValueAdapter::new()),
     })
