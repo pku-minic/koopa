@@ -90,7 +90,7 @@ impl Undef {
   }
 }
 
-/// Aggregate value.
+/// Aggregate constant.
 ///
 /// This 'value' is actually an user.
 pub struct Aggregate {
@@ -98,12 +98,17 @@ pub struct Aggregate {
 }
 
 impl Aggregate {
-  /// Creates an aggregate with elements `elems`.
+  /// Creates an aggregate constant with elements `elems`.
   ///
   /// The type of the created aggregate will be `(elems[0].ty)[elems.len]`.
   pub fn new(elems: Vec<ValueRc>) -> ValueRc {
     // element list should not be empty
     debug_assert!(!elems.is_empty(), "`elems` must not be empty!");
+    // check if all elements are constant
+    debug_assert!(
+      elems.iter().all(|e| e.is_const()),
+      "`elems` must all be constants!"
+    );
     // check if all elements have the same type
     debug_assert!(
       elems.windows(2).all(|e| e[0].ty() == e[1].ty()),
