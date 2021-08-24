@@ -56,11 +56,11 @@ impl Type {
   }
 
   /// Gets a specific type.
-  pub fn get_type(type_data: TypeKind) -> Type {
+  pub fn get(type_data: TypeKind) -> Type {
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&type_data).cloned().unwrap_or_else(|| {
-        let v = Type(Rc::new(type_data.clone()));
+        let v = Self(Rc::new(type_data.clone()));
         pool.insert(type_data, v.clone());
         v
       })
@@ -69,28 +69,28 @@ impl Type {
 
   /// Gets an `i32` type.
   pub fn get_i32() -> Type {
-    Type::get_type(TypeKind::Int32)
+    Type::get(TypeKind::Int32)
   }
 
   /// Gets an `unit` type.
   pub fn get_unit() -> Type {
-    Type::get_type(TypeKind::Unit)
+    Type::get(TypeKind::Unit)
   }
 
   /// Gets an array type.
   pub fn get_array(base: Type, len: usize) -> Type {
     debug_assert!(len != 0, "`len` can not be zero!");
-    Type::get_type(TypeKind::Array(base, len))
+    Type::get(TypeKind::Array(base, len))
   }
 
   /// Gets an pointer type.
   pub fn get_pointer(base: Type) -> Type {
-    Type::get_type(TypeKind::Pointer(base))
+    Type::get(TypeKind::Pointer(base))
   }
 
   /// Gets an function type.
   pub fn get_function(args: Vec<Type>, ret: Type) -> Type {
-    Type::get_type(TypeKind::Function(args, ret))
+    Type::get(TypeKind::Function(args, ret))
   }
 
   /// Gets the kind of the current `Type`.
