@@ -14,7 +14,7 @@ impl Alloc {
       !matches!(ty.kind(), TypeKind::Unit),
       "`ty` can not be unit!"
     );
-    Value::new(Type::get_pointer(ty), ValueKind::Alloc(Alloc))
+    Value::new(Type::get_pointer(ty), ValueKind::Alloc(Self))
   }
 }
 
@@ -30,7 +30,7 @@ impl GlobalAlloc {
   pub fn new(init: ValueRc) -> ValueRc {
     let ty = Type::get_pointer(init.ty().clone());
     Value::new_with_init(ty, |user| {
-      ValueKind::GlobalAlloc(GlobalAlloc {
+      ValueKind::GlobalAlloc(Self {
         init: Use::new(Some(init), user),
       })
     })
@@ -58,7 +58,7 @@ impl Load {
       _ => panic!("expected a pointer type!"),
     };
     Value::new_with_init(ty, |user| {
-      ValueKind::Load(Load {
+      ValueKind::Load(Self {
         src: Use::new(Some(src), user),
       })
     })
@@ -84,7 +84,7 @@ impl Store {
       "the type of `dest` must be the pointer of `value`'s type!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
-      ValueKind::Store(Store {
+      ValueKind::Store(Self {
         value: Use::new(Some(value), user.clone()),
         dest: Use::new(Some(dest), user),
       })
@@ -125,7 +125,7 @@ impl GetPtr {
       _ => panic!("`src` must be an array or a pointer!"),
     };
     Value::new_with_init(ty, |user| {
-      ValueKind::GetPtr(GetPtr {
+      ValueKind::GetPtr(Self {
         src: Use::new(Some(src), user.clone()),
         index: Use::new(Some(index), user),
         step,
@@ -180,7 +180,7 @@ impl Binary {
       "both `lhs` and `rhs` must be integer!"
     );
     Value::new_with_init(ty, |user| {
-      ValueKind::Binary(Binary {
+      ValueKind::Binary(Self {
         op,
         lhs: Use::new(Some(lhs), user.clone()),
         rhs: Use::new(Some(rhs), user),
@@ -227,7 +227,7 @@ impl Unary {
       "`opr` must be integer!"
     );
     Value::new_with_init(ty, |user| {
-      ValueKind::Unary(Unary {
+      ValueKind::Unary(Self {
         op,
         opr: Use::new(Some(opr), user),
       })
@@ -261,7 +261,7 @@ impl Branch {
       "`cond` must be integer!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
-      ValueKind::Branch(Branch {
+      ValueKind::Branch(Self {
         cond: Use::new(Some(cond), user),
         targets: [true_bb, false_bb],
       })
@@ -296,7 +296,7 @@ pub struct Jump {
 impl Jump {
   /// Creates a unconditional jump.
   pub fn new(target: BasicBlockRef) -> ValueRc {
-    Value::new(Type::get_unit(), ValueKind::Jump(Jump { target }))
+    Value::new(Type::get_unit(), ValueKind::Jump(Self { target }))
   }
 
   /// Gets the target basic block.
@@ -327,7 +327,7 @@ impl Call {
       _ => panic!("expected a function type"),
     };
     Value::new_with_init(ty, |user| {
-      ValueKind::Call(Call {
+      ValueKind::Call(Self {
         callee,
         args: args
           .into_iter()
@@ -363,7 +363,7 @@ impl Return {
       "the type of `value` must not be `unit`!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
-      ValueKind::Return(Return {
+      ValueKind::Return(Self {
         value: Use::new(value, user),
       })
     })
@@ -397,7 +397,7 @@ impl Phi {
       "value type must not be `unit`!"
     );
     Value::new_with_init(ty, |user| {
-      ValueKind::Phi(Phi {
+      ValueKind::Phi(Self {
         oprs: oprs
           .into_iter()
           .map(|v| (Use::new(Some(v.0), user.clone()), v.1))

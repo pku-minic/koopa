@@ -31,7 +31,7 @@ pub type ValueRef = Weak<Value>;
 
 impl Value {
   pub(crate) fn new(ty: Type, kind: ValueKind) -> ValueRc {
-    Rc::new(Value {
+    Rc::new(Self {
       link: LinkedListLink::new(),
       ty,
       kind,
@@ -59,7 +59,7 @@ impl Value {
     unsafe {
       ptr::write(
         ptr as *mut Value,
-        Value {
+        Self {
           link: LinkedListLink::new(),
           ty,
           kind,
@@ -228,7 +228,7 @@ pub type UseRef = UnsafeRef<Use>;
 impl Use {
   /// Creates a new `Rc` of `Use`.
   pub fn new(value: Option<ValueRc>, user: ValueRef) -> UseBox {
-    let use_ptr = Box::into_raw(Box::new(Use {
+    let use_ptr = Box::into_raw(Box::new(Self {
       link: LinkedListLink::new(),
       value: Cell::new(value.clone()),
       user,

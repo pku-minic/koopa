@@ -14,7 +14,7 @@ pub struct Program {
 impl Program {
   /// Creates a new IR program.
   pub fn new() -> Self {
-    Program {
+    Self {
       vars: LinkedList::default(),
       funcs: LinkedList::default(),
     }
@@ -85,7 +85,7 @@ impl Function {
         .collect(),
       ret_ty,
     );
-    Rc::new(Function {
+    Rc::new(Self {
       link: LinkedListLink::new(),
       ty,
       name,
@@ -171,7 +171,7 @@ pub type BasicBlockRef = Weak<BasicBlock>;
 impl BasicBlock {
   /// Creates a new basic block.
   pub fn new(name: Option<String>) -> BasicBlockRc {
-    Rc::new(BasicBlock {
+    Rc::new(Self {
       link: LinkedListLink::new(),
       name,
       inner: RefCell::new(BasicBlockInner {

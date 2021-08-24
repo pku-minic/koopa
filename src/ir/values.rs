@@ -21,7 +21,7 @@ impl Integer {
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&value).cloned().unwrap_or_else(|| {
-        let v = Value::new(Type::get_i32(), ValueKind::Integer(Integer { value }));
+        let v = Value::new(Type::get_i32(), ValueKind::Integer(Self { value }));
         pool.insert(value, v.clone());
         v
       })
@@ -54,7 +54,7 @@ impl ZeroInit {
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&ty).cloned().unwrap_or_else(|| {
-        let v = Value::new(ty.clone(), ValueKind::ZeroInit(ZeroInit));
+        let v = Value::new(ty.clone(), ValueKind::ZeroInit(Self));
         pool.insert(ty, v.clone());
         v
       })
@@ -82,7 +82,7 @@ impl Undef {
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&ty).cloned().unwrap_or_else(|| {
-        let v = Value::new(ty.clone(), ValueKind::Undef(Undef));
+        let v = Value::new(ty.clone(), ValueKind::Undef(Self));
         pool.insert(ty, v.clone());
         v
       })
@@ -123,7 +123,7 @@ impl Aggregate {
     // create value
     let ty = Type::get_array(base, elems.len());
     Value::new_with_init(ty, |user| {
-      ValueKind::Aggregate(Aggregate {
+      ValueKind::Aggregate(Self {
         elems: elems
           .into_iter()
           .map(|e| Use::new(Some(e), user.clone()))
@@ -152,7 +152,7 @@ impl ArgRef {
       !matches!(ty.kind(), TypeKind::Unit),
       "`ty` can not be unit!"
     );
-    Value::new(ty, ValueKind::ArgRef(ArgRef { index }))
+    Value::new(ty, ValueKind::ArgRef(Self { index }))
   }
 
   /// Gets the index.
