@@ -72,7 +72,6 @@ impl Function {
   /// Creates a new function.
   pub fn new(name: String, params: Vec<ValueRc>, ret_ty: Type) -> FunctionRc {
     let ty = Type::get_function(
-      ret_ty,
       params
         .iter()
         .map(|p| {
@@ -84,6 +83,7 @@ impl Function {
           ty
         })
         .collect(),
+      ret_ty,
     );
     Rc::new(Function {
       link: LinkedListLink::new(),

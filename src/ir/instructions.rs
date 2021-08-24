@@ -317,7 +317,7 @@ impl Call {
   /// The type of created call will be the return type of function `callee`.
   pub fn new(callee: FunctionRef, args: Vec<ValueRc>) -> ValueRc {
     let ty = match callee.upgrade().unwrap().ty().kind() {
-      TypeKind::Function(ret, params) => {
+      TypeKind::Function(params, ret) => {
         debug_assert!(
           params.iter().zip(args.iter()).all(|v| v.0 == v.1.ty()),
           "argument type mismatch"
