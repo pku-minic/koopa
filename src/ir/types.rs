@@ -10,7 +10,7 @@ pub enum TypeKind {
   Int32,
   /// Unit (void).
   Unit,
-  /// Array (with base type and shape).
+  /// Array (with base type and length).
   Array(Type, usize),
   /// Pointer (with base type).
   Pointer(Type),
@@ -23,7 +23,7 @@ impl fmt::Display for TypeKind {
     match self {
       TypeKind::Int32 => write!(f, "i32"),
       TypeKind::Unit => write!(f, "unit"),
-      TypeKind::Array(t, len) => write!(f, "{}[{}]", t, len),
+      TypeKind::Array(t, len) => write!(f, "[{}; {}]", t, len),
       TypeKind::Pointer(t) => write!(f, "{}*", t),
       TypeKind::Function(ret, args) => {
         write!(f, "{}(", ret)?;
@@ -129,7 +129,11 @@ mod test {
     assert_eq!(format!("{}", Type::get_unit()), "unit");
     assert_eq!(
       format!("{}", Type::get_array(Type::get_i32(), 10)),
-      "i32[10]"
+      "[i32; 10]"
+    );
+    assert_eq!(
+      format!("{}", Type::get_array(Type::get_array(Type::get_i32(), 2), 3)),
+      "[[i32; 2]; 3]"
     );
     assert_eq!(
       format!("{}", Type::get_pointer(Type::get_pointer(Type::get_i32()))),
