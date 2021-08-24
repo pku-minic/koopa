@@ -84,6 +84,17 @@ impl Value {
     &self.kind
   }
 
+  /// Checks if the current `Value` is a constant.
+  pub fn is_const(&self) -> bool {
+    matches!(
+      self.kind,
+      ValueKind::Integer(..)
+        | ValueKind::ZeroInit(..)
+        | ValueKind::Undef(..)
+        | ValueKind::Aggregate(..)
+    )
+  }
+
   /// Checks if the current `Value` is an instruction.
   pub fn is_inst(&self) -> bool {
     !matches!(
