@@ -7,3 +7,6 @@ Cargo.lock
 
 # VS Code
 .vscode
+
+# Debugging
+/debug
