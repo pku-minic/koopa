@@ -14,8 +14,8 @@ pub enum TypeKind {
   Array(Type, usize),
   /// Pointer (with base type).
   Pointer(Type),
-  /// Function (with return type and parameter types).
-  Function(Type, Vec<Type>),
+  /// Function (with parameter types and return type).
+  Function(Vec<Type>, Type),
 }
 
 impl fmt::Display for TypeKind {
@@ -23,10 +23,10 @@ impl fmt::Display for TypeKind {
     match self {
       TypeKind::Int32 => write!(f, "i32"),
       TypeKind::Unit => write!(f, "unit"),
-      TypeKind::Array(t, len) => write!(f, "[{}; {}]", t, len),
+      TypeKind::Array(t, len) => write!(f, "[{}, {}]", t, len),
       TypeKind::Pointer(t) => write!(f, "{}*", t),
-      TypeKind::Function(ret, args) => {
-        write!(f, "{}(", ret)?;
+      TypeKind::Function(args, ret) => {
+        write!(f, "(")?;
         let mut first = true;
         for arg in args.iter() {
           if !first {
@@ -35,7 +35,11 @@ impl fmt::Display for TypeKind {
           write!(f, "{}", arg)?;
           first = false;
         }
-        write!(f, ")")
+        if !matches!(ret.0.as_ref(), TypeKind::Unit) {
+          write!(f, "): {}", ret)
+        } else {
+          write!(f, ")")
+        }
       }
     }
   }
@@ -85,8 +89,8 @@ impl Type {
   }
 
   /// Gets an function type.
-  pub fn get_function(ret: Type, args: Vec<Type>) -> Type {
-    Type::get_type(TypeKind::Function(ret, args))
+  pub fn get_function(args: Vec<Type>, ret: Type) -> Type {
+    Type::get_type(TypeKind::Function(args, ret))
   }
 
   /// Gets the kind of the current `Type`.
@@ -129,33 +133,36 @@ mod test {
     assert_eq!(format!("{}", Type::get_unit()), "unit");
     assert_eq!(
       format!("{}", Type::get_array(Type::get_i32(), 10)),
-      "[i32; 10]"
+      "[i32, 10]"
     );
     assert_eq!(
-      format!("{}", Type::get_array(Type::get_array(Type::get_i32(), 2), 3)),
-      "[[i32; 2]; 3]"
+      format!(
+        "{}",
+        Type::get_array(Type::get_array(Type::get_i32(), 2), 3)
+      ),
+      "[[i32, 2], 3]"
     );
     assert_eq!(
       format!("{}", Type::get_pointer(Type::get_pointer(Type::get_i32()))),
       "i32**"
     );
     assert_eq!(
-      format!("{}", Type::get_function(Type::get_unit(), vec![])),
-      "unit()"
+      format!("{}", Type::get_function(vec![], Type::get_unit())),
+      "()"
     );
     assert_eq!(
       format!(
         "{}",
-        Type::get_function(Type::get_unit(), vec![Type::get_i32()])
+        Type::get_function(vec![Type::get_i32()], Type::get_unit())
       ),
-      "unit(i32)"
+      "(i32)"
     );
     assert_eq!(
       format!(
         "{}",
-        Type::get_function(Type::get_i32(), vec![Type::get_i32(), Type::get_i32()])
+        Type::get_function(vec![Type::get_i32(), Type::get_i32()], Type::get_i32())
       ),
-      "i32(i32, i32)"
+      "(i32, i32): i32"
     );
   }
 
