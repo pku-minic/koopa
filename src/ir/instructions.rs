@@ -158,7 +158,7 @@ pub struct Binary {
 
 /// Supported binary operators.
 #[rustfmt::skip]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BinaryOp {
   // comparison
   NotEq, Eq, Gt, Lt, Ge, Le,
@@ -212,7 +212,7 @@ pub struct Unary {
 }
 
 /// Supported unary operators.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum UnaryOp {
   Neg, // negation
   Not, // bitwise not
