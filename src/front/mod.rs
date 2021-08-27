@@ -1,1 +1,2 @@
-pub mod lexer;
+mod lexer;
+mod span;
