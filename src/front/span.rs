@@ -6,8 +6,8 @@ use std::fmt;
 ///
 /// Used to print error messages.
 pub struct Span {
-  from: Mark,
-  to: Mark,
+  start: Pos,
+  end: Pos,
 }
 
 impl Span {
@@ -30,9 +30,9 @@ impl Span {
     });
   }
 
-  /// Creates a new span from `Mark`.
-  pub fn new(from: Mark, to: Mark) -> Self {
-    Self { from, to }
+  /// Creates a new span from `Pos`.
+  pub fn new(start: Pos) -> Self {
+    Self { start, end: start }
   }
 
   /// Logs error message.
@@ -41,7 +41,7 @@ impl Span {
     Self::STATE.with(|gs| {
       let gs = gs.borrow();
       eprintln!("{}: {}", "error".red(), message);
-      eprintln!("   {} {}:{}", "at".blue().dimmed(), gs.file, self.from);
+      eprintln!("   {} {}:{}", "at".blue().dimmed(), gs.file, self.start);
     });
   }
 
@@ -51,49 +51,53 @@ impl Span {
     Self::STATE.with(|gs| {
       let gs = gs.borrow();
       eprintln!("{}: {}", "warning".red(), message);
-      eprintln!("     {} {}:{}", "at".blue().dimmed(), gs.file, self.from);
+      eprintln!("     {} {}:{}", "at".blue().dimmed(), gs.file, self.start);
     });
   }
 
-  /// Consumes and then updates the `to` mark.
-  pub fn update(self, to: Mark) -> Self {
-    self.to = to;
-    self
+  /// Consumes and then updates the end position.
+  pub fn update(self, end: Pos) -> Self {
+    Self {
+      start: self.start,
+      end,
+    }
   }
 
-  /// Consumes and then updates the `to` mark according to another span.
+  /// Consumes and then updates the ens position according to another span.
   pub fn update_span(self, span: Span) -> Self {
-    self.to = span.to;
-    self
+    Self {
+      start: self.start,
+      end: span.end,
+    }
   }
 }
 
 /// Line-column mark.
 #[derive(Clone, Copy)]
-pub struct Mark {
+pub struct Pos {
   line: u32,
   col: u32,
 }
 
-impl Mark {
+impl Pos {
   /// Creates a new mark.
   pub fn new() -> Self {
     Self { line: 1, col: 1 }
   }
 
-  /// Increases the line number and resets the column number.
-  pub fn increase_line(&mut self) {
+  /// Updates the line number and resets the column number.
+  pub fn update_line(&mut self) {
     self.col = 1;
     self.line += 1;
   }
 
-  /// Increases the column number.
-  pub fn increase_col(&mut self) {
+  /// Updates the column number.
+  pub fn update_col(&mut self) {
     self.col += 1;
   }
 }
 
-impl fmt::Display for Mark {
+impl fmt::Display for Pos {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}:{}", self.line, self.col)
   }
@@ -111,8 +115,8 @@ impl fmt::Display for FileType {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       FileType::File(file) => f.write_str(file),
-      FileType::Stdin => f.write_str("stdin"),
-      FileType::Buffer => f.write_str("buffer"),
+      FileType::Stdin => f.write_str("<stdin>"),
+      FileType::Buffer => f.write_str("<buffer>"),
     }
   }
 }
