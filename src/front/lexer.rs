@@ -45,6 +45,7 @@ pub struct Lexer<T: Read> {
   last_char: Option<char>,
 }
 
+/// Result returned by `Lexer`.
 pub type Result = std::result::Result<Token, String>;
 
 impl<T: Read> Lexer<T> {
@@ -285,12 +286,12 @@ mod test {
       r#"
       // comment
       fun @main(): i32 {
-        %entry:
-          %ret = alloc i32
-          store 0, %ret
-          %0 = load %ret
-          %1 = add %0, 1
-          ret %1
+      %entry:
+        %ret /**/ = alloc i32
+        store 0, %ret
+        %0 = load %ret
+        %1 = add %0, 1
+        ret %1
       /*
       block
       comment
