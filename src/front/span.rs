@@ -19,6 +19,11 @@ impl Span {
     });
   }
 
+  /// Creates a new span from `Pos`.
+  pub fn new(start: Pos) -> Self {
+    Self { start, end: start }
+  }
+
   /// Resets the global state.
   pub fn reset(file: FileType) {
     Self::STATE.with(|gs| {
@@ -30,9 +35,31 @@ impl Span {
     });
   }
 
-  /// Creates a new span from `Pos`.
-  pub fn new(start: Pos) -> Self {
-    Self { start, end: start }
+  /// Logs global information (total error/warning number).
+  pub fn log_global() {
+    Self::STATE.with(|gs| {
+      let gs = gs.borrow();
+      // error info
+      if gs.err_num != 0 {
+        eprint!("{} {}", gs.err_num, "error".red());
+        if gs.err_num > 1 {
+          eprint!("{}", "s".red());
+        }
+      }
+      // seperator
+      if gs.err_num != 0 && gs.warn_num != 0 {
+        eprint!(" and ");
+      }
+      // warning info
+      if gs.warn_num != 0 {
+        eprint!("{} {}", gs.warn_num, "warning".yellow());
+        if gs.warn_num > 1 {
+          eprint!("{}", "s".red());
+        }
+      }
+      // ending
+      eprintln!(" emitted");
+    });
   }
 
   /// Logs error message.
