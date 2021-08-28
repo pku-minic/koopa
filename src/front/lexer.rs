@@ -75,7 +75,7 @@ impl<T: Read> Lexer<T> {
       } else if c.is_alphabetic() {
         // keywords or operands
         self.handle_keyword()
-      } else if c.is_numeric() {
+      } else if c.is_numeric() || c == '-' {
         // integer literals
         self.handle_integer()
       } else {
@@ -116,7 +116,8 @@ impl<T: Read> Lexer<T> {
   fn handle_integer(&mut self) -> Result {
     let span = Span::new(self.pos);
     // read to string
-    let mut num = String::new();
+    let mut num = String::from(self.last_char.unwrap());
+    self.next_char()?;
     while self.last_char.map_or(false, |c| c.is_numeric()) {
       num.push(self.last_char.unwrap());
       self.next_char()?;
