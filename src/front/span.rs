@@ -39,7 +39,10 @@ impl Span {
   pub fn log_error(&self, message: &str) {
     // TODO: rustc-like error message
     Self::STATE.with(|gs| {
-      let gs = gs.borrow();
+      // update error number
+      let mut gs = gs.borrow_mut();
+      gs.err_num += 1;
+      // print message to stderr
       eprintln!("{}: {}", "error".red(), message);
       eprintln!("   {} {}:{}", "at".blue().dimmed(), gs.file, self.start);
     });
@@ -49,8 +52,11 @@ impl Span {
   pub fn log_warning(&self, message: &str) {
     // TODO: rustc-like warning message
     Self::STATE.with(|gs| {
-      let gs = gs.borrow();
-      eprintln!("{}: {}", "warning".red(), message);
+      // update warning number
+      let mut gs = gs.borrow_mut();
+      gs.warn_num += 1;
+      // print message to stderr
+      eprintln!("{}: {}", "warning".yellow(), message);
       eprintln!("     {} {}:{}", "at".blue().dimmed(), gs.file, self.start);
     });
   }
