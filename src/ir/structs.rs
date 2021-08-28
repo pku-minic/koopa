@@ -132,6 +132,9 @@ pub struct FunctionInner {
 
 impl FunctionInner {
   /// Gets the basic block list.
+  /// 
+  /// If `bbs` is empty, the current function will be a declaration.
+  /// Otherwise, the first basic block in the list will be the entry.
   pub fn bbs(&self) -> &LinkedList<BasicBlockAdapter> {
     &self.bbs
   }
