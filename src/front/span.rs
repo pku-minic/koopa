@@ -123,6 +123,13 @@ impl Span {
       end: span.end,
     }
   }
+
+  /// Checks if the current span is in the same line as the specific span.
+  pub fn is_in_same_line_as(&self, span: &Span) -> bool {
+    self.start.line == self.end.line
+      && span.start.line == span.end.line
+      && self.end.line == span.end.line
+  }
 }
 
 /// Line-column mark.
