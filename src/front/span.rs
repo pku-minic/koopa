@@ -151,7 +151,7 @@ impl Pos {
 }
 
 impl fmt::Display for Pos {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}:{}", self.line, self.col)
   }
 }
@@ -165,7 +165,7 @@ pub enum FileType {
 }
 
 impl fmt::Display for FileType {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       FileType::File(file) => f.write_str(file),
       FileType::Stdin => f.write_str("<stdin>"),

@@ -207,7 +207,7 @@ pub enum BinaryOp {
 }
 
 impl fmt::Display for BinaryOp {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       BinaryOp::NotEq => f.write_str("ne"),
       BinaryOp::Eq => f.write_str("eq"),
@@ -273,7 +273,7 @@ pub enum UnaryOp {
 }
 
 impl fmt::Display for UnaryOp {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       UnaryOp::Neg => f.write_str("neg"),
       UnaryOp::Not => f.write_str("not"),
