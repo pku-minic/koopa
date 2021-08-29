@@ -106,14 +106,14 @@ impl Store {
 pub struct GetPtr {
   src: UseBox,
   index: UseBox,
-  step: Option<usize>,
+  step: Option<i32>,
 }
 
 impl GetPtr {
   /// Creates a pointer calculation.
   ///
   /// The type of the created `GetPtr` will be the dereference of `src`'s type.
-  pub fn new(src: ValueRc, index: ValueRc, step: Option<usize>) -> ValueRc {
+  pub fn new(src: ValueRc, index: ValueRc, step: Option<i32>) -> ValueRc {
     debug_assert!(
       matches!(index.ty().kind(), TypeKind::Int32),
       "``index` must be an integer!"
@@ -144,7 +144,7 @@ impl GetPtr {
   }
 
   /// Gets the step of pointer calculation.
-  pub fn step(&self) -> &Option<usize> {
+  pub fn step(&self) -> &Option<i32> {
     &self.step
   }
 }
