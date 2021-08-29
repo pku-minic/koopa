@@ -46,7 +46,7 @@ pub struct Lexer<T: Read> {
 }
 
 /// Result returned by `Lexer`.
-pub type Result = std::result::Result<Token, String>;
+pub type Result = std::result::Result<Token, ()>;
 
 impl<T: Read> Lexer<T> {
   /// Creates a new `Lexer` from the specific reader.
@@ -91,13 +91,13 @@ impl<T: Read> Lexer<T> {
   }
 
   /// Reads a character from file.
-  fn next_char(&mut self) -> std::result::Result<(), String> {
+  fn next_char(&mut self) -> std::result::Result<(), ()> {
     // NOTE: UTF-8 characters will not be handled here.
     let mut single_char = [0];
     self.last_char = (self
       .reader
       .read(&mut single_char)
-      .map_err(|err| format!("{}", err))?
+      .map_err(|err| Span::log_raw_error(&format!("{}", err)))?
       != 0)
       .then(|| {
         let ch = single_char[0] as char;
@@ -123,13 +123,13 @@ impl<T: Read> Lexer<T> {
       self.next_char()?;
     }
     // convert to integer
+    let span = span.update(self.pos);
     num
       .parse()
-      .map(|i| Token {
-        span: span.update(self.pos),
-        kind: TokenKind::Int(i),
+      .map_err(|_| {
+        span.log_error::<()>("invalid integer literal");
       })
-      .map_err(|_| "invalid integer literal".into())
+      .map(|i| Token::new(span, TokenKind::Int(i)))
   }
 
   /// Handles symbols.
@@ -143,7 +143,7 @@ impl<T: Read> Lexer<T> {
     if self.last_char.map_or(false, |c| c.is_numeric()) {
       // check if is named symbol
       if tag == '@' {
-        return Err("invalid named symbol".into());
+        return span.log_error("invalid named symbol");
       }
       // check the first digit
       let digit = self.last_char.unwrap();
@@ -187,17 +187,18 @@ impl<T: Read> Lexer<T> {
     } else if let Some(op) = UNARY_OPS.get(&keyword) {
       Ok(Token::new(span, TokenKind::UnaryOp(op.clone())))
     } else {
-      Err("invalid keyword/operator".into())
+      span.log_error("invalid keyword/operator")
     }
   }
 
   /// Handles comments.
   fn handle_comment(&mut self) -> Result {
+    let span = Span::new(self.pos);
     // eat '/'
     self.next_char()?;
     // check if is block comment
     if self.last_char == Some('*') {
-      self.handle_block_comment()
+      self.handle_block_comment(span)
     } else if self.last_char == Some('/') {
       // skip the current line
       while self.last_char.map_or(false, |c| c != '\r' && c != '\n') {
@@ -206,12 +207,12 @@ impl<T: Read> Lexer<T> {
       // return the next token
       self.next_token()
     } else {
-      Err("invalid comment".into())
+      span.update(self.pos).log_error("invalid comment")
     }
   }
 
   /// Handles block comments.
-  fn handle_block_comment(&mut self) -> Result {
+  fn handle_block_comment(&mut self, span: Span) -> Result {
     // eat '*'
     self.next_char()?;
     // read until there is '*/' in stream
@@ -222,7 +223,7 @@ impl<T: Read> Lexer<T> {
     }
     // check unclosed block comment
     if self.last_char.is_none() {
-      Err("comment unclosed at EOF".into())
+      span.update(self.pos).log_error("comment unclosed at EOF")
     } else {
       // eat '/'
       self.next_char()?;
