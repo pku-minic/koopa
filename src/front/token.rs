@@ -43,5 +43,5 @@ pub enum Keyword {
   I32,
   Undef, Zeroinit,
   Global, Alloc, Load, Store, Getptr,
-  Br, Jump, Call, Ret, Fun, Phi,
+  Br, Jump, Call, Ret, Fun, Decl, Phi,
 }

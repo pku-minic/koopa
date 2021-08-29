@@ -213,6 +213,7 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
   "call" => Keyword::Call,
   "ret" => Keyword::Ret,
   "fun" => Keyword::Fun,
+  "decl" => Keyword::Decl,
   "phi" => Keyword::Phi,
 };
 
