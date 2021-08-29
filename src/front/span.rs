@@ -1,6 +1,7 @@
 use colored::*;
 use std::cell::RefCell;
 use std::fmt;
+use std::result::Result;
 
 /// A span.
 ///
@@ -35,6 +36,28 @@ impl Span {
     });
   }
 
+  /// Logs error with no span provided.
+  pub fn log_raw_error(message: &str) {
+    Self::STATE.with(|gs| {
+      // update error number
+      let mut gs = gs.borrow_mut();
+      gs.err_num += 1;
+      // print message to stderr
+      eprintln!("{}: {}", "error".red(), message);
+    });
+  }
+
+  /// Logs warning with no span provided.
+  pub fn log_raw_warning(message: &str) {
+    Self::STATE.with(|gs| {
+      // update warning number
+      let mut gs = gs.borrow_mut();
+      gs.warn_num += 1;
+      // print message to stderr
+      eprintln!("{}: {}", "warning".yellow(), message);
+    });
+  }
+
   /// Logs global information (total error/warning number).
   pub fn log_global() {
     Self::STATE.with(|gs| {
@@ -63,29 +86,25 @@ impl Span {
   }
 
   /// Logs error message.
-  pub fn log_error(&self, message: &str) {
+  pub fn log_error<T>(&self, message: &str) -> Result<T, ()> {
     // TODO: rustc-like error message
+    Self::log_raw_error(message);
     Self::STATE.with(|gs| {
-      // update error number
-      let mut gs = gs.borrow_mut();
-      gs.err_num += 1;
-      // print message to stderr
-      eprintln!("{}: {}", "error".red(), message);
-      eprintln!("   {} {}:{}", "at".blue().dimmed(), gs.file, self.start);
+      let file = &gs.borrow().file;
+      eprintln!("   {} {}:{}", "at".blue().dimmed(), file, self.start);
     });
+    Err(())
   }
 
   /// Logs warning message.
-  pub fn log_warning(&self, message: &str) {
+  pub fn log_warning<T>(&self, message: &str) -> Result<T, ()> {
     // TODO: rustc-like warning message
+    Self::log_raw_warning(message);
     Self::STATE.with(|gs| {
-      // update warning number
-      let mut gs = gs.borrow_mut();
-      gs.warn_num += 1;
-      // print message to stderr
-      eprintln!("{}: {}", "warning".yellow(), message);
-      eprintln!("     {} {}:{}", "at".blue().dimmed(), gs.file, self.start);
+      let file = &gs.borrow().file;
+      eprintln!("     {} {}:{}", "at".blue().dimmed(), file, self.start);
     });
+    Err(())
   }
 
   /// Consumes and then updates the end position.
