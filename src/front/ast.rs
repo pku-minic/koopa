@@ -26,7 +26,10 @@ pub enum AstKind {
   /// Pointer type.
   PointerType { base: AstBox },
   /// Function type.
-  FunType { params: Vec<AstBox>, ret: AstBox },
+  FunType {
+    params: Vec<AstBox>,
+    ret: Option<AstBox>,
+  },
 
   /// Symbol refernce.
   SymbolRef { symbol: String },
