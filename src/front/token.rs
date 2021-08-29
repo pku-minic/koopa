@@ -55,8 +55,8 @@ impl fmt::Display for TokenKind {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Keyword {
   I32,
-  Undef, Zeroinit,
-  Global, Alloc, Load, Store, Getptr,
+  Undef, ZeroInit,
+  Global, Alloc, Load, Store, GetPtr,
   Br, Jump, Call, Ret, Fun, Decl, Phi,
 }
 
@@ -65,12 +65,12 @@ impl fmt::Display for Keyword {
     match self {
       Keyword::I32 => f.write_str("i32"),
       Keyword::Undef => f.write_str("undef"),
-      Keyword::Zeroinit => f.write_str("zeroinit"),
+      Keyword::ZeroInit => f.write_str("zeroinit"),
       Keyword::Global => f.write_str("global"),
       Keyword::Alloc => f.write_str("alloc"),
       Keyword::Load => f.write_str("load"),
       Keyword::Store => f.write_str("store"),
-      Keyword::Getptr => f.write_str("getptr"),
+      Keyword::GetPtr => f.write_str("getptr"),
       Keyword::Br => f.write_str("br"),
       Keyword::Jump => f.write_str("jump"),
       Keyword::Call => f.write_str("call"),
