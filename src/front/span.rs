@@ -6,6 +6,7 @@ use std::result::Result;
 /// A span.
 ///
 /// Used to print error messages.
+#[derive(Clone, Copy)]
 pub struct Span {
   start: Pos,
   end: Pos,
