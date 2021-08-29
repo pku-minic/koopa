@@ -11,8 +11,9 @@ pub struct Ast {
 pub type AstBox = Box<Ast>;
 
 impl Ast {
-  fn new(span: Span, kind: AstKind) -> Self {
-    Self { span, kind }
+  /// Creates a new AST box.
+  pub fn new(span: Span, kind: AstKind) -> AstBox {
+    Box::new(Self { span, kind })
   }
 }
 
