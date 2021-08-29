@@ -1,6 +1,7 @@
 use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
 use crate::ir::structs::{BasicBlockRef, FunctionRef};
 use crate::ir::types::{Type, TypeKind};
+use std::fmt;
 
 /// Local memory allocation.
 pub struct Alloc;
@@ -156,20 +157,6 @@ pub struct Binary {
   rhs: UseBox,
 }
 
-/// Supported binary operators.
-#[rustfmt::skip]
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum BinaryOp {
-  // comparison
-  NotEq, Eq, Gt, Lt, Ge, Le,
-  // arithmetic
-  Add, Sub, Mul, Div, Mod,
-  // bitwise operations
-  And, Or, Xor,
-  // shifting
-  Shl, Shr, Sar,
-}
-
 impl Binary {
   /// Creates a binary operation.
   ///
@@ -205,17 +192,48 @@ impl Binary {
   }
 }
 
+/// Supported binary operators.
+#[rustfmt::skip]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum BinaryOp {
+  // comparison
+  NotEq, Eq, Gt, Lt, Ge, Le,
+  // arithmetic
+  Add, Sub, Mul, Div, Mod,
+  // bitwise operations
+  And, Or, Xor,
+  // shifting
+  Shl, Shr, Sar,
+}
+
+impl fmt::Display for BinaryOp {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      BinaryOp::NotEq => f.write_str("ne"),
+      BinaryOp::Eq => f.write_str("eq"),
+      BinaryOp::Gt => f.write_str("gt"),
+      BinaryOp::Lt => f.write_str("lt"),
+      BinaryOp::Ge => f.write_str("ge"),
+      BinaryOp::Le => f.write_str("le"),
+      BinaryOp::Add => f.write_str("add"),
+      BinaryOp::Sub => f.write_str("sub"),
+      BinaryOp::Mul => f.write_str("mul"),
+      BinaryOp::Div => f.write_str("div"),
+      BinaryOp::Mod => f.write_str("mod"),
+      BinaryOp::And => f.write_str("and"),
+      BinaryOp::Or => f.write_str("or"),
+      BinaryOp::Xor => f.write_str("xor"),
+      BinaryOp::Shl => f.write_str("shl"),
+      BinaryOp::Shr => f.write_str("shr"),
+      BinaryOp::Sar => f.write_str("sar"),
+    }
+  }
+}
+
 /// Unary operation
 pub struct Unary {
   op: UnaryOp,
   opr: UseBox,
-}
-
-/// Supported unary operators.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum UnaryOp {
-  Neg, // negation
-  Not, // bitwise not
 }
 
 impl Unary {
@@ -244,6 +262,22 @@ impl Unary {
   /// Gets the operand.
   pub fn opr(&self) -> &UseBox {
     &self.opr
+  }
+}
+
+/// Supported unary operators.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum UnaryOp {
+  Neg, // negation
+  Not, // bitwise not
+}
+
+impl fmt::Display for UnaryOp {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      UnaryOp::Neg => f.write_str("neg"),
+      UnaryOp::Not => f.write_str("not"),
+    }
   }
 }
 
