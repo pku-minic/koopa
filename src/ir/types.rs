@@ -24,7 +24,7 @@ impl fmt::Display for TypeKind {
       TypeKind::Int32 => write!(f, "i32"),
       TypeKind::Unit => write!(f, "unit"),
       TypeKind::Array(t, len) => write!(f, "[{}, {}]", t, len),
-      TypeKind::Pointer(t) => write!(f, "{}*", t),
+      TypeKind::Pointer(t) => write!(f, "*{}", t),
       TypeKind::Function(args, ret) => {
         write!(f, "(")?;
         let mut first = true;
@@ -144,7 +144,7 @@ mod test {
     );
     assert_eq!(
       format!("{}", Type::get_pointer(Type::get_pointer(Type::get_i32()))),
-      "i32**"
+      "**i32"
     );
     assert_eq!(
       format!("{}", Type::get_function(vec![], Type::get_unit())),
