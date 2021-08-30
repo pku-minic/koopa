@@ -1,7 +1,7 @@
 use colored::*;
 use std::cell::RefCell;
-use std::fmt;
 use std::result::Result;
+use std::{default, fmt};
 
 /// A span.
 ///
@@ -131,6 +131,12 @@ impl Span {
   }
 }
 
+impl default::Default for Span {
+  fn default() -> Self {
+    Self::new(Pos::default())
+  }
+}
+
 /// Line-column mark.
 #[derive(Clone, Copy)]
 pub struct Pos {
@@ -153,6 +159,12 @@ impl Pos {
   /// Updates the column number.
   pub fn update_col(&mut self) {
     self.col += 1;
+  }
+}
+
+impl default::Default for Pos {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
