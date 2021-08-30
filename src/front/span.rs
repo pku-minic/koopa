@@ -48,6 +48,8 @@ impl Span {
   /// Logs error with no span provided.
   #[cfg(feature = "no-front-logger")]
   pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
+    // update error number
+    Self::STATE.with(|gs| gs.borrow_mut().err_num += 1);
     Err(message.into())
   }
 
@@ -56,8 +58,7 @@ impl Span {
   pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
     Self::STATE.with(|gs| {
       // update error number
-      let mut gs = gs.borrow_mut();
-      gs.err_num += 1;
+      gs.borrow_mut().err_num += 1;
       // print message to stderr
       eprintln!("{}: {}", "error".bright_red(), message);
     });
@@ -65,17 +66,29 @@ impl Span {
   }
 
   /// Logs warning with no span provided.
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_raw_warning(_: &str) {
+    // update warning number
+    Self::STATE.with(|gs| gs.borrow_mut().warn_num += 1);
+  }
+
+  /// Logs warning with no span provided.
+  #[cfg(not(feature = "no-front-logger"))]
   pub fn log_raw_warning(message: &str) {
     Self::STATE.with(|gs| {
       // update warning number
-      let mut gs = gs.borrow_mut();
-      gs.warn_num += 1;
+      gs.borrow_mut().warn_num += 1;
       // print message to stderr
       eprintln!("{}: {}", "warning".yellow(), message);
     });
   }
 
   /// Logs global information (total error/warning number).
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_global() {}
+
+  /// Logs global information (total error/warning number).
+  #[cfg(not(feature = "no-front-logger"))]
   pub fn log_global() {
     Self::STATE.with(|gs| {
       let gs = gs.borrow();
@@ -110,6 +123,7 @@ impl Span {
   /// Logs error message.
   #[cfg(feature = "no-front-logger")]
   pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
+    Self::log_raw_error::<()>(message).unwrap_err();
     Err(message.into())
   }
 
@@ -127,7 +141,9 @@ impl Span {
 
   /// Logs warning message.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_warning(&self, _: &str) {}
+  pub fn log_warning(&self, message: &str) {
+    Self::log_raw_warning(message);
+  }
 
   /// Logs warning message.
   #[cfg(not(feature = "no-front-logger"))]
