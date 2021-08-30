@@ -1,5 +1,5 @@
 use crate::front::ast::{Ast, AstBox, AstKind};
-use crate::front::lexer::{Lexer, Result as LexerResult};
+use crate::front::lexer::Lexer;
 use crate::front::span::{Error, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
 use std::io::Read;
@@ -7,7 +7,7 @@ use std::io::Read;
 /// Parser of Koopa IR.
 pub struct Parser<T: Read> {
   lexer: Lexer<T>,
-  cur_token: LexerResult,
+  cur_token: Token,
 }
 
 /// Result returned by `Parser`
@@ -15,20 +15,16 @@ pub type Result = std::result::Result<AstBox, Error>;
 
 /// Reads the value of the specific kind of token from lexer.
 macro_rules! read {
-  ($self:ident, $p:path, $prompt:expr) => {
-    match &$self.cur_token {
-      Ok(Token { span, kind }) => {
-        if let $p(v) = kind {
-          let v = v.clone();
-          $self.next_token();
-          Ok(v)
-        } else {
-          span.log_error(&format!("expected {}, found {}", $prompt, kind))
-        }
-      }
-      Err(e) => Err(e.clone()),
+  ($self:ident, $p:path, $prompt:expr) => {{
+    let Token { span, kind } = &$self.cur_token;
+    if let $p(v) = kind {
+      let v = v.clone();
+      $self.next_token()?;
+      Ok(v)
+    } else {
+      span.log_error(&format!("expected {}, found {}", $prompt, kind))
     }
-  };
+  }};
 }
 
 impl<T: Read> Parser<T> {
@@ -36,7 +32,7 @@ impl<T: Read> Parser<T> {
   pub fn new(lexer: Lexer<T>) -> Self {
     let mut parser = Self {
       lexer,
-      cur_token: Ok(Token::default()),
+      cur_token: Token::default(),
     };
     parser.next_token();
     parser
@@ -44,36 +40,35 @@ impl<T: Read> Parser<T> {
 
   /// Parses the next AST.
   pub fn parse_next(&mut self) -> Result {
-    match &self.cur_token {
-      Ok(token) => match token.kind {
-        TokenKind::End => Ok(Ast::new(token.span, AstKind::End)),
-        TokenKind::Keyword(Keyword::Global) => self.parse_global_def(),
-        TokenKind::Keyword(Keyword::Fun) => self.parse_fun_def(),
-        TokenKind::Keyword(Keyword::Decl) => self.parse_fun_decl(),
-        _ => token.span.log_error(&format!(
-          "expected global definition/declaration, found {}",
-          token.kind
-        )),
-      },
-      Err(e) => Err(e.clone()),
+    let Token { span, kind } = &self.cur_token;
+    match kind {
+      TokenKind::End => Ok(Ast::new(*span, AstKind::End)),
+      TokenKind::Keyword(Keyword::Global) => self.parse_global_def(),
+      TokenKind::Keyword(Keyword::Fun) => self.parse_fun_def(),
+      TokenKind::Keyword(Keyword::Decl) => self.parse_fun_decl(),
+      _ => span.log_error(&format!(
+        "expected global definition/declaration, found {}",
+        kind
+      )),
     }
   }
 
   /// Gets the next token.
-  fn next_token(&mut self) {
-    self.cur_token = self.lexer.next_token();
+  fn next_token(&mut self) -> std::result::Result<(), Error> {
+    self.cur_token = self.lexer.next_token()?;
+    Ok(())
   }
 
   /// Gets the current span.
   fn span(&self) -> Span {
-    self.cur_token.as_ref().unwrap().span
+    self.cur_token.span
   }
 
   /// Parses global symbol definitions.
   fn parse_global_def(&mut self) -> Result {
     let span = self.span();
     // eat 'global'
-    self.next_token();
+    self.next_token()?;
     // get symbol name
     let name = read!(self, TokenKind::Symbol, "symbol name")?;
     // check & eat '= alloc'
@@ -103,7 +98,7 @@ impl<T: Read> Parser<T> {
   fn parse_fun_def(&mut self) -> Result {
     let span = self.span();
     // eat 'fun'
-    self.next_token();
+    self.next_token()?;
     // get function name
     let name = read!(self, TokenKind::Symbol, "function name")?;
     // get parameters
@@ -118,7 +113,7 @@ impl<T: Read> Parser<T> {
     // get return type
     let mut ret = None;
     if self.is_token(TokenKind::Other(':')) {
-      self.next_token();
+      self.next_token()?;
       ret = Some(self.parse_type()?);
     }
     // check & eat '{'
@@ -130,7 +125,7 @@ impl<T: Read> Parser<T> {
     }
     // eat '}'
     let span = span.update_span(self.span());
-    self.next_token();
+    self.next_token()?;
     // create function definition
     if bbs.is_empty() {
       span.log_error("expected at least one basic block in function definition")
@@ -151,7 +146,7 @@ impl<T: Read> Parser<T> {
   fn parse_fun_decl(&mut self) -> Result {
     let mut span = self.span();
     // eat 'fun'
-    self.next_token();
+    self.next_token()?;
     // get function name
     let name = read!(self, TokenKind::Symbol, "function name")?;
     // get parameters
@@ -160,7 +155,7 @@ impl<T: Read> Parser<T> {
     // get return type
     let mut ret = None;
     if self.is_token(TokenKind::Other(':')) {
-      self.next_token();
+      self.next_token()?;
       let ty = self.parse_type()?;
       span = span.update_span(ty.span);
       ret = Some(ty);
@@ -171,24 +166,20 @@ impl<T: Read> Parser<T> {
 
   /// Parses types.
   fn parse_type(&mut self) -> Result {
-    match &self.cur_token {
-      Ok(token) => match token.kind {
-        TokenKind::Keyword(Keyword::I32) => self.parse_int_type(),
-        TokenKind::Other('[') => self.parse_array_type(),
-        TokenKind::Other('*') => self.parse_pointer_type(),
-        TokenKind::Other('(') => self.parse_fun_type(),
-        _ => token
-          .span
-          .log_error(&format!("expected type, found {}", token.kind)),
-      },
-      Err(e) => Err(e.clone()),
+    let Token { span, kind } = &self.cur_token;
+    match kind {
+      TokenKind::Keyword(Keyword::I32) => self.parse_int_type(),
+      TokenKind::Other('[') => self.parse_array_type(),
+      TokenKind::Other('*') => self.parse_pointer_type(),
+      TokenKind::Other('(') => self.parse_fun_type(),
+      _ => span.log_error(&format!("expected type, found {}", kind)),
     }
   }
 
   /// Parses 32-bit integer types.
   fn parse_int_type(&mut self) -> Result {
     let span = self.span();
-    self.next_token();
+    self.next_token()?;
     Ok(Ast::new(span, AstKind::IntType))
   }
 
@@ -196,7 +187,7 @@ impl<T: Read> Parser<T> {
   fn parse_array_type(&mut self) -> Result {
     let span = self.span();
     // eat '['
-    self.next_token();
+    self.next_token()?;
     // get base type
     let base = self.parse_type()?;
     // check & eat ','
@@ -212,7 +203,7 @@ impl<T: Read> Parser<T> {
   fn parse_pointer_type(&mut self) -> Result {
     let span = self.span();
     // eat '*'
-    self.next_token();
+    self.next_token()?;
     // get base type
     self
       .parse_type()
@@ -228,7 +219,7 @@ impl<T: Read> Parser<T> {
     // get return type
     let mut ret = None;
     if self.is_token(TokenKind::Other(':')) {
-      self.next_token();
+      self.next_token()?;
       let ty = self.parse_type()?;
       span = span.update_span(ty.span);
       ret = Some(ty);
@@ -247,28 +238,24 @@ impl<T: Read> Parser<T> {
     // get statements
     let mut stmts = Vec::new();
     loop {
-      match &self.cur_token {
-        Ok(token) => match token.kind {
-          TokenKind::Symbol(_) => stmts.push(self.parse_symbol_def()?),
-          TokenKind::Keyword(Keyword::Store) => stmts.push(self.parse_store()?),
-          TokenKind::Keyword(Keyword::Call) => stmts.push(self.parse_fun_call()?),
-          TokenKind::Keyword(Keyword::Br) => {
-            stmts.push(self.parse_branch()?);
-            break;
-          }
-          TokenKind::Keyword(Keyword::Jump) => {
-            stmts.push(self.parse_jump()?);
-            break;
-          }
-          TokenKind::Keyword(Keyword::Ret) => {
-            stmts.push(self.parse_return()?);
-            break;
-          }
-          _ => token
-            .span
-            .log_error(&format!("expected statement, found {}", token.kind))?,
-        },
-        Err(e) => return Err(e.clone()),
+      let Token { span, kind } = &self.cur_token;
+      match kind {
+        TokenKind::Symbol(_) => stmts.push(self.parse_symbol_def()?),
+        TokenKind::Keyword(Keyword::Store) => stmts.push(self.parse_store()?),
+        TokenKind::Keyword(Keyword::Call) => stmts.push(self.parse_fun_call()?),
+        TokenKind::Keyword(Keyword::Br) => {
+          stmts.push(self.parse_branch()?);
+          break;
+        }
+        TokenKind::Keyword(Keyword::Jump) => {
+          stmts.push(self.parse_jump()?);
+          break;
+        }
+        TokenKind::Keyword(Keyword::Ret) => {
+          stmts.push(self.parse_return()?);
+          break;
+        }
+        _ => span.log_error(&format!("expected statement, found {}", kind))?,
       }
     }
     // create basic block
@@ -286,20 +273,16 @@ impl<T: Read> Parser<T> {
     // check & eat '='
     self.expect(TokenKind::Other('='))?;
     // get value
-    match &self.cur_token {
-      Ok(token) => match token.kind {
-        TokenKind::Keyword(Keyword::Alloc) => self.parse_mem_decl(),
-        TokenKind::Keyword(Keyword::Load) => self.parse_load(),
-        TokenKind::Keyword(Keyword::GetPtr) => self.parse_get_pointer(),
-        TokenKind::BinaryOp(_) => self.parse_binary_expr(),
-        TokenKind::UnaryOp(_) => self.parse_unary_expr(),
-        TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
-        TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
-        _ => token
-          .span
-          .log_error(&format!("expected expression, found {}", token.kind)),
-      },
-      Err(e) => return Err(e.clone()),
+    let Token { span: sp, kind } = &self.cur_token;
+    match kind {
+      TokenKind::Keyword(Keyword::Alloc) => self.parse_mem_decl(),
+      TokenKind::Keyword(Keyword::Load) => self.parse_load(),
+      TokenKind::Keyword(Keyword::GetPtr) => self.parse_get_pointer(),
+      TokenKind::BinaryOp(_) => self.parse_binary_expr(),
+      TokenKind::UnaryOp(_) => self.parse_unary_expr(),
+      TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
+      TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
+      _ => sp.log_error(&format!("expected expression, found {}", kind)),
     }
     .map(|value| {
       Ast::new(
@@ -313,7 +296,7 @@ impl<T: Read> Parser<T> {
   fn parse_mem_decl(&mut self) -> Result {
     let span = self.span();
     // eat 'alloc'
-    self.next_token();
+    self.next_token()?;
     // get type
     self
       .parse_type()
@@ -324,7 +307,7 @@ impl<T: Read> Parser<T> {
   fn parse_load(&mut self) -> Result {
     let span = self.span();
     // eat 'load'
-    self.next_token();
+    self.next_token()?;
     // get symbol name
     let span = span.update_span(self.span());
     read!(self, TokenKind::Symbol, "symbol").map(|symbol| Ast::new(span, AstKind::Load { symbol }))
@@ -334,12 +317,12 @@ impl<T: Read> Parser<T> {
   fn parse_store(&mut self) -> Result {
     let span = self.span();
     // eat 'store'
-    self.next_token();
+    self.next_token()?;
     // get value
-    let value = if let Ok(Token {
+    let value = if let Token {
       span,
       kind: TokenKind::Symbol(symbol),
-    }) = &self.cur_token
+    } = &self.cur_token
     {
       Ast::new(
         *span,
@@ -362,7 +345,7 @@ impl<T: Read> Parser<T> {
   fn parse_get_pointer(&mut self) -> Result {
     let mut span = self.span();
     // eat 'getptr'
-    self.next_token();
+    self.next_token()?;
     // get symbol name
     let symbol = read!(self, TokenKind::Symbol, "symbol")?;
     // check & eat ','
@@ -373,7 +356,7 @@ impl<T: Read> Parser<T> {
     // get step
     let mut step = None;
     if self.is_token(TokenKind::Other(',')) {
-      self.next_token();
+      self.next_token()?;
       span = span.update_span(self.span());
       step = Some(read!(self, TokenKind::Int, "step")? as i32);
     }
@@ -419,7 +402,7 @@ impl<T: Read> Parser<T> {
   fn parse_branch(&mut self) -> Result {
     let span = self.span();
     // eat 'branch'
-    self.next_token();
+    self.next_token()?;
     // get condition
     let cond = self.parse_value()?;
     // check & eat ','
@@ -438,7 +421,7 @@ impl<T: Read> Parser<T> {
   fn parse_jump(&mut self) -> Result {
     let span = self.span();
     // eat 'jump'
-    self.next_token();
+    self.next_token()?;
     // get symbol
     let span = span.update_span(self.span());
     read!(self, TokenKind::Symbol, "basic block name")
@@ -449,7 +432,7 @@ impl<T: Read> Parser<T> {
   fn parse_fun_call(&mut self) -> Result {
     let span = self.span();
     // eat 'call'
-    self.next_token();
+    self.next_token()?;
     // get function name
     let fun = read!(self, TokenKind::Symbol, "function name")?;
     // get arguments
@@ -465,7 +448,7 @@ impl<T: Read> Parser<T> {
   fn parse_return(&mut self) -> Result {
     let mut span = self.span();
     // eat 'ret'
-    self.next_token();
+    self.next_token()?;
     // get value
     let mut value = None;
     if span.is_in_same_line_as(&self.span()) {
@@ -481,14 +464,14 @@ impl<T: Read> Parser<T> {
   fn parse_phi(&mut self) -> Result {
     let mut span = self.span();
     // eat 'phi'
-    self.next_token();
+    self.next_token()?;
     // get the first operand
     let (first, sp) = self.parse_phi_opr()?;
     span = span.update_span(sp);
     let mut oprs = vec![first];
     // get the rest operands
     while self.is_token(TokenKind::Other(',')) {
-      self.next_token();
+      self.next_token()?;
       let (opr, sp) = self.parse_phi_opr()?;
       oprs.push(opr);
       span = span.update_span(sp);
@@ -516,55 +499,47 @@ impl<T: Read> Parser<T> {
 
   /// Parses values.
   fn parse_value(&mut self) -> Result {
-    let ret = match &self.cur_token {
-      Ok(token) => match &token.kind {
-        // symbol reference
-        TokenKind::Symbol(s) => Ast::new(token.span, AstKind::SymbolRef { symbol: s.clone() }),
-        // integer literal
-        TokenKind::Int(i) => Ast::new(token.span, AstKind::IntVal { value: *i as i32 }),
-        // undefined value
-        TokenKind::Keyword(Keyword::Undef) => Ast::new(token.span, AstKind::UndefVal),
-        // unknown
-        _ => token
-          .span
-          .log_error(&format!("expected value, found {}", token.kind))?,
-      },
-      Err(e) => return Err(e.clone()),
+    let Token { span, kind } = &self.cur_token;
+    let ret = match kind {
+      // symbol reference
+      TokenKind::Symbol(s) => Ast::new(*span, AstKind::SymbolRef { symbol: s.clone() }),
+      // integer literal
+      TokenKind::Int(i) => Ast::new(*span, AstKind::IntVal { value: *i as i32 }),
+      // undefined value
+      TokenKind::Keyword(Keyword::Undef) => Ast::new(*span, AstKind::UndefVal),
+      // unknown
+      _ => span.log_error(&format!("expected value, found {}", kind))?,
     };
-    self.next_token();
+    self.next_token()?;
     Ok(ret)
   }
 
   /// Parses initializers.
   fn parse_init(&mut self) -> Result {
-    match &self.cur_token {
-      Ok(token) => match &token.kind {
-        // integer literal
-        TokenKind::Int(i) => {
-          let ast = Ast::new(token.span, AstKind::IntVal { value: *i as i32 });
-          self.next_token();
-          Ok(ast)
-        }
-        // undefined value
-        TokenKind::Keyword(Keyword::Undef) => {
-          let ast = Ast::new(token.span, AstKind::UndefVal);
-          self.next_token();
-          Ok(ast)
-        }
-        // zero initializer
-        TokenKind::Keyword(Keyword::ZeroInit) => {
-          let ast = Ast::new(token.span, AstKind::ZeroInit);
-          self.next_token();
-          Ok(ast)
-        }
-        // aggregate
-        TokenKind::Other('{') => self.parse_aggregate(),
-        // unknown
-        _ => token
-          .span
-          .log_error(&format!("expected initializer, found {}", token.kind)),
-      },
-      Err(e) => Err(e.clone()),
+    let Token { span, kind } = &self.cur_token;
+    match kind {
+      // integer literal
+      TokenKind::Int(i) => {
+        let ast = Ast::new(*span, AstKind::IntVal { value: *i as i32 });
+        self.next_token()?;
+        Ok(ast)
+      }
+      // undefined value
+      TokenKind::Keyword(Keyword::Undef) => {
+        let ast = Ast::new(*span, AstKind::UndefVal);
+        self.next_token()?;
+        Ok(ast)
+      }
+      // zero initializer
+      TokenKind::Keyword(Keyword::ZeroInit) => {
+        let ast = Ast::new(*span, AstKind::ZeroInit);
+        self.next_token()?;
+        Ok(ast)
+      }
+      // aggregate
+      TokenKind::Other('{') => self.parse_aggregate(),
+      // unknown
+      _ => span.log_error(&format!("expected initializer, found {}", kind)),
     }
   }
 
@@ -576,7 +551,7 @@ impl<T: Read> Parser<T> {
     // get elements
     let mut elems = vec![self.parse_init()?];
     while self.is_token(TokenKind::Other(',')) {
-      self.next_token();
+      self.next_token()?;
       elems.push(self.parse_init()?);
     }
     // check & eat '}'
@@ -603,7 +578,7 @@ impl<T: Read> Parser<T> {
         if !self.is_token(TokenKind::Other(',')) {
           break;
         }
-        self.next_token();
+        self.next_token()?;
       }
     }
     // check & eat ')'
@@ -612,22 +587,18 @@ impl<T: Read> Parser<T> {
 
   /// Checks if the current token is the specific token.
   fn is_token(&self, tk: TokenKind) -> bool {
-    self.cur_token.as_ref().map_or(false, |t| t.kind == tk)
+    self.cur_token.kind == tk
   }
 
   /// Expects the specific token from lexer.
   fn expect(&mut self, tk: TokenKind) -> std::result::Result<Span, Error> {
-    match &self.cur_token {
-      Ok(Token { span, kind }) => {
-        if kind == &tk {
-          let span = *span;
-          self.next_token();
-          Ok(span)
-        } else {
-          span.log_error(&format!("expected {}, found {}", tk, kind))
-        }
-      }
-      Err(e) => Err(e.clone()),
+    let Token { span, kind } = &self.cur_token;
+    if kind == &tk {
+      let span = *span;
+      self.next_token()?;
+      Ok(span)
+    } else {
+      span.log_error(&format!("expected {}, found {}", tk, kind))
     }
   }
 }
