@@ -1,7 +1,9 @@
 use crate::front::span::Span;
 use crate::ir::instructions::{BinaryOp, UnaryOp};
+use std::cmp::PartialEq;
 
 /// AST of Koopa IR.
+#[derive(Debug)]
 pub struct Ast {
   pub span: Span,
   pub kind: AstKind,
@@ -17,7 +19,15 @@ impl Ast {
   }
 }
 
+impl PartialEq for Ast {
+  fn eq(&self, other: &Self) -> bool {
+    // ignore field `span`
+    self.kind == other.kind
+  }
+}
+
 /// Kind of AST.
+#[derive(Debug, PartialEq)]
 pub enum AstKind {
   /// 32-bit integer type.
   IntType,
