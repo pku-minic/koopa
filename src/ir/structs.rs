@@ -3,7 +3,7 @@ use crate::ir::types::{Type, TypeKind};
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
-use std::slice;
+use std::{default, slice};
 
 /// Represents a program.
 pub struct Program {
@@ -42,6 +42,12 @@ impl Program {
   /// Adds the specific function to the current program.
   pub fn add_func(&mut self, func: FunctionRc) {
     self.funcs.push_back(func);
+  }
+}
+
+impl default::Default for Program {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
@@ -132,7 +138,7 @@ pub struct FunctionInner {
 
 impl FunctionInner {
   /// Gets the basic block list.
-  /// 
+  ///
   /// If `bbs` is empty, the current function will be a declaration.
   /// Otherwise, the first basic block in the list will be the entry.
   pub fn bbs(&self) -> &LinkedList<BasicBlockAdapter> {
