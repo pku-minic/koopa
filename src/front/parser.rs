@@ -725,5 +725,11 @@ mod test {
       })],
     });
     assert_eq!(ast, expected);
+    let ast = parser.parse_next().unwrap();
+    let expected = new_ast(End);
+    assert_eq!(ast, expected);
+    let ast = parser.parse_next().unwrap();
+    let expected = new_ast(End);
+    assert_eq!(ast, expected);
   }
 }
