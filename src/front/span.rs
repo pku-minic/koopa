@@ -3,6 +3,14 @@ use std::cell::RefCell;
 use std::result::Result;
 use std::{default, fmt};
 
+/// The type of error returned by logger methods of `Span`.
+#[cfg(feature = "no-front-logger")]
+pub type Error = String;
+
+/// The type of error returned by logger methods of `Span`.
+#[cfg(not(feature = "no-front-logger"))]
+pub type Error = ();
+
 /// A span.
 ///
 /// Used to print error messages.
@@ -38,7 +46,14 @@ impl Span {
   }
 
   /// Logs error with no span provided.
-  pub fn log_raw_error(message: &str) {
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
+    Err(message.into())
+  }
+
+  /// Logs error with no span provided.
+  #[cfg(not(feature = "no-front-logger"))]
+  pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
     Self::STATE.with(|gs| {
       // update error number
       let mut gs = gs.borrow_mut();
@@ -46,6 +61,7 @@ impl Span {
       // print message to stderr
       eprintln!("{}: {}", "error".bright_red(), message);
     });
+    Err(())
   }
 
   /// Logs warning with no span provided.
@@ -86,10 +102,22 @@ impl Span {
     });
   }
 
+  /// Checks if there are some errors.
+  pub fn has_error() -> bool {
+    Self::STATE.with(|gs| gs.borrow().err_num != 0)
+  }
+
   /// Logs error message.
-  pub fn log_error<T>(&self, message: &str) -> Result<T, ()> {
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
+    Err(message.into())
+  }
+
+  /// Logs error message.
+  #[cfg(not(feature = "no-front-logger"))]
+  pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
     // TODO: rustc-like error message
-    Self::log_raw_error(message);
+    Self::log_raw_error::<()>(message).unwrap_err();
     Self::STATE.with(|gs| {
       let file = &gs.borrow().file;
       eprintln!("  {} {}:{}", "at".blue(), file, self.start);
@@ -98,6 +126,11 @@ impl Span {
   }
 
   /// Logs warning message.
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_warning(&self, _: &str) {}
+
+  /// Logs warning message.
+  #[cfg(not(feature = "no-front-logger"))]
   pub fn log_warning(&self, message: &str) {
     // TODO: rustc-like warning message
     Self::log_raw_warning(message);
