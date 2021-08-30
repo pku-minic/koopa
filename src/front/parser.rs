@@ -34,7 +34,7 @@ impl<T: Read> Parser<T> {
       lexer,
       cur_token: Token::default(),
     };
-    parser.next_token();
+    parser.next_token().unwrap();
     parser
   }
 
