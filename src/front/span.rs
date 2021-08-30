@@ -44,7 +44,7 @@ impl Span {
       let mut gs = gs.borrow_mut();
       gs.err_num += 1;
       // print message to stderr
-      eprintln!("{}: {}", "error".red(), message);
+      eprintln!("{}: {}", "error".bright_red(), message);
     });
   }
 
@@ -65,9 +65,9 @@ impl Span {
       let gs = gs.borrow();
       // error info
       if gs.err_num != 0 {
-        eprint!("{} {}", gs.err_num, "error".red());
+        eprint!("{} {}", gs.err_num, "error".bright_red());
         if gs.err_num > 1 {
-          eprint!("{}", "s".red());
+          eprint!("{}", "s".bright_red());
         }
       }
       // seperator
@@ -78,7 +78,7 @@ impl Span {
       if gs.warn_num != 0 {
         eprint!("{} {}", gs.warn_num, "warning".yellow());
         if gs.warn_num > 1 {
-          eprint!("{}", "s".red());
+          eprint!("{}", "s".yellow());
         }
       }
       // ending
@@ -92,20 +92,19 @@ impl Span {
     Self::log_raw_error(message);
     Self::STATE.with(|gs| {
       let file = &gs.borrow().file;
-      eprintln!("   {} {}:{}", "at".blue().dimmed(), file, self.start);
+      eprintln!("  {} {}:{}", "at".blue(), file, self.start);
     });
     Err(())
   }
 
   /// Logs warning message.
-  pub fn log_warning<T>(&self, message: &str) -> Result<T, ()> {
+  pub fn log_warning(&self, message: &str) {
     // TODO: rustc-like warning message
     Self::log_raw_warning(message);
     Self::STATE.with(|gs| {
       let file = &gs.borrow().file;
-      eprintln!("     {} {}:{}", "at".blue().dimmed(), file, self.start);
+      eprintln!("  {} {}:{}", "at".blue(), file, self.start);
     });
-    Err(())
   }
 
   /// Consumes and then updates the end position.
@@ -163,6 +162,13 @@ impl fmt::Display for Pos {
   }
 }
 
+/// Global state for `Span`.
+struct GlobalState {
+  file: FileType,
+  err_num: usize,
+  warn_num: usize,
+}
+
 /// Type of input file.
 #[derive(Debug, PartialEq)]
 pub enum FileType {
@@ -181,9 +187,41 @@ impl fmt::Display for FileType {
   }
 }
 
-/// Global state for `Span`.
-struct GlobalState {
-  file: FileType,
-  err_num: usize,
-  warn_num: usize,
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn pos_update() {
+    let mut pos = Pos::new();
+    assert_eq!(format!("{}", pos), "1:1");
+    pos.update_col();
+    pos.update_col();
+    assert_eq!(format!("{}", pos), "1:3");
+    pos.update_line();
+    assert_eq!(format!("{}", pos), "2:1");
+    pos.update_line();
+    pos.update_line();
+    assert_eq!(format!("{}", pos), "4:1");
+  }
+
+  #[test]
+  fn span_update() {
+    let mut pos = Pos::new();
+    let span = Span::new(pos);
+    pos.update_col();
+    pos.update_col();
+    let span = span.update(pos);
+    span.log_error::<()>("test error").unwrap_err();
+    span.log_warning("test warning");
+    span.log_warning("test warning 2");
+    Span::log_global();
+    assert_eq!(format!("{}", span.start), "1:1");
+    assert_eq!(format!("{}", span.end), "1:3");
+    let sp = Span::new(Pos { line: 10, col: 10 });
+    let sp = sp.update(Pos { line: 10, col: 15 });
+    let span = span.update_span(sp);
+    assert_eq!(format!("{}", span.start), "1:1");
+    assert_eq!(format!("{}", span.end), "10:15");
+  }
 }
