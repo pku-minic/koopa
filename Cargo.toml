@@ -1,7 +1,17 @@
 [package]
 name = "koopa"
 version = "0.0.1"
+authors = ["MaxXing <x@MaxXSoft.net>"]
 edition = "2018"
+description = "Library for generating/parsing/optimizing Koopa IR."
+readme = "README.md"
+repository = "https://github.com/pku-minic/libKoopa"
+license = "GPL-3.0"
+keywords = ["compiler", "ir"]
+
+[features]
+# disables the front-end logger, returns error messages as strings
+no-front-logger = []
 
 [dependencies]
 intrusive-collections = "0.9"
