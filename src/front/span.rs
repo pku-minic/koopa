@@ -125,9 +125,7 @@ impl Span {
 
   /// Checks if the current span is in the same line as the specific span.
   pub fn is_in_same_line_as(&self, span: &Span) -> bool {
-    self.start.line == self.end.line
-      && span.start.line == span.end.line
-      && self.end.line == span.end.line
+    self.end.line == span.start.line
   }
 }
 
@@ -226,20 +224,23 @@ mod test {
   #[test]
   fn span_update() {
     let mut pos = Pos::new();
-    let span = Span::new(pos);
+    let sp1 = Span::new(pos);
     pos.update_col();
     pos.update_col();
-    let span = span.update(pos);
-    span.log_error::<()>("test error").unwrap_err();
-    span.log_warning("test warning");
-    span.log_warning("test warning 2");
+    let sp2 = sp1.update(pos);
+    assert_eq!(sp1.is_in_same_line_as(&sp2), true);
+    sp2.log_error::<()>("test error").unwrap_err();
+    sp2.log_warning("test warning");
+    sp2.log_warning("test warning 2");
     Span::log_global();
-    assert_eq!(format!("{}", span.start), "1:1");
-    assert_eq!(format!("{}", span.end), "1:3");
+    assert_eq!(format!("{}", sp2.start), "1:1");
+    assert_eq!(format!("{}", sp2.end), "1:3");
     let sp = Span::new(Pos { line: 10, col: 10 });
     let sp = sp.update(Pos { line: 10, col: 15 });
-    let span = span.update_span(sp);
-    assert_eq!(format!("{}", span.start), "1:1");
-    assert_eq!(format!("{}", span.end), "10:15");
+    assert_eq!(sp2.is_in_same_line_as(&sp), false);
+    let sp3 = sp2.update_span(sp);
+    assert_eq!(sp2.is_in_same_line_as(&sp3), true);
+    assert_eq!(format!("{}", sp3.start), "1:1");
+    assert_eq!(format!("{}", sp3.end), "10:15");
   }
 }
