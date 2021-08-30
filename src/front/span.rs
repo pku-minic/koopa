@@ -137,6 +137,12 @@ impl default::Default for Span {
   }
 }
 
+impl fmt::Debug for Span {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}-{}", self.start, self.end)
+  }
+}
+
 /// Line-column mark.
 #[derive(Clone, Copy)]
 pub struct Pos {
