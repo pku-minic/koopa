@@ -18,7 +18,7 @@ impl Token {
 impl Default for Token {
   fn default() -> Self {
     Self {
-      span: Span::new(Pos::new()),
+      span: Span::default(),
       kind: TokenKind::End,
     }
   }
