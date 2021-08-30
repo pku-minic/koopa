@@ -34,7 +34,7 @@ pub enum AstKind {
   /// Symbol refernce.
   SymbolRef { symbol: String },
   /// Integer literal.
-  IntVal { value: i64 },
+  IntVal { value: i32 },
   /// Undefined value.
   UndefVal,
   /// Aggregate value.
