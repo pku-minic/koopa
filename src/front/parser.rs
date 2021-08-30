@@ -1,6 +1,6 @@
 use crate::front::ast::{Ast, AstBox, AstKind};
 use crate::front::lexer::{Lexer, Result as LexerResult};
-use crate::front::span::Span;
+use crate::front::span::{Error, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
 use std::io::Read;
 
@@ -11,21 +11,22 @@ pub struct Parser<T: Read> {
 }
 
 /// Result returned by `Parser`
-pub type Result = std::result::Result<AstBox, ()>;
+pub type Result = std::result::Result<AstBox, Error>;
 
 /// Reads the value of the specific kind of token from lexer.
 macro_rules! read {
   ($self:ident, $p:path, $prompt:expr) => {
-    if let Ok(Token { span, kind }) = &$self.cur_token {
-      if let $p(v) = kind {
-        let v = v.clone();
-        $self.next_token();
-        Ok(v)
-      } else {
-        span.log_error(&format!("expected {}, found {}", $prompt, kind))
+    match &$self.cur_token {
+      Ok(Token { span, kind }) => {
+        if let $p(v) = kind {
+          let v = v.clone();
+          $self.next_token();
+          Ok(v)
+        } else {
+          span.log_error(&format!("expected {}, found {}", $prompt, kind))
+        }
       }
-    } else {
-      Err(())
+      Err(e) => Err(e.clone()),
     }
   };
 }
@@ -54,7 +55,7 @@ impl<T: Read> Parser<T> {
           token.kind
         )),
       },
-      Err(_) => Err(()),
+      Err(e) => Err(e.clone()),
     }
   }
 
@@ -180,7 +181,7 @@ impl<T: Read> Parser<T> {
           .span
           .log_error(&format!("expected type, found {}", token.kind)),
       },
-      Err(_) => Err(()),
+      Err(e) => Err(e.clone()),
     }
   }
 
@@ -267,7 +268,7 @@ impl<T: Read> Parser<T> {
             .span
             .log_error(&format!("expected statement, found {}", token.kind))?,
         },
-        Err(_) => return Err(()),
+        Err(e) => return Err(e.clone()),
       }
     }
     // create basic block
@@ -298,7 +299,7 @@ impl<T: Read> Parser<T> {
           .span
           .log_error(&format!("expected expression, found {}", token.kind)),
       },
-      Err(_) => return Err(()),
+      Err(e) => return Err(e.clone()),
     }
     .map(|value| {
       Ast::new(
@@ -497,7 +498,7 @@ impl<T: Read> Parser<T> {
   }
 
   /// Parses phi operands.
-  fn parse_phi_opr(&mut self) -> std::result::Result<((AstBox, String), Span), ()> {
+  fn parse_phi_opr(&mut self) -> std::result::Result<((AstBox, String), Span), Error> {
     let span = self.span();
     // check & eat '('
     self.expect(TokenKind::Other('('))?;
@@ -528,7 +529,7 @@ impl<T: Read> Parser<T> {
           .span
           .log_error(&format!("expected value, found {}", token.kind))?,
       },
-      Err(_) => return Err(()),
+      Err(e) => return Err(e.clone()),
     };
     self.next_token();
     Ok(ret)
@@ -563,7 +564,7 @@ impl<T: Read> Parser<T> {
           .span
           .log_error(&format!("expected initializer, found {}", token.kind)),
       },
-      Err(_) => Err(()),
+      Err(e) => Err(e.clone()),
     }
   }
 
@@ -586,9 +587,9 @@ impl<T: Read> Parser<T> {
   }
 
   /// Parses comma-seperated lists.
-  fn parse_list<F, U>(&mut self, parser: F) -> std::result::Result<(Vec<U>, Span), ()>
+  fn parse_list<F, U>(&mut self, parser: F) -> std::result::Result<(Vec<U>, Span), Error>
   where
-    F: Fn(&mut Self) -> std::result::Result<U, ()>,
+    F: Fn(&mut Self) -> std::result::Result<U, Error>,
   {
     // check & eat left bracket
     self.expect(TokenKind::Other('('))?;
@@ -615,17 +616,18 @@ impl<T: Read> Parser<T> {
   }
 
   /// Expects the specific token from lexer.
-  fn expect(&mut self, tk: TokenKind) -> std::result::Result<Span, ()> {
-    if let Ok(Token { span, kind }) = &self.cur_token {
-      if kind == &tk {
-        let span = *span;
-        self.next_token();
-        Ok(span)
-      } else {
-        span.log_error(&format!("expected {}, found {}", tk, kind))
+  fn expect(&mut self, tk: TokenKind) -> std::result::Result<Span, Error> {
+    match &self.cur_token {
+      Ok(Token { span, kind }) => {
+        if kind == &tk {
+          let span = *span;
+          self.next_token();
+          Ok(span)
+        } else {
+          span.log_error(&format!("expected {}, found {}", tk, kind))
+        }
       }
-    } else {
-      Err(())
+      Err(e) => Err(e.clone()),
     }
   }
 }

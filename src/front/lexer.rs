@@ -1,4 +1,4 @@
-use crate::front::span::{Pos, Span};
+use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
 use crate::ir::instructions::{BinaryOp, UnaryOp};
 use phf::phf_map;
@@ -13,7 +13,7 @@ pub struct Lexer<T: Read> {
 }
 
 /// Result returned by `Lexer`.
-pub type Result = std::result::Result<Token, ()>;
+pub type Result = std::result::Result<Token, Error>;
 
 impl<T: Read> Lexer<T> {
   /// Creates a new `Lexer` from the specific reader.
@@ -58,13 +58,13 @@ impl<T: Read> Lexer<T> {
   }
 
   /// Reads a character from file.
-  fn next_char(&mut self) -> std::result::Result<(), ()> {
+  fn next_char(&mut self) -> std::result::Result<(), Error> {
     // NOTE: UTF-8 characters will not be handled here.
     let mut single_char = [0];
     self.last_char = (self
       .reader
       .read(&mut single_char)
-      .map_err(|err| Span::log_raw_error(&format!("{}", err)))?
+      .map_err(|err| Span::log_raw_error::<()>(&format!("{}", err)).unwrap_err())?
       != 0)
       .then(|| {
         let ch = single_char[0] as char;
