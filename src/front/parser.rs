@@ -468,8 +468,9 @@ impl<T: Read> Parser<T> {
     // get value
     let mut value = None;
     if span.is_in_same_line_as(&self.span()) {
-      span = span.update_span(self.span());
-      value = Some(self.parse_value()?);
+      let val = self.parse_value()?;
+      span = span.update_span(val.span);
+      value = Some(val);
     }
     // create function call
     Ok(Ast::new(span, AstKind::Return { value }))
@@ -626,5 +627,103 @@ impl<T: Read> Parser<T> {
     } else {
       Err(())
     }
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::ir::instructions::BinaryOp;
+  use std::io::Cursor;
+  use AstKind::*;
+
+  fn new_ast(kind: AstKind) -> AstBox {
+    Ast::new(Span::default(), kind)
+  }
+
+  #[test]
+  fn parse_string() {
+    let mut parser = Parser::new(Lexer::new(Cursor::new(
+      r#"
+      global @x = alloc [i32, 10], zeroinit
+
+      fun @test(@i: i32): i32 {
+      %entry:
+        %0 = getptr @x, 2
+        store -1, %0
+        %1 = getptr @x, @i, 4
+        %2 = load %1
+        %3 = mul %2, 7
+        ret %3
+      }
+      "#,
+    )));
+    let ast = parser.parse_next().unwrap();
+    let expected = new_ast(GlobalDef {
+      name: "@x".into(),
+      value: new_ast(GlobalDecl {
+        ty: new_ast(ArrayType {
+          base: new_ast(IntType),
+          len: 10,
+        }),
+        init: new_ast(ZeroInit),
+      }),
+    });
+    assert_eq!(ast, expected);
+    let ast = parser.parse_next().unwrap();
+    let expected = new_ast(FunDef {
+      name: "@test".into(),
+      params: vec![("@i".into(), new_ast(IntType))],
+      ret: Some(new_ast(IntType)),
+      bbs: vec![new_ast(Block {
+        name: "%entry".into(),
+        stmts: vec![
+          new_ast(SymbolDef {
+            name: "%0".into(),
+            value: new_ast(GetPointer {
+              symbol: "@x".into(),
+              value: new_ast(IntVal { value: 2 }),
+              step: None,
+            }),
+          }),
+          new_ast(Store {
+            value: new_ast(IntVal { value: -1 }),
+            symbol: "%0".into(),
+          }),
+          new_ast(SymbolDef {
+            name: "%1".into(),
+            value: new_ast(GetPointer {
+              symbol: "@x".into(),
+              value: new_ast(SymbolRef {
+                symbol: "@i".into(),
+              }),
+              step: Some(4),
+            }),
+          }),
+          new_ast(SymbolDef {
+            name: "%2".into(),
+            value: new_ast(Load {
+              symbol: "%1".into(),
+            }),
+          }),
+          new_ast(SymbolDef {
+            name: "%3".into(),
+            value: new_ast(BinaryExpr {
+              op: BinaryOp::Mul,
+              lhs: new_ast(SymbolRef {
+                symbol: "%2".into(),
+              }),
+              rhs: new_ast(IntVal { value: 7 }),
+            }),
+          }),
+          new_ast(Return {
+            value: Some(new_ast(SymbolRef {
+              symbol: "%3".into(),
+            })),
+          }),
+        ],
+      })],
+    });
+    assert_eq!(ast, expected);
   }
 }
