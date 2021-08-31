@@ -175,6 +175,7 @@ impl Span {
   #[cfg(not(feature = "no-front-logger"))]
   fn print_file_info(&self, file: &FileType, color: Color) {
     eprintln!("  {} {}:{}", "at".blue(), file, self.start);
+    // TODO: handle tab indent
     if let FileType::File(path) = file {
       // open file and get lines
       let mut lines = BufReader::new(File::open(path).unwrap()).lines();
