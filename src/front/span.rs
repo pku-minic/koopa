@@ -7,11 +7,33 @@ use std::{default, fmt};
 
 /// The type of error returned by logger methods of `Span`.
 #[cfg(feature = "no-front-logger")]
-pub type Error = String;
+#[derive(Debug)]
+pub enum Error {
+  Normal(String),
+  Fatal(String),
+}
 
 /// The type of error returned by logger methods of `Span`.
 #[cfg(not(feature = "no-front-logger"))]
-pub type Error = ();
+#[derive(Debug)]
+pub enum Error {
+  Normal,
+  Fatal,
+}
+
+impl Error {
+  /// Checks if the current error is fatal.
+  #[cfg(feature = "no-front-logger")]
+  pub fn is_fatal(&self) -> bool {
+    matches!(self, Error::Fatal(..))
+  }
+
+  /// Checks if the current error is fatal.
+  #[cfg(not(feature = "no-front-logger"))]
+  pub fn is_fatal(&self) -> bool {
+    matches!(self, Error::Fatal)
+  }
+}
 
 /// A span.
 ///
@@ -47,15 +69,15 @@ impl Span {
     });
   }
 
-  /// Logs error with no span provided.
+  /// Logs normal error with no span provided.
   #[cfg(feature = "no-front-logger")]
   pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
     // update error number
     Self::STATE.with(|gs| gs.borrow_mut().err_num += 1);
-    Err(message.into())
+    Err(Error::Normal(message.into()))
   }
 
-  /// Logs error with no span provided.
+  /// Logs normal error with no span provided.
   #[cfg(not(feature = "no-front-logger"))]
   pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
     Self::STATE.with(|gs| {
@@ -64,7 +86,27 @@ impl Span {
       // print message to stderr
       eprintln!("{}: {}", "error".bright_red(), message);
     });
-    Err(())
+    Err(Error::Normal)
+  }
+
+  /// Logs fatal error with no span provided.
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_raw_fatal_error<T>(message: &str) -> Result<T, Error> {
+    // update error number
+    Self::STATE.with(|gs| gs.borrow_mut().err_num += 1);
+    Err(Error::Fatal(message.into()))
+  }
+
+  /// Logs fatal error with no span provided.
+  #[cfg(not(feature = "no-front-logger"))]
+  pub fn log_raw_fatal_error<T>(message: &str) -> Result<T, Error> {
+    Self::STATE.with(|gs| {
+      // update error number
+      gs.borrow_mut().err_num += 1;
+      // print message to stderr
+      eprintln!("{}: {}", "error".bright_red(), message);
+    });
+    Err(Error::Fatal)
   }
 
   /// Logs warning with no span provided.
@@ -122,19 +164,34 @@ impl Span {
     Self::STATE.with(|gs| gs.borrow().err_num != 0)
   }
 
-  /// Logs error message.
+  /// Logs normal error message.
   #[cfg(feature = "no-front-logger")]
   pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
     Self::log_raw_error::<()>(message).unwrap_err();
-    Err(message.into())
+    Err(Error::Normal(message.into()))
   }
 
-  /// Logs error message.
+  /// Logs normal error message.
   #[cfg(not(feature = "no-front-logger"))]
   pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
     Self::log_raw_error::<()>(message).unwrap_err();
     Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
-    Err(())
+    Err(Error::Normal)
+  }
+
+  /// Logs fatal error message.
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_fatal_error<T>(&self, message: &str) -> Result<T, Error> {
+    Self::log_raw_error::<()>(message).unwrap_err();
+    Err(Error::Fatal(message.into()))
+  }
+
+  /// Logs fatal error message.
+  #[cfg(not(feature = "no-front-logger"))]
+  pub fn log_fatal_error<T>(&self, message: &str) -> Result<T, Error> {
+    Self::log_raw_error::<()>(message).unwrap_err();
+    Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
+    Err(Error::Fatal)
   }
 
   /// Logs warning message.
