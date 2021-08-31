@@ -1,4 +1,4 @@
-use crate::front::span::{Pos, Span};
+use crate::front::span::Span;
 use crate::ir::instructions::{BinaryOp, UnaryOp};
 use std::{default::Default, fmt};
 
