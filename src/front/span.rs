@@ -1,5 +1,7 @@
 use colored::*;
 use std::cell::RefCell;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::result::Result;
 use std::{default, fmt};
 
@@ -130,12 +132,8 @@ impl Span {
   /// Logs error message.
   #[cfg(not(feature = "no-front-logger"))]
   pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
-    // TODO: rustc-like error message
     Self::log_raw_error::<()>(message).unwrap_err();
-    Self::STATE.with(|gs| {
-      let file = &gs.borrow().file;
-      eprintln!("  {} {}:{}", "at".blue(), file, self.start);
-    });
+    Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
     Err(())
   }
 
@@ -148,12 +146,8 @@ impl Span {
   /// Logs warning message.
   #[cfg(not(feature = "no-front-logger"))]
   pub fn log_warning(&self, message: &str) {
-    // TODO: rustc-like warning message
     Self::log_raw_warning(message);
-    Self::STATE.with(|gs| {
-      let file = &gs.borrow().file;
-      eprintln!("  {} {}:{}", "at".blue(), file, self.start);
-    });
+    Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::Yellow));
   }
 
   /// Consumes and then updates the end position.
@@ -175,6 +169,69 @@ impl Span {
   /// Checks if the current span is in the same line as the specific span.
   pub fn is_in_same_line_as(&self, span: &Span) -> bool {
     self.end.line == span.start.line
+  }
+
+  /// Prints file information.
+  #[cfg(not(feature = "no-front-logger"))]
+  fn print_file_info(&self, file: &FileType, color: Color) {
+    eprintln!("  {} {}:{}", "at".blue(), file, self.start);
+    if let FileType::File(path) = file {
+      // open file and get lines
+      let mut lines = BufReader::new(File::open(path).unwrap()).lines();
+      if self.start.line == self.end.line {
+        // get some parameters
+        let width = ((self.start.line + 1) as f32).log10().ceil() as usize;
+        let leading = self.start.col as usize - 1;
+        let len = (self.end.col - self.start.col) as usize + 1;
+        // print the current line to stderr
+        let line_num = self.start.line as usize;
+        let line = lines.nth(line_num - 1).unwrap().unwrap();
+        eprintln!("{:w$} {}", "", "|".blue(), w = width);
+        eprintln!("{:w$} {} {}", line_num, "|".blue(), line, w = width);
+        eprint!("{:w$} {} {:l$}", "", "|".blue(), "", w = width, l = leading);
+        eprintln!("{}", format!("{:^>w$}", "", w = len).color(color));
+      } else {
+        // get some parameters
+        let width = ((self.end.line + 1) as f32).log10().ceil() as usize;
+        let start = self.start.col as usize;
+        let end = self.end.col as usize;
+        // print the first line to stderr
+        let line_num = self.start.line as usize;
+        let mut lines = lines.skip(line_num - 1);
+        let line = lines.next().unwrap().unwrap();
+        eprintln!("{:w$} {}", "", "|".blue(), w = width);
+        eprintln!("{:w$} {}   {}", line_num, "|".blue(), line, w = width);
+        eprint!("{:w$} {}  ", "", "|".blue(), w = width);
+        eprintln!("{}", format!("{:_>w$}^", "", w = start).color(color));
+        // print the middle lines to stderr
+        let mid_lines = (self.end.line - self.start.line) as usize - 1;
+        if mid_lines <= 4 {
+          for i in 0..mid_lines {
+            let line = lines.next().unwrap().unwrap();
+            eprint!("{:w$} {} ", line_num + i + 1, "|".blue(), w = width);
+            eprintln!("{} {}", "|".color(color), line);
+          }
+        } else {
+          for i in 0..2usize {
+            let line = lines.next().unwrap().unwrap();
+            eprint!("{:w$} {} ", line_num + i + 1, "|".blue(), w = width);
+            eprintln!("{} {}", "|".color(color), line);
+          }
+          eprint!("{:.>w$} {} {}", "", "|".blue(), "|".color(color), w = width);
+          let line = lines.nth(mid_lines - 3).unwrap().unwrap();
+          eprintln!("{:w$} {} ", self.end.line - 1, "|".blue(), w = width);
+          eprintln!("{} {}", "|".color(color), line);
+        }
+        // print the last line to stderr
+        let line_num = self.end.line as usize;
+        let line = lines.next().unwrap().unwrap();
+        eprint!("{:w$} {} ", line_num, "|".blue(), w = width);
+        eprintln!("{} {}", "|".color(color), line);
+        eprint!("{:w$} {} {}", "", "|".blue(), "|".color(color), w = width);
+        eprintln!("{}", format!("{:_>w$}^", "", w = end).color(color));
+      }
+    }
+    eprintln!();
   }
 }
 
@@ -235,7 +292,6 @@ struct GlobalState {
 }
 
 /// Type of input file.
-#[derive(Debug, PartialEq)]
 pub enum FileType {
   File(String),
   Stdin,
