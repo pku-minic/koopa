@@ -1,9 +1,11 @@
-use colored::*;
 use std::cell::RefCell;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::result::Result;
 use std::{default, fmt};
+
+#[cfg(not(feature = "no-front-logger"))]
+use colored::*;
+#[cfg(not(feature = "no-front-logger"))]
+use std::{fs::File, io::BufRead, io::BufReader};
 
 /// The type of error returned by logger methods of `Span`.
 #[cfg(feature = "no-front-logger")]
@@ -168,7 +170,7 @@ impl Span {
   #[cfg(feature = "no-front-logger")]
   pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
     Self::log_raw_error::<()>(message).unwrap_err();
-    Err(Error::Normal(message.into()))
+    Err(Error::Normal(self.get_error_message(message)))
   }
 
   /// Logs normal error message.
@@ -183,7 +185,7 @@ impl Span {
   #[cfg(feature = "no-front-logger")]
   pub fn log_fatal_error<T>(&self, message: &str) -> Result<T, Error> {
     Self::log_raw_error::<()>(message).unwrap_err();
-    Err(Error::Fatal(message.into()))
+    Err(Error::Fatal(self.get_error_message(message)))
   }
 
   /// Logs fatal error message.
@@ -226,6 +228,12 @@ impl Span {
   /// Checks if the current span is in the same line as the specific span.
   pub fn is_in_same_line_as(&self, span: &Span) -> bool {
     self.end.line == span.start.line
+  }
+
+  /// Gets error message.
+  #[cfg(feature = "no-front-logger")]
+  fn get_error_message(&self, message: &str) -> String {
+    Self::STATE.with(|gs| format!("{}:{}: {}", gs.borrow().file, self.start, message))
   }
 
   /// Prints file information.
