@@ -57,14 +57,16 @@ impl<T: Read> Lexer<T> {
     }
   }
 
-  /// Reads a character from file.
+  /// Reads a character from reader.
+  ///
+  /// If fails, this method will always return a fatal error.
   fn next_char(&mut self) -> std::result::Result<(), Error> {
     // NOTE: UTF-8 characters will not be handled here.
     let mut single_char = [0];
     self.last_char = (self
       .reader
       .read(&mut single_char)
-      .map_err(|err| Span::log_raw_error::<()>(&format!("{}", err)).unwrap_err())?
+      .map_err(|err| Span::log_raw_fatal_error::<()>(&format!("{}", err)).unwrap_err())?
       != 0)
       .then(|| {
         let ch = single_char[0] as char;
@@ -94,7 +96,7 @@ impl<T: Read> Lexer<T> {
     if let Ok(i) = num.parse() {
       Ok(Token::new(span, TokenKind::Int(i)))
     } else {
-      span.log_error("invalid integer literal")
+      self.log_err_and_skip(span, "invalid integer literal")
     }
   }
 
@@ -109,7 +111,7 @@ impl<T: Read> Lexer<T> {
     if self.last_char.map_or(false, |c| c.is_numeric()) {
       // check if is named symbol
       if tag == '@' {
-        return span.log_error("invalid named symbol");
+        return self.log_err_and_skip(span, "invalid named symbol");
       }
       // check the first digit
       let digit = self.last_char.unwrap();
@@ -153,7 +155,7 @@ impl<T: Read> Lexer<T> {
     } else if let Some(op) = UNARY_OPS.get(&keyword) {
       Ok(Token::new(span, TokenKind::UnaryOp(op.clone())))
     } else {
-      span.log_error("invalid keyword/operator")
+      self.log_err_and_skip(span, "invalid keyword/operator")
     }
   }
 
@@ -173,7 +175,7 @@ impl<T: Read> Lexer<T> {
       // return the next token
       self.next_token()
     } else {
-      span.update(self.pos).log_error("invalid comment")
+      self.log_err_and_skip(span.update(self.pos), "invalid comment")
     }
   }
 
@@ -189,12 +191,22 @@ impl<T: Read> Lexer<T> {
     }
     // check unclosed block comment
     if self.last_char.is_none() {
-      span.update(self.pos).log_error("comment unclosed at EOF")
+      self.log_err_and_skip(span.update(self.pos), "comment unclosed at EOF")
     } else {
       // eat '/'
       self.next_char()?;
       self.next_token()
     }
+  }
+
+  /// Logs error message to stderr, and skip to the next space character.
+  ///
+  /// For error recovery support.
+  fn log_err_and_skip(&mut self, span: Span, message: &str) -> Result {
+    while self.last_char.map_or(false, |c| !c.is_whitespace()) {
+      self.next_char()?;
+    }
+    span.log_error(message)
   }
 }
 
