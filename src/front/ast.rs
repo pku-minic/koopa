@@ -116,4 +116,6 @@ pub enum AstKind {
 
   /// End of file.
   End,
+  /// Error
+  Error,
 }
