@@ -134,7 +134,12 @@ impl<T: Read> Lexer<T> {
         self.next_char()?;
       }
     }
-    Ok(Token::new(span.update(self.pos), TokenKind::Symbol(symbol)))
+    // check if only the prefix
+    if symbol.len() == 1 {
+      self.log_err_and_skip(span, "invalid symbol")
+    } else {
+      Ok(Token::new(span.update(self.pos), TokenKind::Symbol(symbol)))
+    }
   }
 
   /// Handles keywords or operands.
