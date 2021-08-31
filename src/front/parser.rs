@@ -27,6 +27,35 @@ macro_rules! read {
   }};
 }
 
+/// Performs token matching, and automatically recovers from errors.
+macro_rules! match_token {
+  (
+    use $self:ident, $span:ident, $kind:ident;
+    $($p:pat => $e:expr,)*
+    ? => $default:expr,
+  ) => {{
+    let ($span, $kind) = ($self.cur_token.span, &$self.cur_token.kind);
+    let result = match $self.cur_token.kind {
+      $($p => $e,)*
+      _ => $default,
+    };
+    match &result {
+      Err(e) if !e.is_fatal() => {
+        let mut span = $span;
+        while !matches!($self.cur_token.kind, $($p)|+) {
+          match $self.next_token() {
+            Err(e) if e.is_fatal() => return Err(e),
+            _ => {}
+          }
+          span = span.update_span($self.cur_token.span);
+        }
+        Ok(Ast::new(span, AstKind::Error))
+      }
+      _ => result,
+    }
+  }};
+}
+
 impl<T: Read> Parser<T> {
   /// Creates a new `Parser` from the specific `Lexer`.
   pub fn new(lexer: Lexer<T>) -> Self {
@@ -40,13 +69,13 @@ impl<T: Read> Parser<T> {
 
   /// Parses the next AST.
   pub fn parse_next(&mut self) -> Result {
-    let Token { span, kind } = &self.cur_token;
-    match kind {
-      TokenKind::End => Ok(Ast::new(*span, AstKind::End)),
+    match_token! {
+      use self, span, kind;
+      TokenKind::End => Ok(Ast::new(span, AstKind::End)),
       TokenKind::Keyword(Keyword::Global) => self.parse_global_def(),
       TokenKind::Keyword(Keyword::Fun) => self.parse_fun_def(),
       TokenKind::Keyword(Keyword::Decl) => self.parse_fun_decl(),
-      _ => span.log_error(&format!(
+      ? => span.log_error(&format!(
         "expected global definition/declaration, found {}",
         kind
       )),
@@ -237,26 +266,18 @@ impl<T: Read> Parser<T> {
     self.expect(TokenKind::Other(':'))?;
     // get statements
     let mut stmts = Vec::new();
-    loop {
-      let Token { span, kind } = &self.cur_token;
-      match kind {
-        TokenKind::Symbol(_) => stmts.push(self.parse_symbol_def()?),
-        TokenKind::Keyword(Keyword::Store) => stmts.push(self.parse_store()?),
-        TokenKind::Keyword(Keyword::Call) => stmts.push(self.parse_fun_call()?),
-        TokenKind::Keyword(Keyword::Br) => {
-          stmts.push(self.parse_branch()?);
-          break;
-        }
-        TokenKind::Keyword(Keyword::Jump) => {
-          stmts.push(self.parse_jump()?);
-          break;
-        }
-        TokenKind::Keyword(Keyword::Ret) => {
-          stmts.push(self.parse_return()?);
-          break;
-        }
-        _ => span.log_error(&format!("expected statement, found {}", kind))?,
-      }
+    let mut exit_flag = false;
+    while !exit_flag {
+      stmts.push(match_token! {
+        use self, span, kind;
+        TokenKind::Symbol(_) => self.parse_symbol_def(),
+        TokenKind::Keyword(Keyword::Store) => self.parse_store(),
+        TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
+        TokenKind::Keyword(Keyword::Br) => { exit_flag = true; self.parse_branch() },
+        TokenKind::Keyword(Keyword::Jump) => { exit_flag = true; self.parse_jump() },
+        TokenKind::Keyword(Keyword::Ret) => { exit_flag = true; self.parse_return() },
+        ? => span.log_error(&format!("expected statement, found {}", kind)),
+      }?);
     }
     // create basic block
     Ok(Ast::new(
@@ -704,5 +725,70 @@ mod test {
     let ast = parser.parse_next().unwrap();
     let expected = new_ast(End);
     assert_eq!(ast, expected);
+  }
+
+  #[test]
+  fn parse_error() {
+    let mut parser = Parser::new(Lexer::new(Cursor::new(
+      r#"
+      global @x = alloc [i32, 10, zeroinit
+
+      fun @test(@i: i32): i32 {
+      %entry:
+        %0 = getptr @x, 2
+        store -1, %
+        %1 = getptr @x, @i, 4
+        %2 = load %1
+        %3 = mul , 7
+        ret %3
+      }
+      "#,
+    )));
+    assert_eq!(parser.parse_next().unwrap(), new_ast(Error));
+    let ast = parser.parse_next().unwrap();
+    let expected = new_ast(FunDef {
+      name: "@test".into(),
+      params: vec![("@i".into(), new_ast(IntType))],
+      ret: Some(new_ast(IntType)),
+      bbs: vec![new_ast(Block {
+        name: "%entry".into(),
+        stmts: vec![
+          new_ast(SymbolDef {
+            name: "%0".into(),
+            value: new_ast(GetPointer {
+              symbol: "@x".into(),
+              value: new_ast(IntVal { value: 2 }),
+              step: None,
+            }),
+          }),
+          new_ast(Error),
+          new_ast(SymbolDef {
+            name: "%1".into(),
+            value: new_ast(GetPointer {
+              symbol: "@x".into(),
+              value: new_ast(SymbolRef {
+                symbol: "@i".into(),
+              }),
+              step: Some(4),
+            }),
+          }),
+          new_ast(SymbolDef {
+            name: "%2".into(),
+            value: new_ast(Load {
+              symbol: "%1".into(),
+            }),
+          }),
+          new_ast(Error),
+          new_ast(Return {
+            value: Some(new_ast(SymbolRef {
+              symbol: "%3".into(),
+            })),
+          }),
+        ],
+      })],
+    });
+    assert_eq!(ast, expected);
+    assert_eq!(parser.parse_next().unwrap(), new_ast(End));
+    assert_eq!(parser.parse_next().unwrap(), new_ast(End));
   }
 }
