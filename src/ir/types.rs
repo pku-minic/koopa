@@ -25,14 +25,14 @@ impl fmt::Display for TypeKind {
       TypeKind::Unit => write!(f, "unit"),
       TypeKind::Array(t, len) => write!(f, "[{}, {}]", t, len),
       TypeKind::Pointer(t) => write!(f, "*{}", t),
-      TypeKind::Function(args, ret) => {
+      TypeKind::Function(params, ret) => {
         write!(f, "(")?;
         let mut first = true;
-        for arg in args.iter() {
+        for param in params.iter() {
           if !first {
             write!(f, ", ")?;
           }
-          write!(f, "{}", arg)?;
+          write!(f, "{}", param)?;
           first = false;
         }
         if !matches!(ret.0.as_ref(), TypeKind::Unit) {
@@ -89,8 +89,8 @@ impl Type {
   }
 
   /// Gets an function type.
-  pub fn get_function(args: Vec<Type>, ret: Type) -> Type {
-    Type::get(TypeKind::Function(args, ret))
+  pub fn get_function(params: Vec<Type>, ret: Type) -> Type {
+    Type::get(TypeKind::Function(params, ret))
   }
 
   /// Gets the kind of the current `Type`.
@@ -147,7 +147,7 @@ mod test {
       "**i32"
     );
     assert_eq!(
-      format!("{}", Type::get_function(vec![], Type::get_unit())),
+      format!("{}", Type::get_function(Vec::new(), Type::get_unit())),
       "()"
     );
     assert_eq!(
