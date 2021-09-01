@@ -17,40 +17,6 @@ impl Ast {
   pub(crate) fn new(span: Span, kind: AstKind) -> AstBox {
     Box::new(Self { span, kind })
   }
-
-  /// Accepts an AST visitor, and calls its corresponding visitor method.
-  pub fn accept<T: AstVisitor>(&self, visitor: &mut T) -> T::Output {
-    match &self.kind {
-      AstKind::IntType(ast) => visitor.visit_int_type(&self.span, ast),
-      AstKind::ArrayType(ast) => visitor.visit_array_type(&self.span, ast),
-      AstKind::PointerType(ast) => visitor.visit_pointer_type(&self.span, ast),
-      AstKind::FunType(ast) => visitor.visit_fun_type(&self.span, ast),
-      AstKind::SymbolRef(ast) => visitor.visit_symbol_ref(&self.span, ast),
-      AstKind::IntVal(ast) => visitor.visit_int_val(&self.span, ast),
-      AstKind::UndefVal(ast) => visitor.visit_undef_val(&self.span, ast),
-      AstKind::Aggregate(ast) => visitor.visit_aggregate(&self.span, ast),
-      AstKind::ZeroInit(ast) => visitor.visit_zero_init(&self.span, ast),
-      AstKind::SymbolDef(ast) => visitor.visit_symbol_def(&self.span, ast),
-      AstKind::GlobalDef(ast) => visitor.visit_global_def(&self.span, ast),
-      AstKind::MemDecl(ast) => visitor.visit_mem_decl(&self.span, ast),
-      AstKind::GlobalDecl(ast) => visitor.visit_global_decl(&self.span, ast),
-      AstKind::Load(ast) => visitor.visit_load(&self.span, ast),
-      AstKind::Store(ast) => visitor.visit_store(&self.span, ast),
-      AstKind::GetPointer(ast) => visitor.visit_get_pointer(&self.span, ast),
-      AstKind::BinaryExpr(ast) => visitor.visit_binary_expr(&self.span, ast),
-      AstKind::UnaryExpr(ast) => visitor.visit_unary_expr(&self.span, ast),
-      AstKind::Branch(ast) => visitor.visit_branch(&self.span, ast),
-      AstKind::Jump(ast) => visitor.visit_jump(&self.span, ast),
-      AstKind::FunCall(ast) => visitor.visit_fun_call(&self.span, ast),
-      AstKind::Return(ast) => visitor.visit_return(&self.span, ast),
-      AstKind::FunDef(ast) => visitor.visit_fun_def(&self.span, ast),
-      AstKind::Block(ast) => visitor.visit_block(&self.span, ast),
-      AstKind::FunDecl(ast) => visitor.visit_fun_decl(&self.span, ast),
-      AstKind::Phi(ast) => visitor.visit_phi(&self.span, ast),
-      AstKind::End(ast) => visitor.visit_end(&self.span, ast),
-      AstKind::Error(ast) => visitor.visit_error(&self.span, ast),
-    }
-  }
 }
 
 impl PartialEq for Ast {
@@ -91,69 +57,6 @@ pub enum AstKind {
   Phi(Phi),
   End(End),
   Error(Error),
-}
-
-/// AST visitor.
-pub trait AstVisitor {
-  /// Return type of all visitor methods.
-  type Output;
-
-  /// Visits `IntType` AST.
-  fn visit_int_type(&mut self, span: &Span, ast: &IntType) -> Self::Output;
-  /// Visits `ArrayType` AST.
-  fn visit_array_type(&mut self, span: &Span, ast: &ArrayType) -> Self::Output;
-  /// Visits `PointerType` AST.
-  fn visit_pointer_type(&mut self, span: &Span, ast: &PointerType) -> Self::Output;
-  /// Visits `FunType` AST.
-  fn visit_fun_type(&mut self, span: &Span, ast: &FunType) -> Self::Output;
-  /// Visits `SymbolRef` AST.
-  fn visit_symbol_ref(&mut self, span: &Span, ast: &SymbolRef) -> Self::Output;
-  /// Visits `IntVal` AST.
-  fn visit_int_val(&mut self, span: &Span, ast: &IntVal) -> Self::Output;
-  /// Visits `UndefVal` AST.
-  fn visit_undef_val(&mut self, span: &Span, ast: &UndefVal) -> Self::Output;
-  /// Visits `Aggregate` AST.
-  fn visit_aggregate(&mut self, span: &Span, ast: &Aggregate) -> Self::Output;
-  /// Visits `ZeroInit` AST.
-  fn visit_zero_init(&mut self, span: &Span, ast: &ZeroInit) -> Self::Output;
-  /// Visits `SymbolDef` AST.
-  fn visit_symbol_def(&mut self, span: &Span, ast: &SymbolDef) -> Self::Output;
-  /// Visits `GlobalDef` AST.
-  fn visit_global_def(&mut self, span: &Span, ast: &GlobalDef) -> Self::Output;
-  /// Visits `MemDecl` AST.
-  fn visit_mem_decl(&mut self, span: &Span, ast: &MemDecl) -> Self::Output;
-  /// Visits `GlobalDecl` AST.
-  fn visit_global_decl(&mut self, span: &Span, ast: &GlobalDecl) -> Self::Output;
-  /// Visits `Load` AST.
-  fn visit_load(&mut self, span: &Span, ast: &Load) -> Self::Output;
-  /// Visits `Store` AST.
-  fn visit_store(&mut self, span: &Span, ast: &Store) -> Self::Output;
-  /// Visits `GetPointer` AST.
-  fn visit_get_pointer(&mut self, span: &Span, ast: &GetPointer) -> Self::Output;
-  /// Visits `BinaryExpr` AST.
-  fn visit_binary_expr(&mut self, span: &Span, ast: &BinaryExpr) -> Self::Output;
-  /// Visits `UnaryExpr` AST.
-  fn visit_unary_expr(&mut self, span: &Span, ast: &UnaryExpr) -> Self::Output;
-  /// Visits `Branch` AST.
-  fn visit_branch(&mut self, span: &Span, ast: &Branch) -> Self::Output;
-  /// Visits `Jump` AST.
-  fn visit_jump(&mut self, span: &Span, ast: &Jump) -> Self::Output;
-  /// Visits `FunCall` AST.
-  fn visit_fun_call(&mut self, span: &Span, ast: &FunCall) -> Self::Output;
-  /// Visits `Return` AST.
-  fn visit_return(&mut self, span: &Span, ast: &Return) -> Self::Output;
-  /// Visits `FunDef` AST.
-  fn visit_fun_def(&mut self, span: &Span, ast: &FunDef) -> Self::Output;
-  /// Visits `Block` AST.
-  fn visit_block(&mut self, span: &Span, ast: &Block) -> Self::Output;
-  /// Visits `FunDecl` AST.
-  fn visit_fun_decl(&mut self, span: &Span, ast: &FunDecl) -> Self::Output;
-  /// Visits `Phi` AST.
-  fn visit_phi(&mut self, span: &Span, ast: &Phi) -> Self::Output;
-  /// Visits `End` AST.
-  fn visit_end(&mut self, span: &Span, ast: &End) -> Self::Output;
-  /// Visits `Error` AST.
-  fn visit_error(&mut self, span: &Span, ast: &Error) -> Self::Output;
 }
 
 /// 32-bit integer type.
