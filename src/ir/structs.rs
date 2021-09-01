@@ -75,7 +75,7 @@ pub type FunctionRc = Rc<Function>;
 pub type FunctionRef = Weak<Function>;
 
 impl Function {
-  /// Creates a new function.
+  /// Creates a new function definition.
   pub fn new(name: String, params: Vec<ValueRc>, ret_ty: Type) -> FunctionRc {
     let ty = Type::get_function(
       params
@@ -96,6 +96,28 @@ impl Function {
       ty,
       name,
       params,
+      inner: RefCell::new(FunctionInner {
+        bbs: LinkedList::default(),
+      }),
+    })
+  }
+
+  /// Creates a new function declaration.
+  pub fn new_decl(name: String, ty: Type) -> FunctionRc {
+    match ty.kind() {
+      TypeKind::Function(params, _) => {
+        debug_assert!(
+          params.iter().all(|p| !matches!(p.kind(), TypeKind::Unit)),
+          "parameter type must not be `unit`!"
+        )
+      }
+      _ => panic!("expected a function type!"),
+    };
+    Rc::new(Self {
+      link: LinkedListLink::new(),
+      ty,
+      name,
+      params: Vec::new(),
       inner: RefCell::new(FunctionInner {
         bbs: LinkedList::default(),
       }),
@@ -184,7 +206,7 @@ impl BasicBlock {
       link: LinkedListLink::new(),
       name,
       inner: RefCell::new(BasicBlockInner {
-        preds: vec![],
+        preds: Vec::new(),
         insts: LinkedList::default(),
       }),
     })
