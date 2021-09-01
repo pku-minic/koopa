@@ -348,7 +348,7 @@ impl Pos {
       }
       '\t' => self.col += Self::TAB_WIDTH,
       _ => self.col += 1,
-    };
+    }
   }
 }
 
