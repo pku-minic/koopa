@@ -46,6 +46,17 @@ pub struct Span {
   end: Pos,
 }
 
+/// Gets the string of the specific line.
+#[cfg(not(feature = "no-front-logger"))]
+macro_rules! get_line_str {
+  ($line:expr) => {
+    $line
+      .unwrap()
+      .unwrap()
+      .replace('\t', &format!("{:w$}", "", w = Pos::TAB_WIDTH as usize))
+  };
+}
+
 impl Span {
   thread_local! {
     static STATE: RefCell<GlobalState> = RefCell::new(GlobalState {
@@ -240,7 +251,6 @@ impl Span {
   #[cfg(not(feature = "no-front-logger"))]
   fn print_file_info(&self, file: &FileType, color: Color) {
     eprintln!("  {} {}:{}", "at".blue(), file, self.start);
-    // TODO: handle tab indent
     if let FileType::File(path) = file {
       // open file and get lines
       let mut lines = BufReader::new(File::open(path).unwrap()).lines();
@@ -251,7 +261,7 @@ impl Span {
         let len = (self.end.col - self.start.col) as usize + 1;
         // print the current line to stderr
         let line_num = self.start.line as usize;
-        let line = lines.nth(line_num - 1).unwrap().unwrap();
+        let line = get_line_str!(lines.nth(line_num - 1));
         eprintln!("{:w$} {}", "", "|".blue(), w = width);
         eprintln!("{:w$} {} {}", line_num, "|".blue(), line, w = width);
         eprint!("{:w$} {} {:l$}", "", "|".blue(), "", w = width, l = leading);
@@ -264,7 +274,7 @@ impl Span {
         // print the first line to stderr
         let line_num = self.start.line as usize;
         let mut lines = lines.skip(line_num - 1);
-        let line = lines.next().unwrap().unwrap();
+        let line = get_line_str!(lines.next());
         eprintln!("{:w$} {}", "", "|".blue(), w = width);
         eprintln!("{:w$} {}   {}", line_num, "|".blue(), line, w = width);
         eprint!("{:w$} {}  ", "", "|".blue(), w = width);
@@ -273,24 +283,24 @@ impl Span {
         let mid_lines = (self.end.line - self.start.line) as usize - 1;
         if mid_lines <= 4 {
           for i in 0..mid_lines {
-            let line = lines.next().unwrap().unwrap();
+            let line = get_line_str!(lines.next());
             eprint!("{:w$} {} ", line_num + i + 1, "|".blue(), w = width);
             eprintln!("{} {}", "|".color(color), line);
           }
         } else {
           for i in 0..2usize {
-            let line = lines.next().unwrap().unwrap();
+            let line = get_line_str!(lines.next());
             eprint!("{:w$} {} ", line_num + i + 1, "|".blue(), w = width);
             eprintln!("{} {}", "|".color(color), line);
           }
           eprint!("{:.>w$} {} {}", "", "|".blue(), "|".color(color), w = width);
-          let line = lines.nth(mid_lines - 3).unwrap().unwrap();
+          let line = get_line_str!(lines.nth(mid_lines - 3));
           eprintln!("{:w$} {} ", self.end.line - 1, "|".blue(), w = width);
           eprintln!("{} {}", "|".color(color), line);
         }
         // print the last line to stderr
         let line_num = self.end.line as usize;
-        let line = lines.next().unwrap().unwrap();
+        let line = get_line_str!(lines.next());
         eprint!("{:w$} {} ", line_num, "|".blue(), w = width);
         eprintln!("{} {}", "|".color(color), line);
         eprint!("{:w$} {} {}", "", "|".blue(), "|".color(color), w = width);
@@ -321,20 +331,24 @@ pub struct Pos {
 }
 
 impl Pos {
+  /// The column width occupied by the tab character.
+  const TAB_WIDTH: u32 = 2;
+
   /// Creates a new mark.
   pub fn new() -> Self {
     Self { line: 1, col: 1 }
   }
 
-  /// Updates the line number and resets the column number.
-  pub fn update_line(&mut self) {
-    self.col = 1;
-    self.line += 1;
-  }
-
-  /// Updates the column number.
-  pub fn update_col(&mut self) {
-    self.col += 1;
+  /// Updates the line number ans column number based on the specific character.
+  pub fn update(&mut self, c: char) {
+    match c {
+      '\n' => {
+        self.col = 1;
+        self.line += 1;
+      }
+      '\t' => self.col += Self::TAB_WIDTH,
+      _ => self.col += 1,
+    };
   }
 }
 
@@ -382,13 +396,13 @@ mod test {
   fn pos_update() {
     let mut pos = Pos::new();
     assert_eq!(format!("{}", pos), "1:1");
-    pos.update_col();
-    pos.update_col();
+    pos.update(' ');
+    pos.update(' ');
     assert_eq!(format!("{}", pos), "1:3");
-    pos.update_line();
+    pos.update('\n');
     assert_eq!(format!("{}", pos), "2:1");
-    pos.update_line();
-    pos.update_line();
+    pos.update('\n');
+    pos.update('\n');
     assert_eq!(format!("{}", pos), "4:1");
   }
 
@@ -396,8 +410,8 @@ mod test {
   fn span_update() {
     let mut pos = Pos::new();
     let sp1 = Span::new(pos);
-    pos.update_col();
-    pos.update_col();
+    pos.update(' ');
+    pos.update(' ');
     let sp2 = sp1.update(pos);
     assert_eq!(sp1.is_in_same_line_as(&sp2), true);
     sp2.log_error::<()>("test error").unwrap_err();
