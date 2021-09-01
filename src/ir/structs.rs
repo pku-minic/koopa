@@ -3,7 +3,7 @@ use crate::ir::types::{Type, TypeKind};
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
-use std::{default, slice};
+use std::slice;
 
 /// Represents a program.
 pub struct Program {
@@ -45,7 +45,7 @@ impl Program {
   }
 }
 
-impl default::Default for Program {
+impl Default for Program {
   fn default() -> Self {
     Self::new()
   }

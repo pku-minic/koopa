@@ -1,6 +1,6 @@
 use std::cell::RefCell;
+use std::fmt;
 use std::result::Result;
-use std::{default, fmt};
 
 #[cfg(not(feature = "no-front-logger"))]
 use colored::*;
@@ -301,7 +301,7 @@ impl Span {
   }
 }
 
-impl default::Default for Span {
+impl Default for Span {
   fn default() -> Self {
     Self::new(Pos::default())
   }
@@ -338,7 +338,7 @@ impl Pos {
   }
 }
 
-impl default::Default for Pos {
+impl Default for Pos {
   fn default() -> Self {
     Self::new()
   }
