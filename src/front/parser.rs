@@ -1,4 +1,4 @@
-use crate::front::ast::{Ast, AstBox, AstKind};
+use crate::front::ast::{self, AstBox};
 use crate::front::lexer::Lexer;
 use crate::front::span::{Error, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
@@ -49,7 +49,7 @@ macro_rules! match_token {
           }
           span = span.update_span($self.cur_token.span);
         }
-        Ok(Ast::new(span, AstKind::Error))
+        Ok(ast::Error::new(span))
       }
       _ => result,
     }
@@ -71,7 +71,7 @@ impl<T: Read> Parser<T> {
   pub fn parse_next(&mut self) -> Result {
     match_token! {
       use self, span, kind;
-      TokenKind::End => Ok(Ast::new(span, AstKind::End)),
+      TokenKind::End => Ok(ast::End::new(span)),
       TokenKind::Keyword(Keyword::Global) => self.parse_global_def(),
       TokenKind::Keyword(Keyword::Fun) => self.parse_fun_def(),
       TokenKind::Keyword(Keyword::Decl) => self.parse_fun_decl(),
@@ -111,15 +111,9 @@ impl<T: Read> Parser<T> {
     self.parse_init().map(|init| {
       let span_last = init.span;
       // create global memory declaration
-      let value = Ast::new(
-        span_alloc.update_span(span_last),
-        AstKind::GlobalDecl { ty, init },
-      );
+      let value = ast::GlobalDecl::new(span_alloc.update_span(span_last), ty, init);
       // create global symbol definition
-      Ast::new(
-        span.update_span(span_last),
-        AstKind::GlobalDef { name, value },
-      )
+      ast::GlobalDef::new(span.update_span(span_last), name, value)
     })
   }
 
@@ -159,15 +153,7 @@ impl<T: Read> Parser<T> {
     if bbs.is_empty() {
       span.log_error("expected at least one basic block in function definition")
     } else {
-      Ok(Ast::new(
-        span,
-        AstKind::FunDef {
-          name,
-          params,
-          ret,
-          bbs,
-        },
-      ))
+      Ok(ast::FunDef::new(span, name, params, ret, bbs))
     }
   }
 
@@ -190,7 +176,7 @@ impl<T: Read> Parser<T> {
       ret = Some(ty);
     }
     // create function declaration
-    Ok(Ast::new(span, AstKind::FunDecl { name, params, ret }))
+    Ok(ast::FunDecl::new(span, name, params, ret))
   }
 
   /// Parses types.
@@ -209,7 +195,7 @@ impl<T: Read> Parser<T> {
   fn parse_int_type(&mut self) -> Result {
     let span = self.span();
     self.next_token()?;
-    Ok(Ast::new(span, AstKind::IntType))
+    Ok(ast::IntType::new(span))
   }
 
   /// Parses array types.
@@ -225,7 +211,7 @@ impl<T: Read> Parser<T> {
     let len = read!(self, TokenKind::Int, "length")? as usize;
     // check & eat ']'
     let span = span.update_span(self.expect(TokenKind::Other(']'))?);
-    Ok(Ast::new(span, AstKind::ArrayType { base, len }))
+    Ok(ast::ArrayType::new(span, base, len))
   }
 
   /// Parses pointer types.
@@ -236,7 +222,7 @@ impl<T: Read> Parser<T> {
     // get base type
     self
       .parse_type()
-      .map(|base| Ast::new(span.update_span(base.span), AstKind::PointerType { base }))
+      .map(|base| ast::PointerType::new(span.update_span(base.span), base))
   }
 
   /// Parses function types.
@@ -254,7 +240,7 @@ impl<T: Read> Parser<T> {
       ret = Some(ty);
     }
     // create function type
-    Ok(Ast::new(span, AstKind::FunType { params, ret }))
+    Ok(ast::FunType::new(span, params, ret))
   }
 
   /// Parses basic blocks.
@@ -280,9 +266,10 @@ impl<T: Read> Parser<T> {
       }?);
     }
     // create basic block
-    Ok(Ast::new(
+    Ok(ast::Block::new(
       span.update_span(stmts.last().unwrap().span),
-      AstKind::Block { name, stmts },
+      name,
+      stmts,
     ))
   }
 
@@ -305,12 +292,7 @@ impl<T: Read> Parser<T> {
       TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
       _ => sp.log_error(&format!("expected expression, found {}", kind)),
     }
-    .map(|value| {
-      Ast::new(
-        span.update_span(value.span),
-        AstKind::SymbolDef { name, value },
-      )
-    })
+    .map(|value| ast::SymbolDef::new(span.update_span(value.span), name, value))
   }
 
   /// Parses memory declarations.
@@ -321,7 +303,7 @@ impl<T: Read> Parser<T> {
     // get type
     self
       .parse_type()
-      .map(|ty| Ast::new(span.update_span(ty.span), AstKind::MemDecl { ty }))
+      .map(|ty| ast::MemDecl::new(span.update_span(ty.span), ty))
   }
 
   /// Parses loads.
@@ -331,7 +313,7 @@ impl<T: Read> Parser<T> {
     self.next_token()?;
     // get symbol name
     let span = span.update_span(self.span());
-    read!(self, TokenKind::Symbol, "symbol").map(|symbol| Ast::new(span, AstKind::Load { symbol }))
+    read!(self, TokenKind::Symbol, "symbol").map(|symbol| ast::Load::new(span, symbol))
   }
 
   /// Parses stores.
@@ -345,12 +327,7 @@ impl<T: Read> Parser<T> {
       kind: TokenKind::Symbol(symbol),
     } = &self.cur_token
     {
-      Ast::new(
-        *span,
-        AstKind::SymbolRef {
-          symbol: symbol.clone(),
-        },
-      )
+      ast::SymbolRef::new(*span, symbol.clone())
     } else {
       self.parse_init()?
     };
@@ -358,8 +335,7 @@ impl<T: Read> Parser<T> {
     self.expect(TokenKind::Other(','))?;
     // get symbol name
     let span = span.update_span(self.span());
-    read!(self, TokenKind::Symbol, "symbol")
-      .map(|symbol| Ast::new(span, AstKind::Store { value, symbol }))
+    read!(self, TokenKind::Symbol, "symbol").map(|symbol| ast::Store::new(span, value, symbol))
   }
 
   /// Parses pointer calculations.
@@ -382,14 +358,7 @@ impl<T: Read> Parser<T> {
       step = Some(read!(self, TokenKind::Int, "step")? as i32);
     }
     // create get pointer
-    Ok(Ast::new(
-      span,
-      AstKind::GetPointer {
-        symbol,
-        value,
-        step,
-      },
-    ))
+    Ok(ast::GetPointer::new(span, symbol, value, step))
   }
 
   /// Parses binary expressions.
@@ -400,12 +369,9 @@ impl<T: Read> Parser<T> {
     // get lhs & rhs
     let lhs = self.parse_value()?;
     self.expect(TokenKind::Other(','))?;
-    self.parse_value().map(|rhs| {
-      Ast::new(
-        span.update_span(rhs.span),
-        AstKind::BinaryExpr { op, lhs, rhs },
-      )
-    })
+    self
+      .parse_value()
+      .map(|rhs| ast::BinaryExpr::new(span.update_span(rhs.span), op, lhs, rhs))
   }
 
   /// Parses unary expressions.
@@ -416,7 +382,7 @@ impl<T: Read> Parser<T> {
     // get operand
     self
       .parse_value()
-      .map(|opr| Ast::new(span.update_span(opr.span), AstKind::UnaryExpr { op, opr }))
+      .map(|opr| ast::UnaryExpr::new(span.update_span(opr.span), op, opr))
   }
 
   /// Parses branches.
@@ -435,7 +401,7 @@ impl<T: Read> Parser<T> {
     // get false target basic block
     let span = span.update_span(self.span());
     read!(self, TokenKind::Symbol, "basic block name")
-      .map(|fbb| Ast::new(span, AstKind::Branch { cond, tbb, fbb }))
+      .map(|fbb| ast::Branch::new(span, cond, tbb, fbb))
   }
 
   /// Parses jumps.
@@ -445,8 +411,7 @@ impl<T: Read> Parser<T> {
     self.next_token()?;
     // get symbol
     let span = span.update_span(self.span());
-    read!(self, TokenKind::Symbol, "basic block name")
-      .map(|target| Ast::new(span, AstKind::Jump { target }))
+    read!(self, TokenKind::Symbol, "basic block name").map(|target| ast::Jump::new(span, target))
   }
 
   /// Parses function calls.
@@ -459,10 +424,7 @@ impl<T: Read> Parser<T> {
     // get arguments
     let (args, sp) = self.parse_list(|s| s.parse_value())?;
     // create function call
-    Ok(Ast::new(
-      span.update_span(sp),
-      AstKind::FunCall { fun, args },
-    ))
+    Ok(ast::FunCall::new(span.update_span(sp), fun, args))
   }
 
   /// Parses returns.
@@ -478,7 +440,7 @@ impl<T: Read> Parser<T> {
       value = Some(val);
     }
     // create function call
-    Ok(Ast::new(span, AstKind::Return { value }))
+    Ok(ast::Return::new(span, value))
   }
 
   /// Parses phi functions.
@@ -498,7 +460,7 @@ impl<T: Read> Parser<T> {
       span = span.update_span(sp);
     }
     // create phi function
-    Ok(Ast::new(span, AstKind::Phi { oprs }))
+    Ok(ast::Phi::new(span, oprs))
   }
 
   /// Parses phi operands.
@@ -523,11 +485,11 @@ impl<T: Read> Parser<T> {
     let Token { span, kind } = &self.cur_token;
     let ret = match kind {
       // symbol reference
-      TokenKind::Symbol(s) => Ast::new(*span, AstKind::SymbolRef { symbol: s.clone() }),
+      TokenKind::Symbol(s) => ast::SymbolRef::new(*span, s.clone()),
       // integer literal
-      TokenKind::Int(i) => Ast::new(*span, AstKind::IntVal { value: *i as i32 }),
+      TokenKind::Int(i) => ast::IntVal::new(*span, *i as i32),
       // undefined value
-      TokenKind::Keyword(Keyword::Undef) => Ast::new(*span, AstKind::UndefVal),
+      TokenKind::Keyword(Keyword::Undef) => ast::UndefVal::new(*span),
       // unknown
       _ => span.log_error(&format!("expected value, found {}", kind))?,
     };
@@ -541,19 +503,19 @@ impl<T: Read> Parser<T> {
     match kind {
       // integer literal
       TokenKind::Int(i) => {
-        let ast = Ast::new(*span, AstKind::IntVal { value: *i as i32 });
+        let ast = ast::IntVal::new(*span, *i as i32);
         self.next_token()?;
         Ok(ast)
       }
       // undefined value
       TokenKind::Keyword(Keyword::Undef) => {
-        let ast = Ast::new(*span, AstKind::UndefVal);
+        let ast = ast::UndefVal::new(*span);
         self.next_token()?;
         Ok(ast)
       }
       // zero initializer
       TokenKind::Keyword(Keyword::ZeroInit) => {
-        let ast = Ast::new(*span, AstKind::ZeroInit);
+        let ast = ast::ZeroInit::new(*span);
         self.next_token()?;
         Ok(ast)
       }
@@ -576,9 +538,9 @@ impl<T: Read> Parser<T> {
       elems.push(self.parse_init()?);
     }
     // check & eat '}'
-    Ok(Ast::new(
+    Ok(ast::Aggregate::new(
       span.update_span(self.expect(TokenKind::Other('}'))?),
-      AstKind::Aggregate { elems },
+      elems,
     ))
   }
 
@@ -629,10 +591,14 @@ mod test {
   use super::*;
   use crate::ir::instructions::BinaryOp;
   use std::io::Cursor;
-  use AstKind::*;
 
-  fn new_ast(kind: AstKind) -> AstBox {
-    Ast::new(Span::default(), kind)
+  macro_rules! new_ast {
+    ($name:ident { $($field:ident: $value:expr),+ $(,)? }) => {
+      ast::$name::new(Span::default(), $($value),+)
+    };
+    ($name:ident) => {
+      ast::$name::new(Span::default())
+    };
   }
 
   #[test]
@@ -653,65 +619,65 @@ mod test {
       "#,
     )));
     let ast = parser.parse_next().unwrap();
-    let expected = new_ast(GlobalDef {
+    let expected = new_ast!(GlobalDef {
       name: "@x".into(),
-      value: new_ast(GlobalDecl {
-        ty: new_ast(ArrayType {
-          base: new_ast(IntType),
+      value: new_ast!(GlobalDecl {
+        ty: new_ast!(ArrayType {
+          base: new_ast!(IntType),
           len: 10,
         }),
-        init: new_ast(ZeroInit),
+        init: new_ast!(ZeroInit),
       }),
     });
     assert_eq!(ast, expected);
     let ast = parser.parse_next().unwrap();
-    let expected = new_ast(FunDef {
+    let expected = new_ast!(FunDef {
       name: "@test".into(),
-      params: vec![("@i".into(), new_ast(IntType))],
-      ret: Some(new_ast(IntType)),
-      bbs: vec![new_ast(Block {
+      params: vec![("@i".into(), new_ast!(IntType))],
+      ret: Some(new_ast!(IntType)),
+      bbs: vec![new_ast!(Block {
         name: "%entry".into(),
         stmts: vec![
-          new_ast(SymbolDef {
+          new_ast!(SymbolDef {
             name: "%0".into(),
-            value: new_ast(GetPointer {
+            value: new_ast!(GetPointer {
               symbol: "@x".into(),
-              value: new_ast(IntVal { value: 2 }),
+              value: new_ast!(IntVal { value: 2 }),
               step: None,
             }),
           }),
-          new_ast(Store {
-            value: new_ast(IntVal { value: -1 }),
+          new_ast!(Store {
+            value: new_ast!(IntVal { value: -1 }),
             symbol: "%0".into(),
           }),
-          new_ast(SymbolDef {
+          new_ast!(SymbolDef {
             name: "%1".into(),
-            value: new_ast(GetPointer {
+            value: new_ast!(GetPointer {
               symbol: "@x".into(),
-              value: new_ast(SymbolRef {
+              value: new_ast!(SymbolRef {
                 symbol: "@i".into(),
               }),
               step: Some(4),
             }),
           }),
-          new_ast(SymbolDef {
+          new_ast!(SymbolDef {
             name: "%2".into(),
-            value: new_ast(Load {
+            value: new_ast!(Load {
               symbol: "%1".into(),
             }),
           }),
-          new_ast(SymbolDef {
+          new_ast!(SymbolDef {
             name: "%3".into(),
-            value: new_ast(BinaryExpr {
+            value: new_ast!(BinaryExpr {
               op: BinaryOp::Mul,
-              lhs: new_ast(SymbolRef {
+              lhs: new_ast!(SymbolRef {
                 symbol: "%2".into(),
               }),
-              rhs: new_ast(IntVal { value: 7 }),
+              rhs: new_ast!(IntVal { value: 7 }),
             }),
           }),
-          new_ast(Return {
-            value: Some(new_ast(SymbolRef {
+          new_ast!(Return {
+            value: Some(new_ast!(SymbolRef {
               symbol: "%3".into(),
             })),
           }),
@@ -720,10 +686,10 @@ mod test {
     });
     assert_eq!(ast, expected);
     let ast = parser.parse_next().unwrap();
-    let expected = new_ast(End);
+    let expected = new_ast!(End);
     assert_eq!(ast, expected);
     let ast = parser.parse_next().unwrap();
-    let expected = new_ast(End);
+    let expected = new_ast!(End);
     assert_eq!(ast, expected);
   }
 
@@ -744,43 +710,43 @@ mod test {
       }
       "#,
     )));
-    assert_eq!(parser.parse_next().unwrap(), new_ast(Error));
+    assert_eq!(parser.parse_next().unwrap(), new_ast!(Error));
     let ast = parser.parse_next().unwrap();
-    let expected = new_ast(FunDef {
+    let expected = new_ast!(FunDef {
       name: "@test".into(),
-      params: vec![("@i".into(), new_ast(IntType))],
-      ret: Some(new_ast(IntType)),
-      bbs: vec![new_ast(Block {
+      params: vec![("@i".into(), new_ast!(IntType))],
+      ret: Some(new_ast!(IntType)),
+      bbs: vec![new_ast!(Block {
         name: "%entry".into(),
         stmts: vec![
-          new_ast(SymbolDef {
+          new_ast!(SymbolDef {
             name: "%0".into(),
-            value: new_ast(GetPointer {
+            value: new_ast!(GetPointer {
               symbol: "@x".into(),
-              value: new_ast(IntVal { value: 2 }),
+              value: new_ast!(IntVal { value: 2 }),
               step: None,
             }),
           }),
-          new_ast(Error),
-          new_ast(SymbolDef {
+          new_ast!(Error),
+          new_ast!(SymbolDef {
             name: "%1".into(),
-            value: new_ast(GetPointer {
+            value: new_ast!(GetPointer {
               symbol: "@x".into(),
-              value: new_ast(SymbolRef {
+              value: new_ast!(SymbolRef {
                 symbol: "@i".into(),
               }),
               step: Some(4),
             }),
           }),
-          new_ast(SymbolDef {
+          new_ast!(SymbolDef {
             name: "%2".into(),
-            value: new_ast(Load {
+            value: new_ast!(Load {
               symbol: "%1".into(),
             }),
           }),
-          new_ast(Error),
-          new_ast(Return {
-            value: Some(new_ast(SymbolRef {
+          new_ast!(Error),
+          new_ast!(Return {
+            value: Some(new_ast!(SymbolRef {
               symbol: "%3".into(),
             })),
           }),
@@ -788,7 +754,7 @@ mod test {
       })],
     });
     assert_eq!(ast, expected);
-    assert_eq!(parser.parse_next().unwrap(), new_ast(End));
-    assert_eq!(parser.parse_next().unwrap(), new_ast(End));
+    assert_eq!(parser.parse_next().unwrap(), new_ast!(End));
+    assert_eq!(parser.parse_next().unwrap(), new_ast!(End));
   }
 }
