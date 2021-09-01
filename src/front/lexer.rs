@@ -69,14 +69,10 @@ impl<T: Read> Lexer<T> {
       .map_err(|err| Span::log_raw_fatal_error::<()>(&format!("{}", err)).unwrap_err())?
       != 0)
       .then(|| {
-        let ch = single_char[0] as char;
+        let c = single_char[0] as char;
         // update the current position
-        if ch == '\n' {
-          self.pos.update_line();
-        } else {
-          self.pos.update_col();
-        }
-        ch
+        self.pos.update(c);
+        c
       });
     Ok(())
   }
