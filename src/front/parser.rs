@@ -29,11 +29,11 @@ macro_rules! read {
 
 /// Performs token matching, and automatically recovers from errors.
 macro_rules! match_token {
-  (
+  {
     use $self:ident, $span:ident, $kind:ident;
     $($p:pat => $e:expr,)*
     ? => $default:expr,
-  ) => {{
+  } => {{
     let ($span, $kind) = ($self.cur_token.span, &$self.cur_token.kind);
     let result = match $self.cur_token.kind {
       $($p => $e,)*
