@@ -287,7 +287,8 @@ impl Span {
         let len = c2 - c1 + 1;
         // print the current line to stderr
         eprintln!("{:w$} {}", "", "|".blue(), w = width);
-        eprintln!("{:w$} {} {}", line_num, "|".blue(), line, w = width);
+        eprint!("{} ", format!("{:w$}", line_num, w = width).blue());
+        eprintln!("{} {}", "|".blue(), line);
         eprint!("{:w$} {} {:l$}", "", "|".blue(), "", w = width, l = leading);
         eprintln!("{}", format!("{:^>w$}", "", w = len).color(color));
       } else {
@@ -298,7 +299,8 @@ impl Span {
         let mut lines = lines.skip(line_num - 1);
         let (line, start) = get_line_str!(lines.next(), self.start.col);
         eprintln!("{:w$} {}", "", "|".blue(), w = width);
-        eprintln!("{:w$} {}   {}", line_num, "|".blue(), line, w = width);
+        eprint!("{} ", format!("{:w$}", line_num, w = width).blue());
+        eprintln!("{}   {}", "|".blue(), line);
         eprint!("{:w$} {}  ", "", "|".blue(), w = width);
         eprintln!("{}", format!("{:_>w$}^", "", w = start).color(color));
         // print the middle lines to stderr
@@ -306,25 +308,25 @@ impl Span {
         if mid_lines <= 4 {
           for i in 0..mid_lines {
             let line = get_line_str!(lines.next());
-            eprint!("{:w$} {} ", line_num + i + 1, "|".blue(), w = width);
-            eprintln!("{} {}", "|".color(color), line);
+            eprint!("{} ", format!("{:w$}", line_num + i + 1, w = width).blue());
+            eprintln!("{} {} {}", "|".blue(), "|".color(color), line);
           }
         } else {
           for i in 0..2usize {
             let line = get_line_str!(lines.next());
-            eprint!("{:w$} {} ", line_num + i + 1, "|".blue(), w = width);
-            eprintln!("{} {}", "|".color(color), line);
+            eprint!("{} ", format!("{:w$}", line_num + i + 1, w = width).blue());
+            eprintln!("{} {} {}", "|".blue(), "|".color(color), line);
           }
           eprint!("{:.>w$} {} {}", "", "|".blue(), "|".color(color), w = width);
           let line = get_line_str!(lines.nth(mid_lines - 3));
-          eprintln!("{:w$} {} ", self.end.line - 1, "|".blue(), w = width);
-          eprintln!("{} {}", "|".color(color), line);
+          eprint!("{} ", format!("{:w$}", self.end.line - 1, w = width).blue());
+          eprintln!("{} {} {}", "|".blue(), "|".color(color), line);
         }
         // print the last line to stderr
         let line_num = self.end.line as usize;
         let (line, end) = get_line_str!(lines.next(), self.end.col);
-        eprint!("{:w$} {} ", line_num, "|".blue(), w = width);
-        eprintln!("{} {}", "|".color(color), line);
+        eprint!("{} ", format!("{:w$}", line_num, w = width).blue());
+        eprintln!("{} {} {}", "|".blue(), "|".color(color), line);
         eprint!("{:w$} {} {}", "", "|".blue(), "|".color(color), w = width);
         eprintln!("{}", format!("{:_>w$}^", "", w = end).color(color));
       }
