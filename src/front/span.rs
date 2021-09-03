@@ -244,20 +244,32 @@ impl Span {
     Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::Yellow));
   }
 
-  /// Consumes and then updates the end position.
-  pub fn update(self, end: Pos) -> Self {
+  /// Converts the current span into a new one
+  /// where the end position has been updated.
+  pub fn into_updated(self, end: Pos) -> Self {
     Self {
       start: self.start,
       end,
     }
   }
 
-  /// Consumes and then updates the ens position according to another span.
-  pub fn update_span(self, span: Span) -> Self {
+  /// Updates the end position.
+  pub fn update(&mut self, end: Pos) {
+    self.end = end;
+  }
+
+  /// Converts the current span into a new one where the end position
+  /// has been updated according to another span.
+  pub fn into_updated_span(self, span: Span) -> Self {
     Self {
       start: self.start,
       end: span.end,
     }
+  }
+
+  /// Updates the end position according to another span.
+  pub fn update_span(&mut self, span: Span) {
+    self.end = span.end;
   }
 
   /// Checks if the current span is in the same line as the specific span.
@@ -357,14 +369,14 @@ pub struct Pos {
 impl Pos {
   /// Creates a new mark.
   pub fn new() -> Self {
-    Self { line: 1, col: 1 }
+    Self { line: 1, col: 0 }
   }
 
   /// Updates the line number ans column number based on the specific character.
   pub fn update(&mut self, c: char) {
     match c {
       '\n' => {
-        self.col = 1;
+        self.col = 0;
         self.line += 1;
       }
       _ => self.col += 1,
@@ -415,24 +427,25 @@ mod test {
   #[test]
   fn pos_update() {
     let mut pos = Pos::new();
-    assert_eq!(format!("{}", pos), "1:1");
+    assert_eq!(format!("{}", pos), "1:0");
     pos.update(' ');
     pos.update(' ');
-    assert_eq!(format!("{}", pos), "1:3");
+    assert_eq!(format!("{}", pos), "1:2");
     pos.update('\n');
-    assert_eq!(format!("{}", pos), "2:1");
+    assert_eq!(format!("{}", pos), "2:0");
     pos.update('\n');
     pos.update('\n');
-    assert_eq!(format!("{}", pos), "4:1");
+    assert_eq!(format!("{}", pos), "4:0");
   }
 
   #[test]
   fn span_update() {
     let mut pos = Pos::new();
+    pos.update(' ');
     let sp1 = Span::new(pos);
     pos.update(' ');
     pos.update(' ');
-    let sp2 = sp1.update(pos);
+    let sp2 = sp1.into_updated(pos);
     assert_eq!(sp1.is_in_same_line_as(&sp2), true);
     sp2.log_error::<()>("test error").unwrap_err();
     sp2.log_warning("test warning");
@@ -440,10 +453,10 @@ mod test {
     Span::log_global();
     assert_eq!(format!("{}", sp2.start), "1:1");
     assert_eq!(format!("{}", sp2.end), "1:3");
-    let sp = Span::new(Pos { line: 10, col: 10 });
-    let sp = sp.update(Pos { line: 10, col: 15 });
+    let mut sp = Span::new(Pos { line: 10, col: 10 });
+    sp.update(Pos { line: 10, col: 15 });
     assert_eq!(sp2.is_in_same_line_as(&sp), false);
-    let sp3 = sp2.update_span(sp);
+    let sp3 = sp2.into_updated_span(sp);
     assert_eq!(sp2.is_in_same_line_as(&sp3), true);
     assert_eq!(format!("{}", sp3.start), "1:1");
     assert_eq!(format!("{}", sp3.end), "10:15");
