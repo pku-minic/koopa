@@ -33,6 +33,7 @@ macro_rules! match_token {
     use $self:ident, $span:ident, $kind:ident;
     $($p:pat => $e:expr,)*
     ? => $default:expr,
+    $(break if $($br_pat:pat)|+ $(=> $br_block:block)?,)?
   } => {{
     let ($span, $kind) = ($self.cur_token.span, &$self.cur_token.kind);
     let result = match $self.cur_token.kind {
@@ -43,6 +44,10 @@ macro_rules! match_token {
       Err(e) if !e.is_fatal() => {
         let mut span = $span;
         while !matches!($self.cur_token.kind, $($p)|+) {
+          $(if matches!($self.cur_token.kind, $($br_pat)|+) {
+            $($br_block)?
+            break;
+          })?
           match $self.next_token() {
             Err(e) if e.is_fatal() => return Err(e),
             _ => {}
@@ -263,6 +268,7 @@ impl<T: Read> Parser<T> {
         TokenKind::Keyword(Keyword::Jump) => { exit_flag = true; self.parse_jump() },
         TokenKind::Keyword(Keyword::Ret) => { exit_flag = true; self.parse_return() },
         ? => span.log_error(&format!("expected statement, found {}", kind)),
+        break if TokenKind::Other('}') => { exit_flag = true; },
       }?);
     }
     // create basic block
