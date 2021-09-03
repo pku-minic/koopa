@@ -47,7 +47,7 @@ macro_rules! match_token {
             Err(e) if e.is_fatal() => return Err(e),
             _ => {}
           }
-          span = span.update_span($self.cur_token.span);
+          span.update_span($self.cur_token.span);
         }
         Ok(ast::Error::new(span))
       }
@@ -111,15 +111,15 @@ impl<T: Read> Parser<T> {
     self.parse_init().map(|init| {
       let span_last = init.span;
       // create global memory declaration
-      let value = ast::GlobalDecl::new(span_alloc.update_span(span_last), ty, init);
+      let value = ast::GlobalDecl::new(span_alloc.into_updated_span(span_last), ty, init);
       // create global symbol definition
-      ast::GlobalDef::new(span.update_span(span_last), name, value)
+      ast::GlobalDef::new(span.into_updated_span(span_last), name, value)
     })
   }
 
   /// Parses function definitions.
   fn parse_fun_def(&mut self) -> Result {
-    let span = self.span();
+    let mut span = self.span();
     // eat 'fun'
     self.next_token()?;
     // get function name
@@ -147,7 +147,7 @@ impl<T: Read> Parser<T> {
       bbs.push(self.parse_block()?);
     }
     // eat '}'
-    let span = span.update_span(self.span());
+    span.update_span(self.span());
     self.next_token()?;
     // create function definition
     if bbs.is_empty() {
@@ -166,13 +166,13 @@ impl<T: Read> Parser<T> {
     let name = read!(self, TokenKind::Symbol, "function name")?;
     // get parameters
     let (params, sp) = self.parse_list(|s| s.parse_type())?;
-    span = span.update_span(sp);
+    span.update_span(sp);
     // get return type
     let mut ret = None;
     if self.is_token(TokenKind::Other(':')) {
       self.next_token()?;
       let ty = self.parse_type()?;
-      span = span.update_span(ty.span);
+      span.update_span(ty.span);
       ret = Some(ty);
     }
     // create function declaration
@@ -200,7 +200,7 @@ impl<T: Read> Parser<T> {
 
   /// Parses array types.
   fn parse_array_type(&mut self) -> Result {
-    let span = self.span();
+    let mut span = self.span();
     // eat '['
     self.next_token()?;
     // get base type
@@ -210,7 +210,7 @@ impl<T: Read> Parser<T> {
     // get length
     let len = read!(self, TokenKind::Int, "length")? as usize;
     // check & eat ']'
-    let span = span.update_span(self.expect(TokenKind::Other(']'))?);
+    span.update_span(self.expect(TokenKind::Other(']'))?);
     Ok(ast::ArrayType::new(span, base, len))
   }
 
@@ -222,7 +222,7 @@ impl<T: Read> Parser<T> {
     // get base type
     self
       .parse_type()
-      .map(|base| ast::PointerType::new(span.update_span(base.span), base))
+      .map(|base| ast::PointerType::new(span.into_updated_span(base.span), base))
   }
 
   /// Parses function types.
@@ -230,13 +230,13 @@ impl<T: Read> Parser<T> {
     let mut span = self.span();
     // get parameter type list
     let (params, sp) = self.parse_list(|s| s.parse_type())?;
-    span = span.update_span(sp);
+    span.update_span(sp);
     // get return type
     let mut ret = None;
     if self.is_token(TokenKind::Other(':')) {
       self.next_token()?;
       let ty = self.parse_type()?;
-      span = span.update_span(ty.span);
+      span.update_span(ty.span);
       ret = Some(ty);
     }
     // create function type
@@ -267,7 +267,7 @@ impl<T: Read> Parser<T> {
     }
     // create basic block
     Ok(ast::Block::new(
-      span.update_span(stmts.last().unwrap().span),
+      span.into_updated_span(stmts.last().unwrap().span),
       name,
       stmts,
     ))
@@ -292,7 +292,7 @@ impl<T: Read> Parser<T> {
       TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
       _ => sp.log_error(&format!("expected expression, found {}", kind)),
     }
-    .map(|value| ast::SymbolDef::new(span.update_span(value.span), name, value))
+    .map(|value| ast::SymbolDef::new(span.into_updated_span(value.span), name, value))
   }
 
   /// Parses memory declarations.
@@ -303,22 +303,22 @@ impl<T: Read> Parser<T> {
     // get type
     self
       .parse_type()
-      .map(|ty| ast::MemDecl::new(span.update_span(ty.span), ty))
+      .map(|ty| ast::MemDecl::new(span.into_updated_span(ty.span), ty))
   }
 
   /// Parses loads.
   fn parse_load(&mut self) -> Result {
-    let span = self.span();
+    let mut span = self.span();
     // eat 'load'
     self.next_token()?;
     // get symbol name
-    let span = span.update_span(self.span());
+    span.update_span(self.span());
     read!(self, TokenKind::Symbol, "symbol").map(|symbol| ast::Load::new(span, symbol))
   }
 
   /// Parses stores.
   fn parse_store(&mut self) -> Result {
-    let span = self.span();
+    let mut span = self.span();
     // eat 'store'
     self.next_token()?;
     // get value
@@ -334,7 +334,7 @@ impl<T: Read> Parser<T> {
     // check & eat ','
     self.expect(TokenKind::Other(','))?;
     // get symbol name
-    let span = span.update_span(self.span());
+    span.update_span(self.span());
     read!(self, TokenKind::Symbol, "symbol").map(|symbol| ast::Store::new(span, value, symbol))
   }
 
@@ -349,12 +349,12 @@ impl<T: Read> Parser<T> {
     self.expect(TokenKind::Other(','))?;
     // get value
     let value = self.parse_value()?;
-    span = span.update_span(value.span);
+    span.update_span(value.span);
     // get step
     let mut step = None;
     if self.is_token(TokenKind::Other(',')) {
       self.next_token()?;
-      span = span.update_span(self.span());
+      span.update_span(self.span());
       step = Some(read!(self, TokenKind::Int, "step")? as i32);
     }
     // create get pointer
@@ -371,7 +371,7 @@ impl<T: Read> Parser<T> {
     self.expect(TokenKind::Other(','))?;
     self
       .parse_value()
-      .map(|rhs| ast::BinaryExpr::new(span.update_span(rhs.span), op, lhs, rhs))
+      .map(|rhs| ast::BinaryExpr::new(span.into_updated_span(rhs.span), op, lhs, rhs))
   }
 
   /// Parses unary expressions.
@@ -382,12 +382,12 @@ impl<T: Read> Parser<T> {
     // get operand
     self
       .parse_value()
-      .map(|opr| ast::UnaryExpr::new(span.update_span(opr.span), op, opr))
+      .map(|opr| ast::UnaryExpr::new(span.into_updated_span(opr.span), op, opr))
   }
 
   /// Parses branches.
   fn parse_branch(&mut self) -> Result {
-    let span = self.span();
+    let mut span = self.span();
     // eat 'branch'
     self.next_token()?;
     // get condition
@@ -399,18 +399,18 @@ impl<T: Read> Parser<T> {
     // check & eat ','
     self.expect(TokenKind::Other(','))?;
     // get false target basic block
-    let span = span.update_span(self.span());
+    span.update_span(self.span());
     read!(self, TokenKind::Symbol, "basic block name")
       .map(|fbb| ast::Branch::new(span, cond, tbb, fbb))
   }
 
   /// Parses jumps.
   fn parse_jump(&mut self) -> Result {
-    let span = self.span();
+    let mut span = self.span();
     // eat 'jump'
     self.next_token()?;
     // get symbol
-    let span = span.update_span(self.span());
+    span.update_span(self.span());
     read!(self, TokenKind::Symbol, "basic block name").map(|target| ast::Jump::new(span, target))
   }
 
@@ -424,7 +424,7 @@ impl<T: Read> Parser<T> {
     // get arguments
     let (args, sp) = self.parse_list(|s| s.parse_value())?;
     // create function call
-    Ok(ast::FunCall::new(span.update_span(sp), fun, args))
+    Ok(ast::FunCall::new(span.into_updated_span(sp), fun, args))
   }
 
   /// Parses returns.
@@ -436,7 +436,7 @@ impl<T: Read> Parser<T> {
     let mut value = None;
     if span.is_in_same_line_as(&self.span()) {
       let val = self.parse_value()?;
-      span = span.update_span(val.span);
+      span.update_span(val.span);
       value = Some(val);
     }
     // create function call
@@ -450,14 +450,14 @@ impl<T: Read> Parser<T> {
     self.next_token()?;
     // get the first operand
     let (first, sp) = self.parse_phi_opr()?;
-    span = span.update_span(sp);
+    span.update_span(sp);
     let mut oprs = vec![first];
     // get the rest operands
     while self.is_token(TokenKind::Other(',')) {
       self.next_token()?;
       let (opr, sp) = self.parse_phi_opr()?;
       oprs.push(opr);
-      span = span.update_span(sp);
+      span.update_span(sp);
     }
     // create phi function
     Ok(ast::Phi::new(span, oprs))
@@ -476,7 +476,7 @@ impl<T: Read> Parser<T> {
     let symbol = read!(self, TokenKind::Symbol, "symbol")?;
     Ok((
       (value, symbol),
-      span.update_span(self.expect(TokenKind::Other(')'))?),
+      span.into_updated_span(self.expect(TokenKind::Other(')'))?),
     ))
   }
 
@@ -539,7 +539,7 @@ impl<T: Read> Parser<T> {
     }
     // check & eat '}'
     Ok(ast::Aggregate::new(
-      span.update_span(self.expect(TokenKind::Other('}'))?),
+      span.into_updated_span(self.expect(TokenKind::Other('}'))?),
       elems,
     ))
   }
