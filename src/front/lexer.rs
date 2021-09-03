@@ -79,16 +79,16 @@ impl<T: Read> Lexer<T> {
 
   /// Handles integer literals.
   fn handle_integer(&mut self) -> Result {
-    let span = Span::new(self.pos);
+    let mut span = Span::new(self.pos);
     // read to string
     let mut num = String::from(self.last_char.unwrap());
     self.next_char()?;
     while self.last_char.map_or(false, |c| c.is_numeric()) {
       num.push(self.last_char.unwrap());
+      span.update(self.pos);
       self.next_char()?;
     }
     // convert to integer
-    let span = span.update(self.pos);
     if let Ok(i) = num.parse() {
       Ok(Token::new(span, TokenKind::Int(i)))
     } else {
@@ -98,7 +98,7 @@ impl<T: Read> Lexer<T> {
 
   /// Handles symbols.
   fn handle_symbol(&mut self) -> Result {
-    let span = Span::new(self.pos);
+    let mut span = Span::new(self.pos);
     let tag = self.last_char.unwrap();
     // read the first char to string
     let mut symbol = String::from(tag);
@@ -112,11 +112,13 @@ impl<T: Read> Lexer<T> {
       // check the first digit
       let digit = self.last_char.unwrap();
       symbol.push(digit);
+      span.update(self.pos);
       self.next_char()?;
       if digit != '0' {
         // read the rest numbers to string
         while self.last_char.map_or(false, |c| c.is_numeric()) {
           symbol.push(self.last_char.unwrap());
+          span.update(self.pos);
           self.next_char()?;
         }
       }
@@ -127,6 +129,7 @@ impl<T: Read> Lexer<T> {
         .map_or(false, |c| c.is_alphanumeric() || c == '_')
       {
         symbol.push(self.last_char.unwrap());
+        span.update(self.pos);
         self.next_char()?;
       }
     }
@@ -134,21 +137,21 @@ impl<T: Read> Lexer<T> {
     if symbol.len() == 1 {
       self.log_err_and_skip(span, "invalid symbol")
     } else {
-      Ok(Token::new(span.update(self.pos), TokenKind::Symbol(symbol)))
+      Ok(Token::new(span, TokenKind::Symbol(symbol)))
     }
   }
 
   /// Handles keywords or operands.
   fn handle_keyword(&mut self) -> Result {
-    let span = Span::new(self.pos);
+    let mut span = Span::new(self.pos);
     // read to string
     let mut keyword = String::new();
     while self.last_char.map_or(false, |c| c.is_alphanumeric()) {
       keyword.push(self.last_char.unwrap());
+      span.update(self.pos);
       self.next_char()?;
     }
     // check the string
-    let span = span.update(self.pos);
     if let Some(keyword) = KEYWORDS.get(&keyword) {
       Ok(Token::new(span, TokenKind::Keyword(keyword.clone())))
     } else if let Some(op) = BINARY_OPS.get(&keyword) {
@@ -176,7 +179,7 @@ impl<T: Read> Lexer<T> {
       // return the next token
       self.next_token()
     } else {
-      self.log_err_and_skip(span.update(self.pos), "invalid comment")
+      self.log_err_and_skip(span.into_updated(self.pos), "invalid comment")
     }
   }
 
@@ -192,7 +195,7 @@ impl<T: Read> Lexer<T> {
     }
     // check unclosed block comment
     if self.last_char.is_none() {
-      self.log_err_and_skip(span.update(self.pos), "comment unclosed at EOF")
+      self.log_err_and_skip(span.into_updated(self.pos), "comment unclosed at EOF")
     } else {
       // eat '/'
       self.next_char()?;
