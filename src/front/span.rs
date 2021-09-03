@@ -53,11 +53,35 @@ macro_rules! get_line_str {
     $line
       .unwrap()
       .unwrap()
-      .replace('\t', &format!("{:w$}", "", w = Pos::TAB_WIDTH as usize))
+      .replace('\t', &format!("{:w$}", "", w = Span::TAB_WIDTH))
   };
+  ($line:expr, $col:expr) => {{
+    let line = $line.unwrap().unwrap();
+    let col = $col as usize;
+    let tabs = (&line[..col]).matches('\t').count();
+    (
+      line.replace('\t', &format!("{:w$}", "", w = Span::TAB_WIDTH)),
+      col + tabs * (Span::TAB_WIDTH - 1),
+    )
+  }};
+  ($line:expr, $col1:expr, $col2:expr) => {{
+    let line = $line.unwrap().unwrap();
+    let col1 = $col1 as usize;
+    let col2 = $col2 as usize;
+    let tabs1 = (&line[..col1]).matches('\t').count();
+    let tabs2 = tabs1 + (&line[col1..col2]).matches('\t').count();
+    (
+      line.replace('\t', &format!("{:w$}", "", w = Span::TAB_WIDTH)),
+      col1 + tabs1 * (Span::TAB_WIDTH - 1),
+      col2 + tabs2 * (Span::TAB_WIDTH - 1),
+    )
+  }};
 }
 
 impl Span {
+  /// The column width occupied by the tab character.
+  const TAB_WIDTH: usize = 2;
+
   thread_local! {
     static STATE: RefCell<GlobalState> = RefCell::new(GlobalState {
       file: FileType::Buffer,
@@ -256,12 +280,12 @@ impl Span {
       let mut lines = BufReader::new(File::open(path).unwrap()).lines();
       if self.start.line == self.end.line {
         // get some parameters
-        let width = ((self.start.line + 1) as f32).log10().ceil() as usize;
-        let leading = self.start.col as usize - 1;
-        let len = (self.end.col - self.start.col) as usize + 1;
-        // print the current line to stderr
         let line_num = self.start.line as usize;
-        let line = get_line_str!(lines.nth(line_num - 1));
+        let (line, c1, c2) = get_line_str!(lines.nth(line_num - 1), self.start.col, self.end.col);
+        let width = ((line_num + 1) as f32).log10().ceil() as usize;
+        let leading = c1 - 1;
+        let len = c2 - c1 + 1;
+        // print the current line to stderr
         eprintln!("{:w$} {}", "", "|".blue(), w = width);
         eprintln!("{:w$} {} {}", line_num, "|".blue(), line, w = width);
         eprint!("{:w$} {} {:l$}", "", "|".blue(), "", w = width, l = leading);
@@ -269,12 +293,10 @@ impl Span {
       } else {
         // get some parameters
         let width = ((self.end.line + 1) as f32).log10().ceil() as usize;
-        let start = self.start.col as usize;
-        let end = self.end.col as usize;
         // print the first line to stderr
         let line_num = self.start.line as usize;
         let mut lines = lines.skip(line_num - 1);
-        let line = get_line_str!(lines.next());
+        let (line, start) = get_line_str!(lines.next(), self.start.col);
         eprintln!("{:w$} {}", "", "|".blue(), w = width);
         eprintln!("{:w$} {}   {}", line_num, "|".blue(), line, w = width);
         eprint!("{:w$} {}  ", "", "|".blue(), w = width);
@@ -300,7 +322,7 @@ impl Span {
         }
         // print the last line to stderr
         let line_num = self.end.line as usize;
-        let line = get_line_str!(lines.next());
+        let (line, end) = get_line_str!(lines.next(), self.end.col);
         eprint!("{:w$} {} ", line_num, "|".blue(), w = width);
         eprintln!("{} {}", "|".color(color), line);
         eprint!("{:w$} {} {}", "", "|".blue(), "|".color(color), w = width);
@@ -331,9 +353,6 @@ pub struct Pos {
 }
 
 impl Pos {
-  /// The column width occupied by the tab character.
-  const TAB_WIDTH: u32 = 2;
-
   /// Creates a new mark.
   pub fn new() -> Self {
     Self { line: 1, col: 1 }
@@ -346,7 +365,6 @@ impl Pos {
         self.col = 1;
         self.line += 1;
       }
-      '\t' => self.col += Self::TAB_WIDTH,
       _ => self.col += 1,
     }
   }
