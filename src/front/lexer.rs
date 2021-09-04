@@ -66,7 +66,7 @@ impl<T: Read> Lexer<T> {
     self.last_char = (self
       .reader
       .read(&mut single_char)
-      .map_err(|err| Span::log_raw_fatal_error::<()>(&format!("{}", err)).unwrap_err())?
+      .map_err(|err| Span::log_raw_fatal_error(&format!("{}", err)))?
       != 0)
       .then(|| {
         let c = single_char[0] as char;
@@ -210,7 +210,7 @@ impl<T: Read> Lexer<T> {
     while self.last_char.map_or(false, |c| !c.is_whitespace()) {
       self.next_char()?;
     }
-    span.log_error(message)
+    span.log_error(message).into()
   }
 }
 
