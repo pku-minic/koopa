@@ -76,7 +76,7 @@ impl Builder {
       .insert(ast.name.clone(), alloc.clone())
       .is_some()
     {
-      span.log_error(format!(
+      span.log_error(&format!(
         "global variable '{}' has already been defined",
         ast.name
       ));
@@ -112,7 +112,7 @@ impl Builder {
       .insert(ast.name.clone(), Rc::downgrade(&def))
       .is_some()
     {
-      span.log_error(format!("function '{}' has already been defined", ast.name));
+      span.log_error(&format!("function '{}' has already been defined", ast.name));
     }
     // add to program
     self.program.add_func(def.clone());
@@ -142,7 +142,7 @@ impl Builder {
       .insert(ast.name.clone(), Rc::downgrade(&decl))
       .is_some()
     {
-      span.log_error(format!("function '{}' has already been defined", ast.name));
+      span.log_error(&format!("function '{}' has already been defined", ast.name));
     }
     // add to program
     self.program.add_func(decl);
@@ -169,7 +169,7 @@ impl Builder {
         )
         .is_some()
       {
-        span.log_error(format!(
+        span.log_error(&format!(
           "basic block '{}' has already been defined",
           block.name
         ));
