@@ -2,20 +2,28 @@ use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::Span;
 use crate::ir::core::ValueRc;
 use crate::ir::instructions as inst;
-use crate::ir::structs::{self, BasicBlockRc, FunctionRc, Program};
+use crate::ir::structs::{self, BasicBlockRc, FunctionRc, FunctionRef, Program};
 use crate::ir::types::Type;
 use crate::ir::values;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 /// Builder for building Koopa IR from AST.
 pub struct Builder {
   program: Program,
   global_vars: HashMap<String, ValueRc>,
-  global_funcs: HashMap<String, FunctionRc>,
-  local_bbs: HashMap<String, BasicBlockRc>,
+  global_funcs: HashMap<String, FunctionRef>,
+  local_bbs: HashMap<String, BasicBlockInfo>,
+}
+
+/// Basic block information.
+struct BasicBlockInfo {
+  bb: BasicBlockRc,
+  preds: Vec<String>,
   local_defs: HashMap<String, ValueRc>,
 }
 
+/// Unwraps the specific AST by its kind.
 macro_rules! unwrap_ast {
   ($ast:expr, $kind:ident) => {
     match &$ast.kind {
@@ -25,7 +33,6 @@ macro_rules! unwrap_ast {
   };
 }
 
-// TODO: check when inserting objects into maps!
 impl Builder {
   /// Creates a new builder.
   pub fn new() -> Self {
@@ -34,16 +41,15 @@ impl Builder {
       global_vars: HashMap::new(),
       global_funcs: HashMap::new(),
       local_bbs: HashMap::new(),
-      local_defs: HashMap::new(),
     }
   }
 
   /// Builds the specific AST into IR.
   pub fn build_on(&mut self, ast: &AstBox) {
     match &ast.kind {
-      AstKind::GlobalDef(ast) => self.build_on_global_def(ast),
-      AstKind::FunDef(ast) => self.build_on_fun_def(ast),
-      AstKind::FunDecl(ast) => self.build_on_fun_decl(ast),
+      AstKind::GlobalDef(def) => self.build_on_global_def(&ast.span, def),
+      AstKind::FunDef(def) => self.build_on_fun_def(&ast.span, def),
+      AstKind::FunDecl(decl) => self.build_on_fun_decl(&ast.span, decl),
       AstKind::Error(_) => todo!(),
       AstKind::End(_) => todo!(),
       _ => panic!("invalid AST input"),
@@ -56,7 +62,7 @@ impl Builder {
   }
 
   /// Builds on global symbol definitions.
-  fn build_on_global_def(&mut self, ast: &ast::GlobalDef) {
+  fn build_on_global_def(&mut self, span: &Span, ast: &ast::GlobalDef) {
     // create global allocation
     let init = self.generate_value(&ast.value);
     let alloc = inst::GlobalAlloc::new(init);
@@ -65,45 +71,53 @@ impl Builder {
       alloc.borrow_mut().set_name(Some(ast.name.clone()));
     }
     // add to global variable map
-    self.global_vars.insert(ast.name.clone(), alloc.clone());
+    if self
+      .global_vars
+      .insert(ast.name.clone(), alloc.clone())
+      .is_some()
+    {
+      span.log_error(format!(
+        "global variable '{}' has already been defined",
+        ast.name
+      ));
+    }
     // add to program
     self.program.add_var(alloc);
   }
 
   /// Builds on function definitions.
-  fn build_on_fun_def(&mut self, ast: &ast::FunDef) {
+  fn build_on_fun_def(&mut self, span: &Span, ast: &ast::FunDef) {
+    // create argument references
+    let args = ast.params.iter().enumerate().map(|(i, (name, ty))| {
+      // create argument reference
+      let arg = values::ArgRef::new(self.generate_type(ty), i);
+      if !name.is_temp() {
+        arg.borrow_mut().set_name(Some(name.clone()));
+      }
+      (name.clone(), arg)
+    });
+    let args: HashMap<_, _> = args.collect();
     // create function definition
     let def = structs::Function::new(
       ast.name.clone(),
-      ast
-        .params
-        .iter()
-        .enumerate()
-        .map(|(i, (name, ty))| {
-          // create argument reference
-          let arg = values::ArgRef::new(self.generate_type(ty), i);
-          if !name.is_temp() {
-            arg.borrow_mut().set_name(Some(name.clone()));
-          }
-          arg
-        })
-        .collect(),
+      args.values().cloned().collect(),
       ast
         .ret
         .as_ref()
         .map_or(Type::get_unit(), |a| self.generate_type(a)),
     );
     // add to global function map
-    self.global_funcs.insert(ast.name.clone(), def.clone());
-    // add to program
-    self.program.add_func(def);
-    // create all basic blocks
-    self.local_bbs.clear();
-    for bb in ast.bbs.iter() {
-      let block = unwrap_ast!(bb, Block);
-      let bb = structs::BasicBlock::new((!block.name.is_temp()).then(|| block.name.clone()));
-      self.local_bbs.insert(block.name.clone(), bb);
+    if self
+      .global_funcs
+      .insert(ast.name.clone(), Rc::downgrade(&def))
+      .is_some()
+    {
+      span.log_error(format!("function '{}' has already been defined", ast.name));
     }
+    // add to program
+    self.program.add_func(def.clone());
+    // initialize local basic block map
+    self.init_local_bbs(def, args, &ast.bbs);
     // build on all basic blocks
     for bb in ast.bbs.iter() {
       self.build_on_block(unwrap_ast!(bb, Block));
@@ -111,7 +125,7 @@ impl Builder {
   }
 
   /// Builds on function declarations.
-  fn build_on_fun_decl(&mut self, ast: &ast::FunDecl) {
+  fn build_on_fun_decl(&mut self, span: &Span, ast: &ast::FunDecl) {
     // get function type
     let ty = Type::get_function(
       ast.params.iter().map(|a| self.generate_type(a)).collect(),
@@ -123,14 +137,84 @@ impl Builder {
     // create function declaration
     let decl = structs::Function::new_decl(ast.name.clone(), ty);
     // add to global function map
-    self.global_funcs.insert(ast.name.clone(), decl.clone());
+    if self
+      .global_funcs
+      .insert(ast.name.clone(), Rc::downgrade(&decl))
+      .is_some()
+    {
+      span.log_error(format!("function '{}' has already been defined", ast.name));
+    }
     // add to program
     self.program.add_func(decl);
   }
 
+  /// Initializes local basic block map.
+  fn init_local_bbs(&mut self, def: FunctionRc, args: HashMap<String, ValueRc>, bbs: &[AstBox]) {
+    // create all basic blocks
+    self.local_bbs.clear();
+    for bb in bbs.iter() {
+      let block = unwrap_ast!(bb, Block);
+      let span = &bb.span;
+      let bb = structs::BasicBlock::new((!block.name.is_temp()).then(|| block.name.clone()));
+      // add to local basic block map
+      if self
+        .local_bbs
+        .insert(
+          block.name.clone(),
+          BasicBlockInfo {
+            bb: bb.clone(),
+            preds: Vec::new(),
+            local_defs: HashMap::new(),
+          },
+        )
+        .is_some()
+      {
+        span.log_error(format!(
+          "basic block '{}' has already been defined",
+          block.name
+        ));
+      }
+      // add to the current function
+      def.borrow_mut().add_bb(bb);
+    }
+    // add argument references to the entry basic block
+    let first_bb = unwrap_ast!(bbs.first().unwrap(), Block);
+    let first_bb_info = &mut self.local_bbs.get_mut(&first_bb.name).unwrap();
+    first_bb_info.local_defs = args;
+    // fill predecessors
+    for bb in bbs.iter() {
+      let block = unwrap_ast!(bb, Block);
+      let last_inst = block.stmts.last().unwrap();
+      let mut add_pred = |bb_name| {
+        if let Some(info) = self.local_bbs.get_mut(bb_name) {
+          info.preds.push(block.name.clone());
+        } else {
+          last_inst
+            .span
+            .log_error(&format!("invalid basic block name {}", bb_name));
+        }
+      };
+      match &last_inst.kind {
+        AstKind::Branch(ast::Branch { cond: _, tbb, fbb }) => {
+          add_pred(tbb);
+          add_pred(fbb);
+        }
+        AstKind::Jump(ast::Jump { target }) => add_pred(target),
+        AstKind::Return(_) | AstKind::Error(_) => {}
+        _ => panic!("invalid end statement"),
+      }
+    }
+  }
+
   /// Builds on basic blocks.
   fn build_on_block(&mut self, ast: &ast::Block) {
-    todo!()
+    let bb_info = &self.local_bbs[&ast.name];
+    // generate each statements
+    for stmt in ast.stmts.iter() {
+      let value = self.generate_stmt(&stmt);
+      // add value to the current basic block
+      bb_info.bb.borrow_mut().add_inst(value);
+    }
   }
 
   /// Generates the type by the specific AST.
@@ -185,6 +269,7 @@ impl Builder {
       AstKind::UnaryExpr(ast) => todo!(),
       AstKind::FunCall(ast) => todo!(),
       AstKind::Phi(ast) => todo!(),
+      AstKind::Error(_) => todo!(),
       _ => panic!("invalid instruction"),
     }
   }
