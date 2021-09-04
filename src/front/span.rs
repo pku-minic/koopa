@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::fmt;
-use std::result::Result;
 
 #[cfg(not(feature = "no-front-logger"))]
 use colored::*;
@@ -34,6 +33,12 @@ impl Error {
   #[cfg(not(feature = "no-front-logger"))]
   pub fn is_fatal(&self) -> bool {
     matches!(self, Error::Fatal)
+  }
+}
+
+impl<T> Into<Result<T, Error>> for Error {
+  fn into(self) -> Result<T, Error> {
+    Err(self)
   }
 }
 
@@ -108,42 +113,42 @@ impl Span {
 
   /// Logs normal error with no span provided.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
+  pub fn log_raw_error(message: &str) -> Error {
     // update error number
     Self::STATE.with(|gs| gs.borrow_mut().err_num += 1);
-    Err(Error::Normal(message.into()))
+    Error::Normal(message.into())
   }
 
   /// Logs normal error with no span provided.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_raw_error<T>(message: &str) -> Result<T, Error> {
+  pub fn log_raw_error(message: &str) -> Error {
     Self::STATE.with(|gs| {
       // update error number
       gs.borrow_mut().err_num += 1;
       // print message to stderr
       eprintln!("{}: {}", "error".bright_red(), message);
     });
-    Err(Error::Normal)
+    Error::Normal
   }
 
   /// Logs fatal error with no span provided.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_raw_fatal_error<T>(message: &str) -> Result<T, Error> {
+  pub fn log_raw_fatal_error(message: &str) -> Error {
     // update error number
     Self::STATE.with(|gs| gs.borrow_mut().err_num += 1);
-    Err(Error::Fatal(message.into()))
+    Error::Fatal(message.into())
   }
 
   /// Logs fatal error with no span provided.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_raw_fatal_error<T>(message: &str) -> Result<T, Error> {
+  pub fn log_raw_fatal_error(message: &str) -> Error {
     Self::STATE.with(|gs| {
       // update error number
       gs.borrow_mut().err_num += 1;
       // print message to stderr
       eprintln!("{}: {}", "error".bright_red(), message);
     });
-    Err(Error::Fatal)
+    Error::Fatal
   }
 
   /// Logs warning with no span provided.
@@ -203,45 +208,32 @@ impl Span {
 
   /// Logs normal error message.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
-    Self::log_raw_error::<()>(message).unwrap_err();
-    Err(Error::Normal(self.get_error_message(message)))
+  pub fn log_error(&self, message: &str) -> Error {
+    Self::log_raw_error(message);
+    Error::Normal(self.get_error_message(message))
   }
 
   /// Logs normal error message.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_error<T>(&self, message: &str) -> Result<T, Error> {
-    Self::log_raw_error::<()>(message).unwrap_err();
+  pub fn log_error(&self, message: &str) -> Error {
+    Self::log_raw_error(message);
     Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
-    Err(Error::Normal)
-  }
-
-  /// Logs normal error message without returning `Result`.
-  #[cfg(feature = "no-front-logger")]
-  pub fn log_error_only(&self, message: &str) {
-    Self::log_raw_error::<()>(message).unwrap_err();
-  }
-
-  /// Logs normal error message without returning `Result`.
-  #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_error_only(&self, message: &str) {
-    Self::log_raw_error::<()>(message).unwrap_err();
-    Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
+    Error::Normal
   }
 
   /// Logs fatal error message.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_fatal_error<T>(&self, message: &str) -> Result<T, Error> {
-    Self::log_raw_error::<()>(message).unwrap_err();
-    Err(Error::Fatal(self.get_error_message(message)))
+  pub fn log_fatal_error(&self, message: &str) -> Error {
+    Self::log_raw_error(message);
+    Error::Fatal(self.get_error_message(message))
   }
 
   /// Logs fatal error message.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_fatal_error<T>(&self, message: &str) -> Result<T, Error> {
-    Self::log_raw_error::<()>(message).unwrap_err();
+  pub fn log_fatal_error(&self, message: &str) -> Error {
+    Self::log_raw_error(message);
     Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
-    Err(Error::Fatal)
+    Error::Fatal
   }
 
   /// Logs warning message.
@@ -484,7 +476,7 @@ mod test {
     pos.update(' ');
     let sp2 = sp1.into_updated(pos);
     assert_eq!(sp1.is_in_same_line_as(&sp2), true);
-    sp2.log_error::<()>("test error").unwrap_err();
+    sp2.log_error("test error");
     sp2.log_warning("test warning");
     sp2.log_warning("test warning 2");
     Span::log_global();
