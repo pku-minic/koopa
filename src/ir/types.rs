@@ -28,7 +28,7 @@ impl fmt::Display for TypeKind {
       TypeKind::Function(params, ret) => {
         write!(f, "(")?;
         let mut first = true;
-        for param in params.iter() {
+        for param in params {
           if !first {
             write!(f, ", ")?;
           }
