@@ -216,6 +216,19 @@ impl Span {
     Err(Error::Normal)
   }
 
+  /// Logs normal error message without returning `Result`.
+  #[cfg(feature = "no-front-logger")]
+  pub fn log_error_only(&self, message: &str) {
+    Self::log_raw_error::<()>(message).unwrap_err();
+  }
+
+  /// Logs normal error message without returning `Result`.
+  #[cfg(not(feature = "no-front-logger"))]
+  pub fn log_error_only(&self, message: &str) {
+    Self::log_raw_error::<()>(message).unwrap_err();
+    Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
+  }
+
   /// Logs fatal error message.
   #[cfg(feature = "no-front-logger")]
   pub fn log_fatal_error<T>(&self, message: &str) -> Result<T, Error> {
