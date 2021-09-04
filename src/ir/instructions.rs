@@ -442,6 +442,18 @@ impl Phi {
     })
   }
 
+  /// Creates a new uninitialized phi function.
+  ///
+  /// This phi function must be replaced with a normal phi function afterwards.
+  pub fn new_uninit(ty: Type) -> ValueRc {
+    // check value type
+    debug_assert!(
+      !matches!(ty.kind(), TypeKind::Unit),
+      "value type must not be `unit`!"
+    );
+    Value::new(ty, ValueKind::Phi(Self { oprs: Vec::new() }))
+  }
+
   /// Gets the operands (incoming values and incoming basic blocks).
   pub fn oprs(&self) -> &[(UseBox, BasicBlockRef)] {
     &self.oprs
