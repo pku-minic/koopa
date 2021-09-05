@@ -422,13 +422,14 @@ impl FunDecl {
 /// Phi function.
 #[derive(Debug, PartialEq)]
 pub struct Phi {
+  pub ty: AstBox,
   pub oprs: Vec<(AstBox, String)>,
 }
 
 impl Phi {
   /// Creates a new box of `Phi` AST.
-  pub fn new(span: Span, oprs: Vec<(AstBox, String)>) -> AstBox {
-    Ast::new(span, AstKind::Phi(Phi { oprs }))
+  pub fn new(span: Span, ty: AstBox, oprs: Vec<(AstBox, String)>) -> AstBox {
+    Ast::new(span, AstKind::Phi(Phi { ty, oprs }))
   }
 }
 
