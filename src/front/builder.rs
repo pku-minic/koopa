@@ -2,7 +2,7 @@ use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::{Error, Span};
 use crate::ir::core::ValueRc;
 use crate::ir::instructions as inst;
-use crate::ir::structs::{self, BasicBlockRc, FunctionRc, FunctionRef, Program};
+use crate::ir::structs::{self, BasicBlockRc, BasicBlockRef, FunctionRc, FunctionRef, Program};
 use crate::ir::types::{Type, TypeKind};
 use crate::ir::values;
 use crate::{log_error, return_error};
@@ -26,7 +26,7 @@ struct BasicBlockInfo {
 }
 
 /// Result returned by value generator methods in `Builder`.
-type ValueResult = std::result::Result<ValueRc, Error>;
+type ValueResult = Result<ValueRc, Error>;
 
 /// Unwraps the specific AST by its kind.
 macro_rules! unwrap_ast {
@@ -70,7 +70,7 @@ impl Builder {
   fn build_on_global_def(&mut self, span: &Span, ast: &ast::GlobalDef) {
     // create global allocation
     let decl = unwrap_ast!(ast.value, GlobalDecl);
-    if let Ok(init) = self.generate_init(self.generate_type(&decl.ty), &decl.init) {
+    if let Ok(init) = self.generate_init(&self.generate_type(&decl.ty), &decl.init) {
       let alloc = inst::GlobalAlloc::new(init);
       // set name for the created value
       if !ast.name.is_temp() {
@@ -106,13 +106,14 @@ impl Builder {
     });
     let args: HashMap<_, _> = args.collect();
     // create function definition
+    let ret_ty = ast
+      .ret
+      .as_ref()
+      .map_or(Type::get_unit(), |a| self.generate_type(a));
     let def = structs::Function::new(
       ast.name.clone(),
       args.values().cloned().collect(),
-      ast
-        .ret
-        .as_ref()
-        .map_or(Type::get_unit(), |a| self.generate_type(a)),
+      ret_ty.clone(),
     );
     // add to global function map
     if self
@@ -130,7 +131,7 @@ impl Builder {
     self.local_symbols.clear();
     // build on all basic blocks
     for bb in &ast.bbs {
-      self.build_on_block(unwrap_ast!(bb, Block));
+      self.build_on_block(&ret_ty, unwrap_ast!(bb, Block));
     }
   }
 
@@ -216,10 +217,10 @@ impl Builder {
   }
 
   /// Builds on basic blocks.
-  fn build_on_block(&mut self, ast: &ast::Block) {
+  fn build_on_block(&mut self, ret_ty: &Type, ast: &ast::Block) {
     // generate each statements
     for stmt in &ast.stmts {
-      if let Ok(stmt) = self.generate_stmt(&ast.name, &stmt) {
+      if let Ok(stmt) = self.generate_stmt(&ast.name, &ret_ty, &stmt) {
         // add value to the current basic block
         self.local_bbs[&ast.name].bb.borrow_mut().add_inst(stmt);
       }
@@ -244,11 +245,20 @@ impl Builder {
   }
 
   /// Generates the initializer by the specific AST.
-  fn generate_init(&self, ty: Type, ast: &AstBox) -> ValueResult {
+  fn generate_init(&self, ty: &Type, ast: &AstBox) -> ValueResult {
     match &ast.kind {
-      AstKind::IntVal(ast) => Ok(values::Integer::get(ast.value)),
-      AstKind::UndefVal(_) => Ok(values::Undef::get(ty)),
-      AstKind::ZeroInit(_) => Ok(values::ZeroInit::get(ty)),
+      AstKind::UndefVal(_) => Ok(values::Undef::get(ty.clone())),
+      AstKind::ZeroInit(_) => Ok(values::ZeroInit::get(ty.clone())),
+      AstKind::IntVal(int) => {
+        if !matches!(ty.kind(), TypeKind::Int32) {
+          return_error!(
+            ast.span,
+            "expected type '{}', but it can not be applied to integers",
+            ty
+          );
+        }
+        Ok(values::Integer::get(int.value))
+      }
       AstKind::Aggregate(agg) => {
         let ty = match ty.kind() {
           TypeKind::Array(base, len) => {
@@ -269,8 +279,8 @@ impl Builder {
           agg
             .elems
             .iter()
-            .map(|e| self.generate_init(ty.clone(), e))
-            .collect::<Result<Vec<_>, _>>()?,
+            .map(|e| self.generate_init(ty, e))
+            .collect::<Result<_, _>>()?,
         ))
       }
       _ => panic!("invalid initializer AST"),
@@ -278,60 +288,103 @@ impl Builder {
   }
 
   /// Generates the value by the specific AST.
-  fn generate_value(&self, bb_name: &str, ty: Type, ast: &AstBox) -> ValueResult {
+  fn generate_value(&self, bb_name: &str, ty: &Type, ast: &AstBox) -> ValueResult {
     match &ast.kind {
       AstKind::SymbolRef(sym) => {
-        let bb_info = &self.local_bbs[bb_name];
-        if let Some(value) = bb_info.local_defs.get(&sym.symbol) {
-          // symbol found in the current basic block
-          Ok(value.clone())
-        } else if !bb_info.preds.is_empty() {
-          // symbol not found, try to find in all predecessors
-          if let Some(value) = bb_info
-            .preds
-            .iter()
-            .find_map(|pred| self.generate_value(pred, ty.clone(), ast).ok())
-          {
-            // check the type of the value to prevent duplication of definitions
-            if value.ty() == &ty {
-              Ok(value)
-            } else {
-              return_error!(
-                ast.span,
-                "type mismatch, expected '{}', found '{}'",
-                ty,
-                value.ty()
-              )
-            }
-          } else {
-            // symbol not found
-            return_error!(ast.span, "symbol '{}' not found", sym.symbol);
-          }
+        let value = self.generate_symbol(&ast.span, bb_name, &sym.symbol)?;
+        // check the type of the value to prevent duplication of definitions
+        if value.ty() == ty {
+          Ok(value)
         } else {
-          // symbol not found
-          return_error!(ast.span, "symbol '{}' not found", sym.symbol);
+          return_error!(
+            ast.span,
+            "type mismatch, expected '{}', found '{}'",
+            ty,
+            value.ty()
+          )
         }
       }
       _ => self.generate_init(ty, ast),
     }
   }
 
+  /// Generates the symbol by the symbol name.
+  fn generate_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
+    let bb_info = &self.local_bbs[bb_name];
+    if let Some(value) = bb_info.local_defs.get(symbol) {
+      // symbol found in the current basic block
+      Ok(value.clone())
+    } else if !bb_info.preds.is_empty() {
+      // symbol not found, try to find in all predecessors
+      if let Some(value) = bb_info
+        .preds
+        .iter()
+        .find_map(|pred| self.generate_symbol(span, pred, symbol).ok())
+      {
+        Ok(value)
+      } else {
+        // symbol not found
+        return_error!(span, "symbol '{}' not found", symbol);
+      }
+    } else {
+      // symbol not found
+      return_error!(span, "symbol '{}' not found", symbol);
+    }
+  }
+
+  /// Generates the basic block reference by the basic block name.
+  fn generate_bb_ref(&self, span: &Span, bb_name: &str) -> Result<BasicBlockRef, Error> {
+    if let Some(info) = self.local_bbs.get(bb_name) {
+      Ok(Rc::downgrade(&info.bb))
+    } else {
+      return_error!(span, "invalid basic block name '{}'", bb_name)
+    }
+  }
+
   /// Generates the statement by the specific AST.
-  fn generate_stmt(&mut self, bb_name: &str, ast: &AstBox) -> ValueResult {
+  fn generate_stmt(&mut self, bb_name: &str, ret_ty: &Type, ast: &AstBox) -> ValueResult {
     match &ast.kind {
-      AstKind::Store(ast) => self.generate_store(ast),
-      AstKind::Branch(ast) => self.generate_branch(ast),
-      AstKind::Jump(ast) => self.generate_jump(ast),
-      AstKind::FunCall(ast) => self.generate_fun_call(ast),
-      AstKind::Return(ast) => self.generate_return(ast),
-      AstKind::Error(_) => todo!(),
+      AstKind::Store(store) => self.generate_store(&ast.span, bb_name, store),
+      AstKind::Branch(br) => self.generate_branch(&ast.span, bb_name, br),
+      AstKind::Jump(jump) => self.generate_jump(&ast.span, jump),
+      AstKind::FunCall(call) => self.generate_fun_call(&ast.span, bb_name, call),
+      AstKind::Return(ret) => self.generate_return(&ast.span, bb_name, ret_ty, ret),
+      AstKind::Error(_) => Error::default().into(),
       AstKind::SymbolDef(def) => {
-        // generate the value of the instruction
-        let inst = self.generate_inst(&def.value)?;
-        // try to add to local basic block
+        // check if has already been defined
         if !self.local_symbols.insert(def.name.clone()) {
           log_error!(ast.span, "symbol '{}' has already been defined", def.name);
         }
+        // generate the value of the instruction
+        let inst = match &def.value.kind {
+          AstKind::Phi(phi) => {
+            // insert an uninitialized phi to break circular reference
+            let ty = self.generate_type(&phi.ty);
+            let uninit_phi = inst::Phi::new_uninit(ty.clone());
+            self
+              .local_bbs
+              .get_mut(bb_name)
+              .unwrap()
+              .local_defs
+              .insert(def.name.clone(), uninit_phi.clone());
+            // get phi function
+            let phi = self.generate_phi(&def.value.span, bb_name, &ty, phi)?;
+            uninit_phi
+              .borrow_mut()
+              .replace_all_uses_with(Some(phi.clone()));
+            phi
+          }
+          _ => self.generate_inst(bb_name, &def.value)?,
+        };
+        // check type
+        if matches!(inst.ty().kind(), TypeKind::Unit) {
+          return_error!(
+            ast.span,
+            "symbol '{}' is defined as a unit type, which is not allowed",
+            def.name
+          );
+        }
+        // add to local basic block
         self
           .local_bbs
           .get_mut(bb_name)
@@ -345,72 +398,176 @@ impl Builder {
   }
 
   /// Generates the instruction by the specific AST.
-  fn generate_inst(&self, ast: &AstBox) -> ValueResult {
+  fn generate_inst(&self, bb_name: &str, ast: &AstBox) -> ValueResult {
     match &ast.kind {
       AstKind::MemDecl(ast) => self.generate_mem_decl(ast),
-      AstKind::Load(ast) => self.generate_load(ast),
-      AstKind::GetPointer(ast) => self.generate_get_pointer(ast),
-      AstKind::BinaryExpr(ast) => self.generate_binary_expr(ast),
-      AstKind::UnaryExpr(ast) => self.generate_unary_expr(ast),
-      AstKind::FunCall(ast) => self.generate_fun_call(ast),
-      AstKind::Phi(ast) => self.generate_phi(ast),
+      AstKind::Load(load) => self.generate_load(&ast.span, bb_name, load),
+      AstKind::GetPointer(gp) => self.generate_get_pointer(&ast.span, bb_name, gp),
+      AstKind::BinaryExpr(ast) => self.generate_binary_expr(bb_name, ast),
+      AstKind::UnaryExpr(ast) => self.generate_unary_expr(bb_name, ast),
+      AstKind::FunCall(call) => self.generate_fun_call(&ast.span, bb_name, call),
       _ => panic!("invalid instruction"),
     }
   }
 
   /// Generates memory declarations.
   fn generate_mem_decl(&self, ast: &ast::MemDecl) -> ValueResult {
-    todo!()
+    Ok(inst::Alloc::new(self.generate_type(&ast.ty)))
   }
 
   /// Generates loads.
-  fn generate_load(&self, ast: &ast::Load) -> ValueResult {
-    todo!()
+  fn generate_load(&self, span: &Span, bb_name: &str, ast: &ast::Load) -> ValueResult {
+    // get source value
+    let src = self.generate_symbol(span, bb_name, &ast.symbol)?;
+    // check source type
+    if !matches!(src.ty().kind(), TypeKind::Pointer(..)) {
+      return_error!(span, "expected pointer type, found '{}'", src.ty());
+    }
+    Ok(inst::Load::new(src))
   }
 
   /// Generates stores.
-  fn generate_store(&self, ast: &ast::Store) -> ValueResult {
-    todo!()
+  fn generate_store(&self, span: &Span, bb_name: &str, ast: &ast::Store) -> ValueResult {
+    // get destination value
+    let dest = self.generate_symbol(span, bb_name, &ast.symbol)?;
+    // check destination type & get source type
+    let src_ty = match dest.ty().kind() {
+      TypeKind::Pointer(base) => base,
+      _ => return_error!(span, "expected pointer type, found '{}'", dest.ty()),
+    };
+    // get source value
+    let value = self.generate_value(bb_name, src_ty, &ast.value)?;
+    Ok(inst::Store::new(value, dest))
   }
 
   /// Generates pointer calculations.
-  fn generate_get_pointer(&self, ast: &ast::GetPointer) -> ValueResult {
-    todo!()
+  fn generate_get_pointer(&self, span: &Span, bb_name: &str, ast: &ast::GetPointer) -> ValueResult {
+    // get source value
+    let src = self.generate_symbol(span, bb_name, &ast.symbol)?;
+    if !matches!(src.ty().kind(), TypeKind::Array(..) | TypeKind::Pointer(..)) {
+      return_error!(span, "expected array/pointer type, found '{}'", src.ty());
+    }
+    // get index
+    let index = self.generate_value(bb_name, &Type::get_i32(), &ast.value)?;
+    // check if step is invalid
+    if ast.step == Some(0) {
+      return_error!(span, "step of `getptr` can not be zero");
+    }
+    Ok(inst::GetPtr::new(src, index, ast.step))
   }
 
   /// Generates binary expressions.
-  fn generate_binary_expr(&self, ast: &ast::BinaryExpr) -> ValueResult {
-    todo!()
+  fn generate_binary_expr(&self, bb_name: &str, ast: &ast::BinaryExpr) -> ValueResult {
+    let ty = Type::get_i32();
+    // get lhs & rhs
+    let lhs = self.generate_value(bb_name, &ty, &ast.lhs)?;
+    let rhs = self.generate_value(bb_name, &ty, &ast.rhs)?;
+    Ok(inst::Binary::new(ast.op, lhs, rhs))
   }
 
   /// Generates unary expressions.
-  fn generate_unary_expr(&self, ast: &ast::UnaryExpr) -> ValueResult {
-    todo!()
+  fn generate_unary_expr(&self, bb_name: &str, ast: &ast::UnaryExpr) -> ValueResult {
+    // get operand
+    let opr = self.generate_value(bb_name, &Type::get_i32(), &ast.opr)?;
+    Ok(inst::Unary::new(ast.op, opr))
   }
 
   /// Generates branchs.
-  fn generate_branch(&self, ast: &ast::Branch) -> ValueResult {
-    todo!()
+  fn generate_branch(&self, span: &Span, bb_name: &str, ast: &ast::Branch) -> ValueResult {
+    // get condition
+    let cond = self.generate_value(bb_name, &Type::get_i32(), &ast.cond)?;
+    // get target basic blocks
+    let tbb = self.generate_bb_ref(span, &ast.tbb)?;
+    let fbb = self.generate_bb_ref(span, &ast.fbb)?;
+    Ok(inst::Branch::new(cond, tbb, fbb))
   }
 
   /// Generates jumps.
-  fn generate_jump(&self, ast: &ast::Jump) -> ValueResult {
-    todo!()
+  fn generate_jump(&self, span: &Span, ast: &ast::Jump) -> ValueResult {
+    Ok(inst::Jump::new(self.generate_bb_ref(span, &ast.target)?))
   }
 
   /// Generates function calls.
-  fn generate_fun_call(&self, ast: &ast::FunCall) -> ValueResult {
-    todo!()
+  fn generate_fun_call(&self, span: &Span, bb_name: &str, ast: &ast::FunCall) -> ValueResult {
+    // get callee
+    let callee = self
+      .global_funcs
+      .get(&ast.fun)
+      .ok_or_else(|| log_error!(span, "function '{}' not found", ast.fun))?;
+    // get arguments
+    match callee.upgrade().unwrap().ty().kind() {
+      TypeKind::Function(args, _) => {
+        // check length of argument list
+        if args.len() != ast.args.len() {
+          return_error!(
+            span,
+            "expected {} {}, found {} {}",
+            args.len(),
+            "arguments".to_plural(args.len()),
+            ast.args.len(),
+            "arguments".to_plural(ast.args.len())
+          );
+        }
+        Ok(inst::Call::new(
+          callee.clone(),
+          ast
+            .args
+            .iter()
+            .zip(args)
+            .map(|(a, ty)| self.generate_value(bb_name, ty, a))
+            .collect::<Result<_, _>>()?,
+        ))
+      }
+      _ => panic!("invalid function"),
+    }
   }
 
   /// Generates returns.
-  fn generate_return(&self, ast: &ast::Return) -> ValueResult {
-    todo!()
+  fn generate_return(
+    &self,
+    span: &Span,
+    bb_name: &str,
+    ret_ty: &Type,
+    ast: &ast::Return,
+  ) -> ValueResult {
+    // check return type
+    let has_ret = !matches!(ret_ty.kind(), TypeKind::Unit);
+    if has_ret && ast.value.is_none() {
+      return_error!(
+        span,
+        "expected return type '{}', but returned nothing",
+        ret_ty
+      );
+    }
+    if !has_ret && ast.value.is_some() {
+      return_error!(
+        span,
+        "function has no return value, but a value has been returned"
+      );
+    }
+    Ok(inst::Return::new(
+      ast
+        .value
+        .as_ref()
+        .map(|v| self.generate_value(bb_name, ret_ty, v))
+        .transpose()?,
+    ))
   }
 
   /// Generates phi functions.
-  fn generate_phi(&self, ast: &ast::Phi) -> ValueResult {
-    todo!()
+  fn generate_phi(&self, span: &Span, bb_name: &str, ty: &Type, ast: &ast::Phi) -> ValueResult {
+    Ok(inst::Phi::new(
+      ast
+        .oprs
+        .iter()
+        .map(|(v, bb)| {
+          Ok((
+            self.generate_value(bb_name, ty, v)?,
+            self.generate_bb_ref(span, bb)?,
+          ))
+        })
+        .collect::<Result<_, _>>()?,
+    ))
   }
 }
 
@@ -422,5 +579,20 @@ trait Symbol {
 impl Symbol for String {
   fn is_temp(&self) -> bool {
     self.chars().all(|c| c == '%' || c.is_numeric())
+  }
+}
+
+/// Helper trait, for getting plural form of a specific word.
+trait ToPlural {
+  fn to_plural(self, num: usize) -> String;
+}
+
+impl ToPlural for &str {
+  fn to_plural(self, num: usize) -> String {
+    if num > 1 {
+      format!("{}s", self)
+    } else {
+      format!("{}", self)
+    }
   }
 }
