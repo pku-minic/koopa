@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::fmt;
+use std::fmt::{self, Arguments};
 
 #[cfg(not(feature = "no-front-logger"))]
 use colored::*;
@@ -113,59 +113,59 @@ impl Span {
 
   /// Logs normal error with no span provided.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_raw_error(message: &str) -> Error {
+  pub fn log_raw_error(args: Arguments) -> Error {
     // update error number
     Self::STATE.with(|gs| gs.borrow_mut().err_num += 1);
-    Error::Normal(message.into())
+    Error::Normal(format!("{}", args))
   }
 
   /// Logs normal error with no span provided.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_raw_error(message: &str) -> Error {
+  pub fn log_raw_error(args: Arguments) -> Error {
     Self::STATE.with(|gs| {
       // update error number
       gs.borrow_mut().err_num += 1;
       // print message to stderr
-      eprintln!("{}: {}", "error".bright_red(), message);
+      eprintln!("{}: {}", "error".bright_red(), args);
     });
     Error::Normal
   }
 
   /// Logs fatal error with no span provided.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_raw_fatal_error(message: &str) -> Error {
+  pub fn log_raw_fatal_error(args: Arguments) -> Error {
     // update error number
     Self::STATE.with(|gs| gs.borrow_mut().err_num += 1);
-    Error::Fatal(message.into())
+    Error::Fatal(format!("{}", args))
   }
 
   /// Logs fatal error with no span provided.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_raw_fatal_error(message: &str) -> Error {
+  pub fn log_raw_fatal_error(args: Arguments) -> Error {
     Self::STATE.with(|gs| {
       // update error number
       gs.borrow_mut().err_num += 1;
       // print message to stderr
-      eprintln!("{}: {}", "error".bright_red(), message);
+      eprintln!("{}: {}", "error".bright_red(), args);
     });
     Error::Fatal
   }
 
   /// Logs warning with no span provided.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_raw_warning(_: &str) {
+  pub fn log_raw_warning(_: Arguments) {
     // update warning number
     Self::STATE.with(|gs| gs.borrow_mut().warn_num += 1);
   }
 
   /// Logs warning with no span provided.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_raw_warning(message: &str) {
+  pub fn log_raw_warning(args: Arguments) {
     Self::STATE.with(|gs| {
       // update warning number
       gs.borrow_mut().warn_num += 1;
       // print message to stderr
-      eprintln!("{}: {}", "warning".yellow(), message);
+      eprintln!("{}: {}", "warning".yellow(), args);
     });
   }
 
@@ -208,44 +208,44 @@ impl Span {
 
   /// Logs normal error message.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_error(&self, message: &str) -> Error {
-    Self::log_raw_error(message);
-    Error::Normal(self.get_error_message(message))
+  pub fn log_error(&self, args: Arguments) -> Error {
+    Self::log_raw_error(args);
+    Error::Normal(self.get_error_message(args))
   }
 
   /// Logs normal error message.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_error(&self, message: &str) -> Error {
-    Self::log_raw_error(message);
+  pub fn log_error(&self, args: Arguments) -> Error {
+    Self::log_raw_error(args);
     Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
     Error::Normal
   }
 
   /// Logs fatal error message.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_fatal_error(&self, message: &str) -> Error {
-    Self::log_raw_error(message);
-    Error::Fatal(self.get_error_message(message))
+  pub fn log_fatal_error(&self, args: Arguments) -> Error {
+    Self::log_raw_error(args);
+    Error::Fatal(self.get_error_message(args))
   }
 
   /// Logs fatal error message.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_fatal_error(&self, message: &str) -> Error {
-    Self::log_raw_error(message);
+  pub fn log_fatal_error(&self, args: Arguments) -> Error {
+    Self::log_raw_error(args);
     Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::BrightRed));
     Error::Fatal
   }
 
   /// Logs warning message.
   #[cfg(feature = "no-front-logger")]
-  pub fn log_warning(&self, message: &str) {
-    Self::log_raw_warning(message);
+  pub fn log_warning(&self, args: Arguments) {
+    Self::log_raw_warning(args);
   }
 
   /// Logs warning message.
   #[cfg(not(feature = "no-front-logger"))]
-  pub fn log_warning(&self, message: &str) {
-    Self::log_raw_warning(message);
+  pub fn log_warning(&self, args: Arguments) {
+    Self::log_raw_warning(args);
     Self::STATE.with(|gs| self.print_file_info(&gs.borrow().file, Color::Yellow));
   }
 
@@ -284,8 +284,8 @@ impl Span {
 
   /// Gets error message.
   #[cfg(feature = "no-front-logger")]
-  fn get_error_message(&self, message: &str) -> String {
-    Self::STATE.with(|gs| format!("{}:{}: {}", gs.borrow().file, self.start, message))
+  fn get_error_message(&self, args: Arguments) -> String {
+    Self::STATE.with(|gs| format!("{}:{}: {}", gs.borrow().file, self.start, args))
   }
 
   /// Prints file information.
@@ -449,6 +449,62 @@ impl fmt::Display for FileType {
   }
 }
 
+/// Logs normal error with no span provided.
+#[macro_export]
+macro_rules! log_raw_error {
+  ($($arg:tt)+) => {
+    Span::log_raw_error(format_args!($($arg)+))
+  };
+}
+
+/// Logs fatal error with no span provided.
+#[macro_export]
+macro_rules! log_raw_fatal_error {
+  ($($arg:tt)+) => {
+    Span::log_raw_fatal_error(format_args!($($arg)+))
+  };
+}
+
+/// Logs warning with no span provided.
+#[macro_export]
+macro_rules! log_raw_warning {
+  ($($arg:tt)+) => {
+    Span::log_raw_warning(format_args!($($arg)+))
+  };
+}
+
+/// Logs normal error message.
+#[macro_export]
+macro_rules! log_error {
+  ($span:expr, $($arg:tt)+) => {
+    $span.log_error(format_args!($($arg)+))
+  };
+}
+
+/// Logs fatal error message.
+#[macro_export]
+macro_rules! log_fatal_error {
+  ($span:expr, $($arg:tt)+) => {
+    $span.log_fatal_error(format_args!($($arg)+))
+  };
+}
+
+/// Logs warning message.
+#[macro_export]
+macro_rules! log_warning {
+  ($span:expr, $($arg:tt)+) => {
+    $span.log_warning(format_args!($($arg)+))
+  };
+}
+
+/// Logs error message and returns a result.
+#[macro_export]
+macro_rules! return_error {
+  ($span:expr, $($arg:tt)+) => {
+    return $span.log_error(format_args!($($arg)+)).into()
+  };
+}
+
 #[cfg(test)]
 mod test {
   use super::*;
@@ -476,9 +532,9 @@ mod test {
     pos.update(' ');
     let sp2 = sp1.into_updated(pos);
     assert_eq!(sp1.is_in_same_line_as(&sp2), true);
-    sp2.log_error("test error");
-    sp2.log_warning("test warning");
-    sp2.log_warning("test warning 2");
+    log_error!(sp2, "test error");
+    log_warning!(sp2, "test warning");
+    log_warning!(sp2, "test warning 2");
     Span::log_global();
     assert_eq!(format!("{}", sp2.start), "1:1");
     assert_eq!(format!("{}", sp2.end), "1:3");
