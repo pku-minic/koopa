@@ -1,10 +1,11 @@
 use crate::front::ast::{self, AstBox, AstKind};
-use crate::front::span::Span;
+use crate::front::span::{Error, Span};
 use crate::ir::core::ValueRc;
 use crate::ir::instructions as inst;
 use crate::ir::structs::{self, BasicBlockRc, FunctionRc, FunctionRef, Program};
 use crate::ir::types::{Type, TypeKind};
 use crate::ir::values;
+use crate::{log_error, return_error};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -23,6 +24,9 @@ struct BasicBlockInfo {
   preds: Vec<String>,
   local_defs: HashMap<String, ValueRc>,
 }
+
+/// Result returned by value generator methods in `Builder`.
+type ValueResult = std::result::Result<ValueRc, Error>;
 
 /// Unwraps the specific AST by its kind.
 macro_rules! unwrap_ast {
@@ -66,25 +70,27 @@ impl Builder {
   fn build_on_global_def(&mut self, span: &Span, ast: &ast::GlobalDef) {
     // create global allocation
     let decl = unwrap_ast!(ast.value, GlobalDecl);
-    let init = self.generate_value(self.generate_type(&decl.ty), &decl.init);
-    let alloc = inst::GlobalAlloc::new(init);
-    // set name for the created value
-    if !ast.name.is_temp() {
-      alloc.borrow_mut().set_name(Some(ast.name.clone()));
+    if let Ok(init) = self.generate_init(self.generate_type(&decl.ty), &decl.init) {
+      let alloc = inst::GlobalAlloc::new(init);
+      // set name for the created value
+      if !ast.name.is_temp() {
+        alloc.borrow_mut().set_name(Some(ast.name.clone()));
+      }
+      // add to global variable map
+      if self
+        .global_vars
+        .insert(ast.name.clone(), alloc.clone())
+        .is_some()
+      {
+        log_error!(
+          span,
+          "global variable '{}' has already been defined",
+          ast.name
+        );
+      }
+      // add to program
+      self.program.add_var(alloc);
     }
-    // add to global variable map
-    if self
-      .global_vars
-      .insert(ast.name.clone(), alloc.clone())
-      .is_some()
-    {
-      span.log_error(&format!(
-        "global variable '{}' has already been defined",
-        ast.name
-      ));
-    }
-    // add to program
-    self.program.add_var(alloc);
   }
 
   /// Builds on function definitions.
@@ -114,7 +120,7 @@ impl Builder {
       .insert(ast.name.clone(), Rc::downgrade(&def))
       .is_some()
     {
-      span.log_error(&format!("function '{}' has already been defined", ast.name));
+      log_error!(span, "function '{}' has already been defined", ast.name);
     }
     // add to program
     self.program.add_func(def.clone());
@@ -123,7 +129,7 @@ impl Builder {
     // reset local symbol set
     self.local_symbols.clear();
     // build on all basic blocks
-    for bb in ast.bbs.iter() {
+    for bb in &ast.bbs {
       self.build_on_block(unwrap_ast!(bb, Block));
     }
   }
@@ -146,7 +152,7 @@ impl Builder {
       .insert(ast.name.clone(), Rc::downgrade(&decl))
       .is_some()
     {
-      span.log_error(&format!("function '{}' has already been defined", ast.name));
+      log_error!(span, "function '{}' has already been defined", ast.name);
     }
     // add to program
     self.program.add_func(decl);
@@ -156,7 +162,7 @@ impl Builder {
   fn init_local_bbs(&mut self, def: FunctionRc, args: HashMap<String, ValueRc>, bbs: &[AstBox]) {
     // create all basic blocks
     self.local_bbs.clear();
-    for bb in bbs.iter() {
+    for bb in bbs {
       let block = unwrap_ast!(bb, Block);
       let span = &bb.span;
       let bb = structs::BasicBlock::new((!block.name.is_temp()).then(|| block.name.clone()));
@@ -173,10 +179,11 @@ impl Builder {
         )
         .is_some()
       {
-        span.log_error(&format!(
+        log_error!(
+          span,
           "basic block '{}' has already been defined",
           block.name
-        ));
+        );
       }
       // add to the current function
       def.borrow_mut().add_bb(bb);
@@ -186,16 +193,14 @@ impl Builder {
     let first_bb_info = &mut self.local_bbs.get_mut(&first_bb.name).unwrap();
     first_bb_info.local_defs = args;
     // fill predecessors
-    for bb in bbs.iter() {
+    for bb in bbs {
       let block = unwrap_ast!(bb, Block);
       let last_inst = block.stmts.last().unwrap();
       let mut add_pred = |bb_name| {
         if let Some(info) = self.local_bbs.get_mut(bb_name) {
           info.preds.push(block.name.clone());
         } else {
-          last_inst
-            .span
-            .log_error(&format!("invalid basic block name {}", bb_name));
+          log_error!(last_inst.span, "invalid basic block name {}", bb_name);
         }
       };
       match &last_inst.kind {
@@ -213,10 +218,11 @@ impl Builder {
   /// Builds on basic blocks.
   fn build_on_block(&mut self, ast: &ast::Block) {
     // generate each statements
-    for stmt in ast.stmts.iter() {
-      let stmt = self.generate_stmt(&ast.name, &stmt);
-      // add value to the current basic block
-      self.local_bbs[&ast.name].bb.borrow_mut().add_inst(stmt);
+    for stmt in &ast.stmts {
+      if let Ok(stmt) = self.generate_stmt(&ast.name, &stmt) {
+        // add value to the current basic block
+        self.local_bbs[&ast.name].bb.borrow_mut().add_inst(stmt);
+      }
     }
   }
 
@@ -237,42 +243,81 @@ impl Builder {
     }
   }
 
-  /// Generates the value by the specific AST.
-  fn generate_value(&self, ty: Type, ast: &AstBox) -> ValueRc {
+  /// Generates the initializer by the specific AST.
+  fn generate_init(&self, ty: Type, ast: &AstBox) -> ValueResult {
     match &ast.kind {
-      AstKind::SymbolRef(ast) => todo!("find symbol from bb or its preds"),
-      AstKind::IntVal(ast) => values::Integer::get(ast.value),
-      AstKind::UndefVal(_) => values::Undef::get(ty),
-      AstKind::ZeroInit(_) => values::ZeroInit::get(ty),
+      AstKind::IntVal(ast) => Ok(values::Integer::get(ast.value)),
+      AstKind::UndefVal(_) => Ok(values::Undef::get(ty)),
+      AstKind::ZeroInit(_) => Ok(values::ZeroInit::get(ty)),
       AstKind::Aggregate(agg) => {
         let ty = match ty.kind() {
           TypeKind::Array(base, len) => {
             if *len != agg.elems.len() {
-              ast.span.log_error(&format!(
+              log_error!(
+                ast.span,
                 "expected array length {}, found length {}",
                 len,
                 agg.elems.len()
-              ));
+              );
             }
             base
           }
           TypeKind::Pointer(base) => base,
-          _ => todo!("log error"),
+          _ => return_error!(ast.span, "invalid aggregate type '{}'", ty),
         };
-        values::Aggregate::new(
+        Ok(values::Aggregate::new(
           agg
             .elems
             .iter()
-            .map(|e| self.generate_value(ty.clone(), e))
-            .collect(),
-        )
+            .map(|e| self.generate_init(ty.clone(), e))
+            .collect::<Result<Vec<_>, _>>()?,
+        ))
       }
-      _ => panic!("invalid value AST"),
+      _ => panic!("invalid initializer AST"),
+    }
+  }
+
+  /// Generates the value by the specific AST.
+  fn generate_value(&self, bb_name: &str, ty: Type, ast: &AstBox) -> ValueResult {
+    match &ast.kind {
+      AstKind::SymbolRef(sym) => {
+        let bb_info = &self.local_bbs[bb_name];
+        if let Some(value) = bb_info.local_defs.get(&sym.symbol) {
+          // symbol found in the current basic block
+          Ok(value.clone())
+        } else if !bb_info.preds.is_empty() {
+          // symbol not found, try to find in all predecessors
+          if let Some(value) = bb_info
+            .preds
+            .iter()
+            .find_map(|pred| self.generate_value(pred, ty.clone(), ast).ok())
+          {
+            // check the type of the value to prevent duplication of definitions
+            if value.ty() == &ty {
+              Ok(value)
+            } else {
+              return_error!(
+                ast.span,
+                "type mismatch, expected '{}', found '{}'",
+                ty,
+                value.ty()
+              )
+            }
+          } else {
+            // symbol not found
+            return_error!(ast.span, "symbol '{}' not found", sym.symbol);
+          }
+        } else {
+          // symbol not found
+          return_error!(ast.span, "symbol '{}' not found", sym.symbol);
+        }
+      }
+      _ => self.generate_init(ty, ast),
     }
   }
 
   /// Generates the statement by the specific AST.
-  fn generate_stmt(&mut self, bb_name: &str, ast: &AstBox) -> ValueRc {
+  fn generate_stmt(&mut self, bb_name: &str, ast: &AstBox) -> ValueResult {
     match &ast.kind {
       AstKind::Store(ast) => self.generate_store(ast),
       AstKind::Branch(ast) => self.generate_branch(ast),
@@ -282,12 +327,10 @@ impl Builder {
       AstKind::Error(_) => todo!(),
       AstKind::SymbolDef(def) => {
         // generate the value of the instruction
-        let inst = self.generate_inst(&def.value);
+        let inst = self.generate_inst(&def.value)?;
         // try to add to local basic block
         if !self.local_symbols.insert(def.name.clone()) {
-          ast
-            .span
-            .log_error(&format!("symbol '{}' has already been defined", def.name));
+          log_error!(ast.span, "symbol '{}' has already been defined", def.name);
         }
         self
           .local_bbs
@@ -295,14 +338,14 @@ impl Builder {
           .unwrap()
           .local_defs
           .insert(def.name.clone(), inst.clone());
-        inst
+        Ok(inst)
       }
       _ => panic!("invalid statement"),
     }
   }
 
   /// Generates the instruction by the specific AST.
-  fn generate_inst(&self, ast: &AstBox) -> ValueRc {
+  fn generate_inst(&self, ast: &AstBox) -> ValueResult {
     match &ast.kind {
       AstKind::MemDecl(ast) => self.generate_mem_decl(ast),
       AstKind::Load(ast) => self.generate_load(ast),
@@ -316,57 +359,57 @@ impl Builder {
   }
 
   /// Generates memory declarations.
-  fn generate_mem_decl(&self, ast: &ast::MemDecl) -> ValueRc {
+  fn generate_mem_decl(&self, ast: &ast::MemDecl) -> ValueResult {
     todo!()
   }
 
   /// Generates loads.
-  fn generate_load(&self, ast: &ast::Load) -> ValueRc {
+  fn generate_load(&self, ast: &ast::Load) -> ValueResult {
     todo!()
   }
 
   /// Generates stores.
-  fn generate_store(&self, ast: &ast::Store) -> ValueRc {
+  fn generate_store(&self, ast: &ast::Store) -> ValueResult {
     todo!()
   }
 
   /// Generates pointer calculations.
-  fn generate_get_pointer(&self, ast: &ast::GetPointer) -> ValueRc {
+  fn generate_get_pointer(&self, ast: &ast::GetPointer) -> ValueResult {
     todo!()
   }
 
   /// Generates binary expressions.
-  fn generate_binary_expr(&self, ast: &ast::BinaryExpr) -> ValueRc {
+  fn generate_binary_expr(&self, ast: &ast::BinaryExpr) -> ValueResult {
     todo!()
   }
 
   /// Generates unary expressions.
-  fn generate_unary_expr(&self, ast: &ast::UnaryExpr) -> ValueRc {
+  fn generate_unary_expr(&self, ast: &ast::UnaryExpr) -> ValueResult {
     todo!()
   }
 
   /// Generates branchs.
-  fn generate_branch(&self, ast: &ast::Branch) -> ValueRc {
+  fn generate_branch(&self, ast: &ast::Branch) -> ValueResult {
     todo!()
   }
 
   /// Generates jumps.
-  fn generate_jump(&self, ast: &ast::Jump) -> ValueRc {
+  fn generate_jump(&self, ast: &ast::Jump) -> ValueResult {
     todo!()
   }
 
   /// Generates function calls.
-  fn generate_fun_call(&self, ast: &ast::FunCall) -> ValueRc {
+  fn generate_fun_call(&self, ast: &ast::FunCall) -> ValueResult {
     todo!()
   }
 
   /// Generates returns.
-  fn generate_return(&self, ast: &ast::Return) -> ValueRc {
+  fn generate_return(&self, ast: &ast::Return) -> ValueResult {
     todo!()
   }
 
   /// Generates phi functions.
-  fn generate_phi(&self, ast: &ast::Phi) -> ValueRc {
+  fn generate_phi(&self, ast: &ast::Phi) -> ValueResult {
     todo!()
   }
 }
