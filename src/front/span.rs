@@ -36,6 +36,18 @@ impl Error {
   }
 }
 
+impl Default for Error {
+  #[cfg(feature = "no-front-logger")]
+  fn default() -> Self {
+    Error::Normal(String::default())
+  }
+
+  #[cfg(not(feature = "no-front-logger"))]
+  fn default() -> Self {
+    Error::Normal
+  }
+}
+
 impl<T> Into<Result<T, Error>> for Error {
   fn into(self) -> Result<T, Error> {
     Err(self)
