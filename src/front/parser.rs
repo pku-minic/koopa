@@ -14,9 +14,9 @@ pub struct Parser<T: Read> {
 pub type Result = std::result::Result<AstBox, Error>;
 
 /// Logs error and returns a result.
-macro_rules! log_error {
+macro_rules! return_error {
   ($span:expr, $msg:expr) => {
-    $span.log_error($msg).into()
+    return $span.log_error($msg).into()
   };
 }
 
@@ -29,7 +29,7 @@ macro_rules! read {
       $self.next_token()?;
       Ok(v)
     } else {
-      log_error!(span, &format!("expected {}, found {}", $prompt, kind))
+      return_error!(span, &format!("expected {}, found {}", $prompt, kind))
     }
   }};
 }
@@ -87,7 +87,7 @@ impl<T: Read> Parser<T> {
       TokenKind::Keyword(Keyword::Global) => self.parse_global_def(),
       TokenKind::Keyword(Keyword::Fun) => self.parse_fun_def(),
       TokenKind::Keyword(Keyword::Decl) => self.parse_fun_decl(),
-      ? => log_error!(span, &format!(
+      ? => return_error!(span, &format!(
         "expected global definition/declaration, found {}",
         kind
       )),
@@ -163,7 +163,7 @@ impl<T: Read> Parser<T> {
     self.next_token()?;
     // create function definition
     if bbs.is_empty() {
-      log_error!(
+      return_error!(
         span,
         "expected at least one basic block in function definition"
       )
@@ -202,7 +202,7 @@ impl<T: Read> Parser<T> {
       TokenKind::Other('[') => self.parse_array_type(),
       TokenKind::Other('*') => self.parse_pointer_type(),
       TokenKind::Other('(') => self.parse_fun_type(),
-      _ => log_error!(span, &format!("expected type, found {}", kind)),
+      _ => return_error!(span, &format!("expected type, found {}", kind)),
     }
   }
 
@@ -277,7 +277,7 @@ impl<T: Read> Parser<T> {
         TokenKind::Keyword(Keyword::Br) => { exit_flag = true; self.parse_branch() },
         TokenKind::Keyword(Keyword::Jump) => { exit_flag = true; self.parse_jump() },
         TokenKind::Keyword(Keyword::Ret) => { exit_flag = true; self.parse_return() },
-        ? => log_error!(span, &format!("expected statement, found {}", kind)),
+        ? => return_error!(span, &format!("expected statement, found {}", kind)),
         break if TokenKind::Other('}') | TokenKind::End => { exit_flag = true; },
       }?);
     }
@@ -306,7 +306,7 @@ impl<T: Read> Parser<T> {
       TokenKind::UnaryOp(_) => self.parse_unary_expr(),
       TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
       TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
-      _ => log_error!(sp, &format!("expected expression, found {}", kind)),
+      _ => return_error!(sp, &format!("expected expression, found {}", kind)),
     }
     .map(|value| ast::SymbolDef::new(span.into_updated_span(value.span), name, value))
   }
@@ -507,7 +507,7 @@ impl<T: Read> Parser<T> {
       // undefined value
       TokenKind::Keyword(Keyword::Undef) => ast::UndefVal::new(*span),
       // unknown
-      _ => return log_error!(span, &format!("expected value, found {}", kind)),
+      _ => return_error!(span, &format!("expected value, found {}", kind)),
     };
     self.next_token()?;
     Ok(ret)
@@ -538,7 +538,7 @@ impl<T: Read> Parser<T> {
       // aggregate
       TokenKind::Other('{') => self.parse_aggregate(),
       // unknown
-      _ => log_error!(span, &format!("expected initializer, found {}", kind)),
+      _ => return_error!(span, &format!("expected initializer, found {}", kind)),
     }
   }
 
@@ -597,7 +597,7 @@ impl<T: Read> Parser<T> {
       self.next_token()?;
       Ok(span)
     } else {
-      log_error!(span, &format!("expected {}, found {}", tk, kind))
+      return_error!(span, &format!("expected {}, found {}", tk, kind))
     }
   }
 }
