@@ -455,6 +455,8 @@ impl<T: Read> Parser<T> {
     let mut span = self.span();
     // eat 'phi'
     self.next_token()?;
+    // get type
+    let ty = self.parse_type()?;
     // get the first operand
     let (first, sp) = self.parse_phi_opr()?;
     span.update_span(sp);
@@ -467,7 +469,7 @@ impl<T: Read> Parser<T> {
       span.update_span(sp);
     }
     // create phi function
-    Ok(ast::Phi::new(span, oprs))
+    Ok(ast::Phi::new(span, ty, oprs))
   }
 
   /// Parses phi operands.
