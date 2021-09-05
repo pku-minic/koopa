@@ -2,6 +2,7 @@ use crate::front::ast::{self, AstBox};
 use crate::front::lexer::Lexer;
 use crate::front::span::{Error, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
+use crate::return_error;
 use std::io::Read;
 
 /// Parser of Koopa IR.
@@ -13,13 +14,6 @@ pub struct Parser<T: Read> {
 /// Result returned by `Parser`
 pub type Result = std::result::Result<AstBox, Error>;
 
-/// Logs error and returns a result.
-macro_rules! return_error {
-  ($span:expr, $msg:expr) => {
-    return $span.log_error($msg).into()
-  };
-}
-
 /// Reads the value of the specific kind of token from lexer.
 macro_rules! read {
   ($self:ident, $p:path, $prompt:expr) => {{
@@ -29,7 +23,7 @@ macro_rules! read {
       $self.next_token()?;
       Ok(v)
     } else {
-      return_error!(span, &format!("expected {}, found {}", $prompt, kind))
+      return_error!(span, "expected {}, found {}", $prompt, kind)
     }
   }};
 }
@@ -87,10 +81,7 @@ impl<T: Read> Parser<T> {
       TokenKind::Keyword(Keyword::Global) => self.parse_global_def(),
       TokenKind::Keyword(Keyword::Fun) => self.parse_fun_def(),
       TokenKind::Keyword(Keyword::Decl) => self.parse_fun_decl(),
-      ? => return_error!(span, &format!(
-        "expected global definition/declaration, found {}",
-        kind
-      )),
+      ? => return_error!(span, "expected global definition/declaration, found {}", kind),
     }
   }
 
@@ -202,7 +193,7 @@ impl<T: Read> Parser<T> {
       TokenKind::Other('[') => self.parse_array_type(),
       TokenKind::Other('*') => self.parse_pointer_type(),
       TokenKind::Other('(') => self.parse_fun_type(),
-      _ => return_error!(span, &format!("expected type, found {}", kind)),
+      _ => return_error!(span, "expected type, found {}", kind),
     }
   }
 
@@ -277,7 +268,7 @@ impl<T: Read> Parser<T> {
         TokenKind::Keyword(Keyword::Br) => { exit_flag = true; self.parse_branch() },
         TokenKind::Keyword(Keyword::Jump) => { exit_flag = true; self.parse_jump() },
         TokenKind::Keyword(Keyword::Ret) => { exit_flag = true; self.parse_return() },
-        ? => return_error!(span, &format!("expected statement, found {}", kind)),
+        ? => return_error!(span, "expected statement, found {}", kind),
         break if TokenKind::Other('}') | TokenKind::End => { exit_flag = true; },
       }?);
     }
@@ -306,7 +297,7 @@ impl<T: Read> Parser<T> {
       TokenKind::UnaryOp(_) => self.parse_unary_expr(),
       TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
       TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
-      _ => return_error!(sp, &format!("expected expression, found {}", kind)),
+      _ => return_error!(sp, "expected expression, found {}", kind),
     }
     .map(|value| ast::SymbolDef::new(span.into_updated_span(value.span), name, value))
   }
@@ -507,7 +498,7 @@ impl<T: Read> Parser<T> {
       // undefined value
       TokenKind::Keyword(Keyword::Undef) => ast::UndefVal::new(*span),
       // unknown
-      _ => return_error!(span, &format!("expected value, found {}", kind)),
+      _ => return_error!(span, "expected value, found {}", kind),
     };
     self.next_token()?;
     Ok(ret)
@@ -538,7 +529,7 @@ impl<T: Read> Parser<T> {
       // aggregate
       TokenKind::Other('{') => self.parse_aggregate(),
       // unknown
-      _ => return_error!(span, &format!("expected initializer, found {}", kind)),
+      _ => return_error!(span, "expected initializer, found {}", kind),
     }
   }
 
@@ -597,7 +588,7 @@ impl<T: Read> Parser<T> {
       self.next_token()?;
       Ok(span)
     } else {
-      return_error!(span, &format!("expected {}, found {}", tk, kind))
+      return_error!(span, "expected {}, found {}", tk, kind)
     }
   }
 }

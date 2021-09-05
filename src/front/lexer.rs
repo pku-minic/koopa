@@ -1,6 +1,7 @@
 use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
 use crate::ir::instructions::{BinaryOp, UnaryOp};
+use crate::{log_raw_fatal_error, return_error};
 use phf::phf_map;
 use std::io::Read;
 
@@ -66,7 +67,7 @@ impl<T: Read> Lexer<T> {
     self.last_char = (self
       .reader
       .read(&mut single_char)
-      .map_err(|err| Span::log_raw_fatal_error(&format!("{}", err)))?
+      .map_err(|err| log_raw_fatal_error!("{}", err))?
       != 0)
       .then(|| {
         let c = single_char[0] as char;
@@ -210,7 +211,7 @@ impl<T: Read> Lexer<T> {
     while self.last_char.map_or(false, |c| !c.is_whitespace()) {
       self.next_char()?;
     }
-    span.log_error(message).into()
+    return_error!(span, "{}", message)
   }
 }
 
