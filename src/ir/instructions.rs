@@ -125,7 +125,7 @@ impl GetPtr {
       TypeKind::Pointer(ty) => ty.clone(),
       _ => panic!("`src` must be an array or a pointer!"),
     };
-    Value::new_with_init(ty, |user| {
+    Value::new_with_init(Type::get_pointer(ty), |user| {
       ValueKind::GetPtr(Self {
         src: Use::new(Some(src), user.clone()),
         index: Use::new(Some(index), user),
