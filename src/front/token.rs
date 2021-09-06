@@ -56,7 +56,7 @@ impl fmt::Display for TokenKind {
 pub enum Keyword {
   I32,
   Undef, ZeroInit,
-  Global, Alloc, Load, Store, GetPtr,
+  Global, Alloc, Load, Store, GetPtr, GetElemPtr,
   Br, Jump, Call, Ret, Fun, Decl, Phi,
 }
 
@@ -71,6 +71,7 @@ impl fmt::Display for Keyword {
       Keyword::Load => f.write_str("load"),
       Keyword::Store => f.write_str("store"),
       Keyword::GetPtr => f.write_str("getptr"),
+      Keyword::GetElemPtr => f.write_str("getelemptr"),
       Keyword::Br => f.write_str("br"),
       Keyword::Jump => f.write_str("jump"),
       Keyword::Call => f.write_str("call"),

@@ -225,6 +225,7 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
   "load" => Keyword::Load,
   "store" => Keyword::Store,
   "getptr" => Keyword::GetPtr,
+  "getelemptr" => Keyword::GetElemPtr,
   "br" => Keyword::Br,
   "jump" => Keyword::Jump,
   "call" => Keyword::Call,
