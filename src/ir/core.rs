@@ -197,6 +197,7 @@ pub enum ValueKind {
   Load(Load),
   Store(Store),
   GetPtr(GetPtr),
+  GetElemPtr(GetElemPtr),
   Binary(Binary),
   Unary(Unary),
   Branch(Branch),
