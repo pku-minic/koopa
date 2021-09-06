@@ -330,7 +330,7 @@ impl Builder {
       if let Some(value) = bb_info
         .preds
         .iter()
-        .find_map(|pred| self.generate_symbol(span, pred, symbol).ok())
+        .find_map(|pred| self.generate_local_symbol(span, pred, symbol).ok())
       {
         Ok(value)
       } else {
