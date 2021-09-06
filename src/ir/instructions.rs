@@ -9,7 +9,7 @@ pub struct Alloc;
 impl Alloc {
   /// Creates a local memory allocation.
   ///
-  /// The type of the created allocation will be `ty*`.
+  /// The type of the created allocation will be `*ty`.
   pub fn new(ty: Type) -> ValueRc {
     debug_assert!(
       !matches!(ty.kind(), TypeKind::Unit),
@@ -51,7 +51,7 @@ pub struct Load {
 impl Load {
   /// Creates a memory load with source `src`.
   ///
-  /// The type of `src` must be some kind of pointer (`ty*`),
+  /// The type of `src` must be some kind of pointer (`*ty`),
   /// and the type of the created load will be `ty`.
   pub fn new(src: ValueRc) -> ValueRc {
     let ty = match src.ty().kind() {
@@ -107,29 +107,26 @@ impl Store {
 pub struct GetPtr {
   src: UseBox,
   index: UseBox,
-  step: Option<i32>,
 }
 
 impl GetPtr {
   /// Creates a pointer calculation.
   ///
-  /// The type of the created `GetPtr` will be the dereference of `src`'s type.
-  pub fn new(src: ValueRc, index: ValueRc, step: Option<i32>) -> ValueRc {
+  /// The type of `src` must be some kind of pointer (`*ty`),
+  /// and the type of the created `GetPtr` will also be `*ty`.
+  pub fn new(src: ValueRc, index: ValueRc) -> ValueRc {
+    debug_assert!(
+      matches!(src.ty().kind(), TypeKind::Pointer(..)),
+      "`src` must be a pointer!"
+    );
     debug_assert!(
       matches!(index.ty().kind(), TypeKind::Int32),
       "``index` must be an integer!"
     );
-    debug_assert!(step != Some(0), "`step` can not be zero");
-    let ty = match src.ty().kind() {
-      TypeKind::Array(ty, _) => ty.clone(),
-      TypeKind::Pointer(ty) => ty.clone(),
-      _ => panic!("`src` must be an array or a pointer!"),
-    };
-    Value::new_with_init(Type::get_pointer(ty), |user| {
+    Value::new_with_init(src.ty().clone(), |user| {
       ValueKind::GetPtr(Self {
         src: Use::new(Some(src), user.clone()),
         index: Use::new(Some(index), user),
-        step,
       })
     })
   }
@@ -143,10 +140,47 @@ impl GetPtr {
   pub fn index(&self) -> &UseBox {
     &self.index
   }
+}
 
-  /// Gets the step of pointer calculation.
-  pub fn step(&self) -> &Option<i32> {
-    &self.step
+/// Element pointer calculation.
+pub struct GetElemPtr {
+  src: UseBox,
+  index: UseBox,
+}
+
+impl GetElemPtr {
+  /// Creates a element pointer calculation.
+  ///
+  /// The type of `src` must be some kind of pointer of array (`*[ty, len]`),
+  /// and the type of the created `GetElemPtr` will be `*ty`.
+  pub fn new(src: ValueRc, index: ValueRc) -> ValueRc {
+    debug_assert!(
+      matches!(index.ty().kind(), TypeKind::Int32),
+      "``index` must be an integer!"
+    );
+    let ty = match src.ty().kind() {
+      TypeKind::Pointer(ty) => match ty.kind() {
+        TypeKind::Array(base, _) => Type::get_pointer(base.clone()),
+        _ => panic!("`src` must be a pointer of array!"),
+      },
+      _ => panic!("`src` must be a pointer of array!"),
+    };
+    Value::new_with_init(ty, |user| {
+      ValueKind::GetElemPtr(Self {
+        src: Use::new(Some(src), user.clone()),
+        index: Use::new(Some(index), user),
+      })
+    })
+  }
+
+  /// Gets the source memory location.
+  pub fn src(&self) -> &UseBox {
+    &self.src
+  }
+
+  /// Gets the index of element pointer calculation.
+  pub fn index(&self) -> &UseBox {
+    &self.index
   }
 }
 
@@ -395,7 +429,7 @@ impl Return {
     debug_assert!(
       value
         .as_ref()
-        .map_or(true, |v| matches!(v.ty().kind(), TypeKind::Unit)),
+        .map_or(true, |v| !matches!(v.ty().kind(), TypeKind::Unit)),
       "the type of `value` must not be `unit`!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
