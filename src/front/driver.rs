@@ -129,4 +129,36 @@ mod test {
       );
     }
   }
+
+  #[test]
+  fn generate_ir_phi() {
+    let driver: Driver<_> = r#"
+      //! version: 0.0.1
+
+      decl @getint(): i32
+      
+      fun @main(): i32 {
+      %entry:
+        %ans_0 = call @getint()
+        jump %while_entry
+      
+      %while_entry: //! pred: %entry, %while_body
+        %ind_var_0 = phi i32 (0, %entry), (%ind_var_1, %while_body)
+        %ans_1 = phi i32 (%ans_0, %entry), (%ans_2, %while_body)
+        %cond = lt %ind_var_0, 10
+        br %cond, %while_body, %while_end
+      
+      %while_body: //! pred: %while_entry
+        %ans_2 = add %ans_1, %ind_var_0
+        %ind_var_1 = add %ind_var_0, 1
+        jump %while_entry
+      
+      %while_end: //! pred: %while_entry
+        ret %ans_1
+      }
+    "#
+    .into();
+    let _ = driver.generate_program().unwrap();
+    assert_eq!(Span::error_num() + Span::warning_num(), 0);
+  }
 }
