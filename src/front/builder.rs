@@ -310,6 +310,17 @@ impl Builder {
 
   /// Generates the symbol by the symbol name.
   fn generate_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
+    // try to find symbol in global scope
+    if let Some(value) = self.global_vars.get(symbol) {
+      Ok(value.clone())
+    } else {
+      // not found, find symbol in local definitions
+      self.generate_local_symbol(span, bb_name, symbol)
+    }
+  }
+
+  /// Generates the symbol locally by the symbol name.
+  fn generate_local_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
     let bb_info = &self.local_bbs[bb_name];
     if let Some(value) = bb_info.local_defs.get(symbol) {
       // symbol found in the current basic block
@@ -352,7 +363,8 @@ impl Builder {
       AstKind::Error(_) => Error::default().into(),
       AstKind::SymbolDef(def) => {
         // check if has already been defined
-        if !self.local_symbols.insert(def.name.clone()) {
+        if self.global_vars.get(&def.name).is_some() || !self.local_symbols.insert(def.name.clone())
+        {
           log_error!(ast.span, "symbol '{}' has already been defined", def.name);
         }
         // generate the value of the instruction
@@ -403,6 +415,7 @@ impl Builder {
       AstKind::MemDecl(ast) => self.generate_mem_decl(ast),
       AstKind::Load(load) => self.generate_load(&ast.span, bb_name, load),
       AstKind::GetPointer(gp) => self.generate_get_pointer(&ast.span, bb_name, gp),
+      AstKind::GetElementPointer(gep) => self.generate_get_element_pointer(&ast.span, bb_name, gep),
       AstKind::BinaryExpr(ast) => self.generate_binary_expr(bb_name, ast),
       AstKind::UnaryExpr(ast) => self.generate_unary_expr(bb_name, ast),
       AstKind::FunCall(call) => self.generate_fun_call(&ast.span, bb_name, call),
@@ -444,16 +457,30 @@ impl Builder {
   fn generate_get_pointer(&self, span: &Span, bb_name: &str, ast: &ast::GetPointer) -> ValueResult {
     // get source value
     let src = self.generate_symbol(span, bb_name, &ast.symbol)?;
-    if !matches!(src.ty().kind(), TypeKind::Array(..) | TypeKind::Pointer(..)) {
-      return_error!(span, "expected array/pointer type, found '{}'", src.ty());
+    if !matches!(src.ty().kind(), TypeKind::Pointer(..)) {
+      return_error!(span, "expected pointer type, found '{}'", src.ty());
     }
     // get index
     let index = self.generate_value(bb_name, &Type::get_i32(), &ast.value)?;
-    // check if step is invalid
-    if ast.step == Some(0) {
-      return_error!(span, "step of `getptr` can not be zero");
+    Ok(inst::GetPtr::new(src, index))
+  }
+
+  /// Generates element pointer calculations.
+  fn generate_get_element_pointer(
+    &self,
+    span: &Span,
+    bb_name: &str,
+    ast: &ast::GetElementPointer,
+  ) -> ValueResult {
+    // get source value
+    let src = self.generate_symbol(span, bb_name, &ast.symbol)?;
+    if !matches!(src.ty().kind(), TypeKind::Pointer(ty) if matches!(ty.kind(), TypeKind::Array(..)))
+    {
+      return_error!(span, "expected a pointer of array, found '{}'", src.ty());
     }
-    Ok(inst::GetPtr::new(src, index, ast.step))
+    // get index
+    let index = self.generate_value(bb_name, &Type::get_i32(), &ast.value)?;
+    Ok(inst::GetElemPtr::new(src, index))
   }
 
   /// Generates binary expressions.
