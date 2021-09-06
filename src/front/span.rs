@@ -213,9 +213,14 @@ impl Span {
     });
   }
 
-  /// Checks if there are some errors.
-  pub fn has_error() -> bool {
-    Self::STATE.with(|gs| gs.borrow().err_num != 0)
+  /// Gets the number of errors.
+  pub fn error_num() -> usize {
+    Self::STATE.with(|gs| gs.borrow().err_num)
+  }
+
+  /// Gets the number of warnings.
+  pub fn warning_num() -> usize {
+    Self::STATE.with(|gs| gs.borrow().warn_num)
   }
 
   /// Logs normal error message.
