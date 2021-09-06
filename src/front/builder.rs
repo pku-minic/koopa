@@ -5,7 +5,7 @@ use crate::ir::instructions as inst;
 use crate::ir::structs::{self, BasicBlockRc, BasicBlockRef, FunctionRc, FunctionRef, Program};
 use crate::ir::types::{Type, TypeKind};
 use crate::ir::values;
-use crate::{log_error, return_error};
+use crate::{log_error, log_warning, return_error};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -583,6 +583,46 @@ impl Builder {
 
   /// Generates phi functions.
   fn generate_phi(&self, span: &Span, bb_name: &str, ty: &Type, ast: &ast::Phi) -> ValueResult {
+    let bb_info = &self.local_bbs[bb_name];
+    let opr_len = bb_info.preds.len();
+    // check the length of operand list
+    if opr_len == 0 {
+      return_error!(
+        span,
+        "invalid phi function, because the current basic block '{}' has no predecessor",
+        bb_name
+      );
+    }
+    if ast.oprs.len() != opr_len {
+      return_error!(
+        span,
+        "expected {} {}, found {} {}",
+        opr_len,
+        "operand".to_plural(opr_len),
+        ast.oprs.len(),
+        "operand".to_plural(ast.oprs.len())
+      );
+    }
+    // check if all operands are valid
+    if let Some(bb) = ast.oprs.iter().find_map(|(_, bb)| {
+      bb_info
+        .preds
+        .iter()
+        .find(|&p| p == bb)
+        .is_none()
+        .then(|| bb)
+    }) {
+      return_error!(
+        span,
+        "basic block '{}' is not a predecessor of the current basic block '{}'",
+        bb,
+        bb_name
+      );
+    }
+    // check if is a redundant phi function
+    if opr_len == 1 {
+      log_warning!(span, "consider removing this redundant phi function");
+    }
     Ok(inst::Phi::new(
       ast
         .oprs
@@ -590,7 +630,7 @@ impl Builder {
         .map(|(v, bb)| {
           Ok((
             self.generate_value(bb_name, ty, v)?,
-            self.generate_bb_ref(span, bb)?,
+            Rc::downgrade(&self.local_bbs[bb].bb),
           ))
         })
         .collect::<Result<_, _>>()?,
