@@ -293,6 +293,7 @@ impl<T: Read> Parser<T> {
       TokenKind::Keyword(Keyword::Alloc) => self.parse_mem_decl(),
       TokenKind::Keyword(Keyword::Load) => self.parse_load(),
       TokenKind::Keyword(Keyword::GetPtr) => self.parse_get_pointer(),
+      TokenKind::Keyword(Keyword::GetElemPtr) => self.parse_get_element_pointer(),
       TokenKind::BinaryOp(_) => self.parse_binary_expr(),
       TokenKind::UnaryOp(_) => self.parse_unary_expr(),
       TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
@@ -357,15 +358,24 @@ impl<T: Read> Parser<T> {
     // get value
     let value = self.parse_value()?;
     span.update_span(value.span);
-    // get step
-    let mut step = None;
-    if self.is_token(TokenKind::Other(',')) {
-      self.next_token()?;
-      span.update_span(self.span());
-      step = Some(read!(self, TokenKind::Int, "step")? as i32);
-    }
     // create get pointer
-    Ok(ast::GetPointer::new(span, symbol, value, step))
+    Ok(ast::GetPointer::new(span, symbol, value))
+  }
+
+  /// Parses element pointer calculations.
+  fn parse_get_element_pointer(&mut self) -> Result {
+    let mut span = self.span();
+    // eat 'getelemptr'
+    self.next_token()?;
+    // get symbol name
+    let symbol = read!(self, TokenKind::Symbol, "symbol")?;
+    // check & eat ','
+    self.expect(TokenKind::Other(','))?;
+    // get value
+    let value = self.parse_value()?;
+    span.update_span(value.span);
+    // create get pointer
+    Ok(ast::GetElementPointer::new(span, symbol, value))
   }
 
   /// Parses binary expressions.
@@ -618,9 +628,9 @@ mod test {
 
       fun @test(@i: i32): i32 {
       %entry:
-        %0 = getptr @x, 2
-        store -1, %0
-        %1 = getptr @x, @i, 4
+        %0 = getptr @x, 0
+        store {1, 2, 3, 4, 5, 0, 0, 0, 0, 10}, %0
+        %1 = getelemptr @x, @i
         %2 = load %1
         %3 = mul %2, 7
         ret %3
@@ -651,22 +661,25 @@ mod test {
             name: "%0".into(),
             value: new_ast!(GetPointer {
               symbol: "@x".into(),
-              value: new_ast!(IntVal { value: 2 }),
-              step: None,
+              value: new_ast!(IntVal { value: 0 }),
             }),
           }),
           new_ast!(Store {
-            value: new_ast!(IntVal { value: -1 }),
+            value: new_ast!(Aggregate {
+              elems: [1, 2, 3, 4, 5, 0, 0, 0, 0, 10]
+                .iter()
+                .map(|i| new_ast!(IntVal { value: *i }))
+                .collect()
+            }),
             symbol: "%0".into(),
           }),
           new_ast!(SymbolDef {
             name: "%1".into(),
-            value: new_ast!(GetPointer {
+            value: new_ast!(GetElementPointer {
               symbol: "@x".into(),
               value: new_ast!(SymbolRef {
                 symbol: "@i".into(),
               }),
-              step: Some(4),
             }),
           }),
           new_ast!(SymbolDef {
@@ -710,9 +723,9 @@ mod test {
 
       fun @test(@i: i32): i32 {
       %entry:
-        %0 = getptr @x, 2
-        store -1, %
-        %1 = getptr @x, @i, 4
+        %0 = getptr @x, 0
+        store {1, 2, 3, 4, 5, 0, 0, 0, 0, 10}, %
+        %1 = getelemptr @x, @i
         %2 = load %1
         %3 = mul , 7
         ret %3
@@ -732,19 +745,17 @@ mod test {
             name: "%0".into(),
             value: new_ast!(GetPointer {
               symbol: "@x".into(),
-              value: new_ast!(IntVal { value: 2 }),
-              step: None,
+              value: new_ast!(IntVal { value: 0 }),
             }),
           }),
           new_ast!(Error),
           new_ast!(SymbolDef {
             name: "%1".into(),
-            value: new_ast!(GetPointer {
+            value: new_ast!(GetElementPointer {
               symbol: "@x".into(),
               value: new_ast!(SymbolRef {
                 symbol: "@i".into(),
               }),
-              step: Some(4),
             }),
           }),
           new_ast!(SymbolDef {
