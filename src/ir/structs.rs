@@ -273,7 +273,7 @@ impl BasicBlockInner {
 
   /// Adds the specific instruction to the current basic block.
   pub fn add_inst(&mut self, inst: ValueRc) {
-    self.insts.push_back(inst)
+    self.insts.push_back(inst);
   }
 }
 
