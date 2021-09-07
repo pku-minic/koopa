@@ -26,11 +26,6 @@ impl<T: Read> Driver<T> {
     }
   }
 
-  /// Creates a new `Driver` from the specific path.
-  pub fn from_file(path: String) -> io::Result<Driver<File>> {
-    File::open(&path).map(|f| Driver::new(FileType::File(path), f))
-  }
-
   /// Generates IR program.
   pub fn generate_program(mut self) -> Result<Program, Error> {
     loop {
@@ -57,6 +52,13 @@ impl<T: Read> Driver<T> {
     } else {
       Ok(self.builder.program())
     }
+  }
+}
+
+impl Driver<File> {
+  /// Creates a new `Driver` from the specific path.
+  pub fn from_file(path: &str) -> io::Result<Self> {
+    File::open(path).map(|f| Driver::new(FileType::File(path.into()), f))
   }
 }
 
