@@ -1,13 +1,35 @@
 use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::{Error, Span};
-use crate::ir::core::ValueRc;
+use crate::ir::core::{ValueKind, ValueRc};
 use crate::ir::instructions as inst;
 use crate::ir::structs::{self, BasicBlockRc, BasicBlockRef, FunctionRc, FunctionRef, Program};
 use crate::ir::types::{Type, TypeKind};
 use crate::ir::values;
 use crate::{log_error, log_warning, return_error};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
+
+/// Basic block information.
+struct BasicBlockInfo {
+  bb: BasicBlockRc,
+  preds: Vec<String>,
+  local_defs: HashMap<String, ValueRc>,
+  insts: Vec<ValueRc>,
+  /// Indices of phi functions in instruction list.
+  phis: HashSet<usize>,
+}
+
+impl BasicBlockInfo {
+  fn new(bb: BasicBlockRc) -> Self {
+    Self {
+      bb,
+      preds: Vec::new(),
+      local_defs: HashMap::new(),
+      insts: Vec::new(),
+      phis: HashSet::new(),
+    }
+  }
+}
 
 /// Builder for building Koopa IR from AST.
 pub struct Builder {
@@ -16,13 +38,6 @@ pub struct Builder {
   global_funcs: HashMap<String, FunctionRef>,
   local_bbs: HashMap<String, BasicBlockInfo>,
   local_symbols: HashSet<String>,
-}
-
-/// Basic block information.
-struct BasicBlockInfo {
-  bb: BasicBlockRc,
-  preds: Vec<String>,
-  local_defs: HashMap<String, ValueRc>,
 }
 
 /// Result returned by value generator methods in `Builder`.
@@ -42,7 +57,7 @@ impl Builder {
   /// Creates a new builder.
   pub fn new() -> Self {
     Self {
-      program: Program::default(),
+      program: Program::new(),
       global_vars: HashMap::new(),
       global_funcs: HashMap::new(),
       local_bbs: HashMap::new(),
@@ -62,6 +77,8 @@ impl Builder {
   }
 
   /// Consumes and get the generated program.
+  ///
+  /// Available only when no error has occurred.
   pub fn program(self) -> Program {
     self.program
   }
@@ -125,13 +142,15 @@ impl Builder {
     }
     // add to program
     self.program.add_func(def.clone());
-    // initialize local basic block map
-    self.init_local_bbs(def, args, &ast.bbs);
     // reset local symbol set
     self.local_symbols.clear();
+    // get basic block list
+    let bbs = self.get_bb_list(&ast.bbs);
+    // initialize local basic block map
+    self.init_local_bbs(def, args, &bbs);
     // build on all basic blocks
-    for bb in &ast.bbs {
-      self.build_on_block(&ret_ty, unwrap_ast!(bb, Block));
+    for (_, block) in bbs {
+      self.build_on_block(&ret_ty, block);
     }
   }
 
@@ -159,50 +178,97 @@ impl Builder {
     self.program.add_func(decl);
   }
 
-  /// Initializes local basic block map.
-  fn init_local_bbs(&mut self, def: FunctionRc, args: HashMap<String, ValueRc>, bbs: &[AstBox]) {
-    // create all basic blocks
-    self.local_bbs.clear();
+  /// Gets basic block list in BFS order.
+  fn get_bb_list<'a>(&self, bbs: &'a [AstBox]) -> Vec<(&'a Span, &'a ast::Block)> {
+    // initialize queue and set
+    let mut queue = VecDeque::new();
+    let mut visited = HashSet::new();
+    let entry_bb_name = &unwrap_ast!(bbs.first().unwrap(), Block).name;
+    queue.push_back(entry_bb_name);
+    // initialize basic block map
+    let mut bb_map = HashMap::new();
     for bb in bbs {
       let block = unwrap_ast!(bb, Block);
-      let span = &bb.span;
-      let bb = structs::BasicBlock::new((!block.name.is_temp()).then(|| block.name.clone()));
-      // add to local basic block map
-      if self
-        .local_bbs
-        .insert(
-          block.name.clone(),
-          BasicBlockInfo {
-            bb: bb.clone(),
-            preds: Vec::new(),
-            local_defs: HashMap::new(),
-          },
-        )
-        .is_some()
-      {
+      if bb_map.insert(&block.name, (&bb.span, block)).is_some() {
         log_error!(
-          span,
+          bb.span,
           "basic block '{}' has already been defined",
           block.name
         );
       }
-      // add to the current function
-      def.borrow_mut().add_bb(bb);
     }
+    // visit blocks
+    let mut bb_list = Vec::new();
+    while let Some(bb) = queue.pop_front() {
+      if visited.insert(bb) {
+        let info = bb_map[bb];
+        // add to basic block list
+        bb_list.push(info);
+        // add the successors to queue
+        let last_stmt = info.1.stmts.last().unwrap();
+        let mut add_target = |bb_name| {
+          if bb_name == entry_bb_name {
+            log_error!(
+              last_stmt.span,
+              "the entry basic block should not have any predecessors"
+            );
+          } else if bb_map.contains_key(bb_name) {
+            queue.push_back(bb_name);
+          } else {
+            log_error!(last_stmt.span, "invalid basic block name '{}'", bb_name);
+          }
+        };
+        match &last_stmt.kind {
+          AstKind::Branch(ast::Branch { cond: _, tbb, fbb }) => {
+            add_target(tbb);
+            add_target(fbb);
+          }
+          AstKind::Jump(ast::Jump { target }) => add_target(target),
+          AstKind::Return(_) | AstKind::Error(_) => {}
+          _ => panic!("invalid end statement"),
+        }
+      }
+    }
+    // check if there are any unvisited blocks
+    for (bb_name, (span, _)) in bb_map {
+      if !visited.contains(bb_name) {
+        log_warning!(span, "basic block '{}' is unreachable, skipped", bb_name);
+      }
+    }
+    bb_list
+  }
+
+  /// Initializes local basic block map.
+  fn init_local_bbs(
+    &mut self,
+    def: FunctionRc,
+    args: HashMap<String, ValueRc>,
+    bbs: &[(&Span, &ast::Block)],
+  ) {
+    // create all basic blocks
+    self.local_bbs = bbs
+      .iter()
+      .map(|(_, block)| {
+        let bb = structs::BasicBlock::new((!block.name.is_temp()).then(|| block.name.clone()));
+        // add to the current function
+        def.borrow_mut().add_bb(bb.clone());
+        (block.name.clone(), BasicBlockInfo::new(bb))
+      })
+      .collect();
     // add argument references to the entry basic block
-    let first_bb = unwrap_ast!(bbs.first().unwrap(), Block);
-    let first_bb_info = &mut self.local_bbs.get_mut(&first_bb.name).unwrap();
-    first_bb_info.local_defs = args;
+    let entry_bb_name = &bbs[0].1.name;
+    let entry_info = &mut self.local_bbs.get_mut(entry_bb_name).unwrap();
+    entry_info.local_defs = args;
     // fill predecessors
-    for bb in bbs {
-      let block = unwrap_ast!(bb, Block);
+    for (_, block) in bbs {
       let last_inst = block.stmts.last().unwrap();
       let mut add_pred = |bb_name| {
-        if let Some(info) = self.local_bbs.get_mut(bb_name) {
-          info.preds.push(block.name.clone());
-        } else {
-          log_error!(last_inst.span, "invalid basic block name {}", bb_name);
-        }
+        self
+          .local_bbs
+          .get_mut(bb_name)
+          .unwrap()
+          .preds
+          .push(block.name.clone());
       };
       match &last_inst.kind {
         AstKind::Branch(ast::Branch { cond: _, tbb, fbb }) => {
@@ -210,8 +276,7 @@ impl Builder {
           add_pred(fbb);
         }
         AstKind::Jump(ast::Jump { target }) => add_pred(target),
-        AstKind::Return(_) | AstKind::Error(_) => {}
-        _ => panic!("invalid end statement"),
+        _ => {}
       }
     }
   }
@@ -221,9 +286,24 @@ impl Builder {
     // generate each statements
     for stmt in &ast.stmts {
       if let Ok(stmt) = self.generate_stmt(&ast.name, &ret_ty, &stmt) {
-        // add value to the current basic block
-        self.local_bbs[&ast.name].bb.borrow_mut().add_inst(stmt);
+        let info = self.local_bbs.get_mut(&ast.name).unwrap();
+        // record the instruction index if the current statement is a phi function
+        if matches!(stmt.kind(), ValueKind::Phi(..)) {
+          info.phis.insert(info.insts.len());
+        }
+        // add statement to the current basic block
+        info.insts.push(stmt);
       }
+    }
+  }
+
+  /// Adds all instruction of all basic blocks to the generated basic block.
+  ///
+  /// Also handles all uninitialized phi functions.
+  fn add_insts_to_block(&self, bbs: &[(&Span, &ast::Block)]) {
+    for (span, block) in bbs {
+      let info = &self.local_bbs[&block.name];
+      todo!()
     }
   }
 
@@ -325,21 +405,16 @@ impl Builder {
     if let Some(value) = bb_info.local_defs.get(symbol) {
       // symbol found in the current basic block
       Ok(value.clone())
-    } else if !bb_info.preds.is_empty() {
-      // symbol not found, try to find in all predecessors
-      if let Some(value) = bb_info
-        .preds
-        .iter()
-        .find_map(|pred| self.generate_local_symbol(span, pred, symbol).ok())
-      {
-        Ok(value)
-      } else {
-        // symbol not found
-        return_error!(span, "symbol '{}' not found", symbol);
-      }
+    } else if bb_info.preds.len() == 1 {
+      // symbol not found, try to find in the predecessor
+      self.generate_local_symbol(span, bb_info.preds.first().unwrap(), symbol)
+    } else if bb_info.preds.len() > 1 {
+      // multiple predecessors, but symbol still not found
+      // requires a phi functions here
+      return_error!(span, "symbol '{}' not found, phi function required", symbol)
     } else {
-      // symbol not found
-      return_error!(span, "symbol '{}' not found", symbol);
+      // symbol not found in entry basic block
+      return_error!(span, "symbol '{}' not found", symbol)
     }
   }
 
@@ -368,26 +443,7 @@ impl Builder {
           log_error!(ast.span, "symbol '{}' has already been defined", def.name);
         }
         // generate the value of the instruction
-        let inst = match &def.value.kind {
-          AstKind::Phi(phi) => {
-            // insert an uninitialized phi to break circular reference
-            let ty = self.generate_type(&phi.ty);
-            let uninit_phi = inst::Phi::new_uninit(ty.clone());
-            self
-              .local_bbs
-              .get_mut(bb_name)
-              .unwrap()
-              .local_defs
-              .insert(def.name.clone(), uninit_phi.clone());
-            // get phi function
-            let phi = self.generate_phi(&def.value.span, bb_name, &ty, phi)?;
-            uninit_phi
-              .borrow_mut()
-              .replace_all_uses_with(Some(phi.clone()));
-            phi
-          }
-          _ => self.generate_inst(bb_name, &def.value)?,
-        };
+        let inst = self.generate_inst(bb_name, &def.value)?;
         // check type
         if matches!(inst.ty().kind(), TypeKind::Unit) {
           return_error!(
@@ -419,6 +475,7 @@ impl Builder {
       AstKind::BinaryExpr(ast) => self.generate_binary_expr(bb_name, ast),
       AstKind::UnaryExpr(ast) => self.generate_unary_expr(bb_name, ast),
       AstKind::FunCall(call) => self.generate_fun_call(&ast.span, bb_name, call),
+      AstKind::Phi(ast) => self.generate_uninit_phi(ast),
       _ => panic!("invalid instruction"),
     }
   }
@@ -581,6 +638,11 @@ impl Builder {
     ))
   }
 
+  /// Generates uninitialized phi functions.
+  fn generate_uninit_phi(&self, ast: &ast::Phi) -> ValueResult {
+    Ok(inst::Phi::new_uninit(self.generate_type(&ast.ty)))
+  }
+
   /// Generates phi functions.
   fn generate_phi(&self, span: &Span, bb_name: &str, ty: &Type, ast: &ast::Phi) -> ValueResult {
     let bb_info = &self.local_bbs[bb_name];
@@ -592,8 +654,7 @@ impl Builder {
         "invalid phi function, because the current basic block '{}' has no predecessor",
         bb_name
       );
-    }
-    if ast.oprs.len() != opr_len {
+    } else if ast.oprs.len() != opr_len {
       return_error!(
         span,
         "expected {} {}, found {} {}",
