@@ -190,26 +190,28 @@ impl Span {
   pub fn log_global() {
     Self::STATE.with(|gs| {
       let gs = gs.borrow();
+      let mut msg = String::new();
       // error info
       if gs.err_num != 0 {
-        eprint!("{} {}", gs.err_num, "error".bright_red());
+        msg += &format!("{} error", gs.err_num);
         if gs.err_num > 1 {
-          eprint!("{}", "s".bright_red());
+          msg += &format!("s");
         }
       }
       // seperator
       if gs.err_num != 0 && gs.warn_num != 0 {
-        eprint!(" and ");
+        msg += &format!(" and ");
       }
       // warning info
       if gs.warn_num != 0 {
-        eprint!("{} {}", gs.warn_num, "warning".yellow());
+        msg += &format!("{} warning", gs.warn_num);
         if gs.warn_num > 1 {
-          eprint!("{}", "s".yellow());
+          msg += &format!("s");
         }
       }
       // ending
-      eprintln!(" emitted");
+      msg += &format!(" emitted");
+      eprintln!("{}", msg.bold());
     });
   }
 
