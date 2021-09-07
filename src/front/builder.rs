@@ -15,8 +15,8 @@ struct BasicBlockInfo {
   preds: Vec<String>,
   local_defs: HashMap<String, ValueRc>,
   insts: Vec<ValueRc>,
-  /// Indices of phi functions in instruction list.
-  phis: HashSet<usize>,
+  /// Indices of phi functions in instruction list (key) and statement list (value).
+  phis: HashMap<usize, usize>,
 }
 
 impl BasicBlockInfo {
@@ -26,7 +26,7 @@ impl BasicBlockInfo {
       preds: Vec::new(),
       local_defs: HashMap::new(),
       insts: Vec::new(),
-      phis: HashSet::new(),
+      phis: HashMap::new(),
     }
   }
 }
@@ -145,13 +145,15 @@ impl Builder {
     // reset local symbol set
     self.local_symbols.clear();
     // get basic block list
-    let bbs = self.get_bb_list(&ast.bbs);
+    let bbs = self.get_block_list(&ast.bbs);
     // initialize local basic block map
     self.init_local_bbs(def, args, &bbs);
     // build on all basic blocks
-    for (_, block) in bbs {
+    for block in &bbs {
       self.build_on_block(&ret_ty, block);
     }
+    // add generated instructions to basic blocks
+    self.add_insts_to_block(&bbs);
   }
 
   /// Builds on function declarations.
@@ -179,7 +181,7 @@ impl Builder {
   }
 
   /// Gets basic block list in BFS order.
-  fn get_bb_list<'a>(&self, bbs: &'a [AstBox]) -> Vec<(&'a Span, &'a ast::Block)> {
+  fn get_block_list<'a>(&self, bbs: &'a [AstBox]) -> Vec<&'a ast::Block> {
     // initialize queue and set
     let mut queue = VecDeque::new();
     let mut visited = HashSet::new();
@@ -203,7 +205,7 @@ impl Builder {
       if visited.insert(bb) {
         let info = bb_map[bb];
         // add to basic block list
-        bb_list.push(info);
+        bb_list.push(info.1);
         // add the successors to queue
         let last_stmt = info.1.stmts.last().unwrap();
         let mut add_target = |bb_name| {
@@ -243,12 +245,12 @@ impl Builder {
     &mut self,
     def: FunctionRc,
     args: HashMap<String, ValueRc>,
-    bbs: &[(&Span, &ast::Block)],
+    bbs: &[&ast::Block],
   ) {
     // create all basic blocks
     self.local_bbs = bbs
       .iter()
-      .map(|(_, block)| {
+      .map(|block| {
         let bb = structs::BasicBlock::new((!block.name.is_temp()).then(|| block.name.clone()));
         // add to the current function
         def.borrow_mut().add_bb(bb.clone());
@@ -256,11 +258,11 @@ impl Builder {
       })
       .collect();
     // add argument references to the entry basic block
-    let entry_bb_name = &bbs[0].1.name;
+    let entry_bb_name = &bbs[0].name;
     let entry_info = &mut self.local_bbs.get_mut(entry_bb_name).unwrap();
     entry_info.local_defs = args;
     // fill predecessors
-    for (_, block) in bbs {
+    for block in bbs {
       let last_inst = block.stmts.last().unwrap();
       let mut add_pred = |bb_name| {
         self
@@ -284,12 +286,12 @@ impl Builder {
   /// Builds on basic blocks.
   fn build_on_block(&mut self, ret_ty: &Type, ast: &ast::Block) {
     // generate each statements
-    for stmt in &ast.stmts {
-      if let Ok(stmt) = self.generate_stmt(&ast.name, &ret_ty, &stmt) {
+    for (i, stmt) in ast.stmts.iter().enumerate() {
+      if let Ok(stmt) = self.generate_stmt(&ast.name, ret_ty, &stmt) {
         let info = self.local_bbs.get_mut(&ast.name).unwrap();
         // record the instruction index if the current statement is a phi function
         if matches!(stmt.kind(), ValueKind::Phi(..)) {
-          info.phis.insert(info.insts.len());
+          info.phis.insert(info.insts.len(), i);
         }
         // add statement to the current basic block
         info.insts.push(stmt);
@@ -300,10 +302,30 @@ impl Builder {
   /// Adds all instruction of all basic blocks to the generated basic block.
   ///
   /// Also handles all uninitialized phi functions.
-  fn add_insts_to_block(&self, bbs: &[(&Span, &ast::Block)]) {
-    for (span, block) in bbs {
+  fn add_insts_to_block(&self, bbs: &[&ast::Block]) {
+    let mut phis = Vec::new();
+    for block in bbs {
       let info = &self.local_bbs[&block.name];
-      todo!()
+      for (i, inst) in info.insts.iter().enumerate() {
+        if let Some(stmt_i) = info.phis.get(&i) {
+          // generate the current phi function
+          let ast = &block.stmts[*stmt_i];
+          let phi = unwrap_ast!(unwrap_ast!(ast, SymbolDef).value, Phi);
+          if let Ok(phi) = self.generate_phi(&ast.span, &block.name, phi) {
+            // store the old phi and the new phi
+            phis.push((inst.clone(), phi.clone()));
+            // add to basic block
+            info.bb.borrow_mut().add_inst(phi);
+          }
+        } else {
+          // just add to basic block
+          info.bb.borrow_mut().add_inst(inst.clone());
+        }
+      }
+    }
+    // replace all old uninitialized phis to new phis
+    for (old, new) in phis {
+      old.borrow_mut().replace_all_uses_with(Some(new));
     }
   }
 
@@ -644,7 +666,7 @@ impl Builder {
   }
 
   /// Generates phi functions.
-  fn generate_phi(&self, span: &Span, bb_name: &str, ty: &Type, ast: &ast::Phi) -> ValueResult {
+  fn generate_phi(&self, span: &Span, bb_name: &str, ast: &ast::Phi) -> ValueResult {
     let bb_info = &self.local_bbs[bb_name];
     let opr_len = bb_info.preds.len();
     // check the length of operand list
@@ -684,13 +706,14 @@ impl Builder {
     if opr_len == 1 {
       log_warning!(span, "consider removing this redundant phi function");
     }
+    let ty = self.generate_type(&ast.ty);
     Ok(inst::Phi::new(
       ast
         .oprs
         .iter()
         .map(|(v, bb)| {
           Ok((
-            self.generate_value(bb_name, ty, v)?,
+            self.generate_value(bb, &ty, v)?,
             Rc::downgrade(&self.local_bbs[bb].bb),
           ))
         })
