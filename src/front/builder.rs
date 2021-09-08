@@ -417,27 +417,21 @@ impl Builder {
       Ok(value.clone())
     } else {
       // not found, find symbol in local definitions
-      self.generate_local_symbol(span, bb_name, symbol)
+      self
+        .generate_local_symbol(span, bb_name, symbol)
+        .ok_or_else(|| return_error!(span, "symbol '{}' not found", symbol))
     }
   }
 
   /// Generates the symbol locally by the symbol name.
-  fn generate_local_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
+  fn generate_local_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> Option<ValueRc> {
     let bb_info = &self.local_bbs[bb_name];
-    if let Some(value) = bb_info.local_defs.get(symbol) {
-      // symbol found in the current basic block
-      Ok(value.clone())
-    } else if bb_info.preds.len() == 1 {
-      // symbol not found, try to find in the predecessor
-      self.generate_local_symbol(span, bb_info.preds.first().unwrap(), symbol)
-    } else if bb_info.preds.len() > 1 {
-      // multiple predecessors, but symbol still not found
-      // requires a phi functions here
-      return_error!(span, "symbol '{}' not found, phi function required", symbol)
-    } else {
-      // symbol not found in entry basic block
-      return_error!(span, "symbol '{}' not found", symbol)
-    }
+    bb_info.local_defs.get(symbol).cloned().or_else(|| {
+      bb_info
+        .preds
+        .iter()
+        .find_map(|pred| self.generate_local_symbol(span, pred, symbol))
+    })
   }
 
   /// Generates the basic block reference by the basic block name.
