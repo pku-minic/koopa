@@ -108,7 +108,7 @@ mod test {
     let program = driver.generate_program().unwrap();
     assert_eq!(Span::error_num() + Span::warning_num(), 0);
     for var in program.vars() {
-      assert_eq!(var.borrow().name(), &Some("@x".into()));
+      assert_eq!(var.inner().name(), &Some("@x".into()));
       assert_eq!(
         var.ty(),
         &Type::get_pointer(Type::get_array(Type::get_i32(), 10))

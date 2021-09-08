@@ -196,7 +196,7 @@ mod test {
           let value = elem.value().unwrap();
           assert!(Rc::ptr_eq(&value, &Integer::get(i as i32)));
           assert_eq!(elem.user().as_ptr(), Rc::as_ptr(&array));
-          let v = value.borrow();
+          let v = value.inner();
           let u = v.uses().front().get();
           assert!(u.is_some());
           assert!(std::ptr::eq(u.unwrap(), elem.as_ref()));
@@ -206,14 +206,14 @@ mod test {
     }
     drop(array);
     for value in (0..10).map(|i| Integer::get(i)) {
-      assert!(value.borrow().uses().is_empty());
+      assert!(value.inner().uses().is_empty());
     }
   }
 
   #[test]
   fn replace_uses() {
     let array = Aggregate::new((0..10).map(|_| Integer::get(0)).collect());
-    Integer::get(0).borrow_mut().replace_all_uses_with(None);
+    Integer::get(0).inner_mut().replace_all_uses_with(None);
     match array.kind() {
       ValueKind::Aggregate(agg) => assert!(agg.elems().iter().all(|e| e.value().is_none())),
       _ => unreachable!(),

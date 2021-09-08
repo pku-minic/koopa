@@ -91,7 +91,7 @@ impl Builder {
       let alloc = inst::GlobalAlloc::new(init);
       // set name for the created value
       if !ast.name.is_temp() {
-        alloc.borrow_mut().set_name(Some(ast.name.clone()));
+        alloc.inner_mut().set_name(Some(ast.name.clone()));
       }
       // add to global variable map
       if self
@@ -117,7 +117,7 @@ impl Builder {
       // create argument reference
       let arg = values::ArgRef::new(self.generate_type(ty), i);
       if !name.is_temp() {
-        arg.borrow_mut().set_name(Some(name.clone()));
+        arg.inner_mut().set_name(Some(name.clone()));
       }
       (name.clone(), arg)
     });
@@ -253,7 +253,7 @@ impl Builder {
       .map(|block| {
         let bb = structs::BasicBlock::new((!block.name.is_temp()).then(|| block.name.clone()));
         // add to the current function
-        def.borrow_mut().add_bb(bb.clone());
+        def.inner_mut().add_bb(bb.clone());
         (block.name.clone(), BasicBlockInfo::new(bb))
       })
       .collect();
@@ -315,17 +315,17 @@ impl Builder {
             // store the old phi and the new phi
             phis.push((inst.clone(), phi.clone()));
             // add to basic block
-            info.bb.borrow_mut().add_inst(phi);
+            info.bb.inner_mut().add_inst(phi);
           }
         } else {
           // just add to basic block
-          info.bb.borrow_mut().add_inst(inst.clone());
+          info.bb.inner_mut().add_inst(inst.clone());
         }
       }
     }
     // replace all old uninitialized phis to new phis
     for (old, new) in phis {
-      old.borrow_mut().replace_all_uses_with(Some(new));
+      old.inner_mut().replace_all_uses_with(Some(new));
     }
   }
 
