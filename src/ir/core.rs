@@ -2,10 +2,10 @@ use crate::ir::instructions::*;
 use crate::ir::structs::BasicBlockRef;
 use crate::ir::types::Type;
 use crate::ir::values::*;
+use crate::utils::NewWithRef;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
-use std::{mem::MaybeUninit, ptr};
 
 /// Value in Koopa IR.
 ///
@@ -47,31 +47,16 @@ impl Value {
   where
     F: FnOnce(ValueRef) -> ValueKind,
   {
-    // create an uninitialized `Rc`
-    let value = unsafe {
-      Rc::from_raw(Rc::into_raw(Rc::new(MaybeUninit::<Value>::uninit())) as *const Value)
-    };
-    // get kind by calling function `init`
-    let user = Rc::downgrade(&value);
-    let kind = init(user);
-    // initialize the created `Rc`
-    let ptr = Rc::into_raw(value);
-    unsafe {
-      ptr::write(
-        ptr as *mut Value,
-        Self {
-          link: LinkedListLink::new(),
-          ty,
-          kind,
-          inner: RefCell::new(ValueInner {
-            name: None,
-            uses: LinkedList::default(),
-            bb: None,
-          }),
-        },
-      );
-      Rc::from_raw(ptr)
-    }
+    Rc::new_with_ref(|value| Self {
+      link: LinkedListLink::new(),
+      ty,
+      kind: init(value.clone()),
+      inner: RefCell::new(ValueInner {
+        name: None,
+        uses: LinkedList::default(),
+        bb: None,
+      }),
+    })
   }
 
   /// Gets the type of the current `Value`.
@@ -107,17 +92,21 @@ impl Value {
     )
   }
 
-  /// Immutably borrows the current value.
+  /// Immutably borrows the inner of the current value.
   ///
-  /// Panics if the value is currently mutably borrowed.
-  pub fn borrow(&self) -> Ref<'_, ValueInner> {
+  /// # Panics
+  ///
+  /// Panics if the inner value is currently mutably borrowed.
+  pub fn inner(&self) -> Ref<'_, ValueInner> {
     self.inner.borrow()
   }
 
-  /// Mutably borrows the current value.
+  /// Mutably borrows the inner of the current value.
   ///
-  /// Panics if the value is currently borrowed.
-  pub fn borrow_mut(&self) -> RefMut<'_, ValueInner> {
+  /// # Panics
+  ///
+  /// Panics if the inner value is currently borrowed.
+  pub fn inner_mut(&self) -> RefMut<'_, ValueInner> {
     self.inner.borrow_mut()
   }
 }
@@ -159,17 +148,20 @@ impl ValueInner {
   }
 
   /// Replaces all uses of the current `Value` to another `Value`.
+  ///
+  /// This method will not handle the values in basic blocks.
+  /// To replace those values, using `BasicBlockInnwe::replace_inst`.
   pub fn replace_all_uses_with(&mut self, value: Option<ValueRc>) {
     debug_assert!(
       value
         .as_ref()
-        .map_or(true, |v| !std::ptr::eq(&v.borrow().uses, &self.uses)),
+        .map_or(true, |v| !std::ptr::eq(&v.inner().uses, &self.uses)),
       "`value` can not be the same as `self`!"
     );
     while let Some(u) = self.uses.front_mut().remove() {
       u.as_ref().value.set(value.clone());
       if let Some(v) = value.clone() {
-        v.borrow_mut().add_use(u);
+        v.inner_mut().add_use(u);
       }
     }
   }
@@ -180,7 +172,7 @@ impl ValueInner {
   }
 
   /// Sets the parent basic block of the current `Value`.
-  pub fn set_bb(&mut self, bb: Option<BasicBlockRef>) {
+  pub(crate) fn set_bb(&mut self, bb: Option<BasicBlockRef>) {
     self.bb = bb;
   }
 }
@@ -236,7 +228,7 @@ impl Use {
     }));
     unsafe {
       if let Some(val) = value {
-        val.borrow_mut().add_use(UnsafeRef::from_raw(use_ptr));
+        val.inner_mut().add_use(UnsafeRef::from_raw(use_ptr));
       }
       Box::from_raw(use_ptr)
     }
@@ -258,10 +250,10 @@ impl Use {
   pub fn set_value(&self, value: Option<ValueRc>) {
     let old_val = self.value.replace(value.clone());
     if let Some(v) = old_val {
-      v.borrow_mut().remove_use(self);
+      v.inner_mut().remove_use(self);
     }
     if let Some(v) = value {
-      v.borrow_mut().add_use(unsafe { UnsafeRef::from_raw(self) });
+      v.inner_mut().add_use(unsafe { UnsafeRef::from_raw(self) });
     }
   }
 }
@@ -270,7 +262,7 @@ impl Drop for Use {
   fn drop(&mut self) {
     let s = &*self;
     if let Some(v) = s.value.take() {
-      v.borrow_mut().remove_use(s)
+      v.inner_mut().remove_use(s)
     }
   }
 }
