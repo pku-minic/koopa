@@ -418,12 +418,12 @@ impl Builder {
       .global_vars
       .get(symbol)
       .cloned()
-      .or_else(|| self.generate_local_symbol(span, bb_name, symbol))
+      .or_else(|| self.generate_local_symbol(bb_name, symbol))
       .ok_or_else(|| return_error!(span, "symbol '{}' not found", symbol))
   }
 
   /// Generates the symbol locally by the symbol name.
-  fn generate_local_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> Option<ValueRc> {
+  fn generate_local_symbol(&self, bb_name: &str, symbol: &str) -> Option<ValueRc> {
     // find symbol in local scope of the current basic block
     // if not found, try to find symbol in all predecessors
     let bb_info = &self.local_bbs[bb_name];
@@ -431,7 +431,7 @@ impl Builder {
       bb_info
         .preds
         .iter()
-        .find_map(|pred| self.generate_local_symbol(span, pred, symbol))
+        .find_map(|pred| self.generate_local_symbol(pred, symbol))
     })
   }
 
