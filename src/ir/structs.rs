@@ -1,5 +1,6 @@
 use crate::ir::core::{ValueAdapter, ValueKind, ValueRc};
 use crate::ir::types::{Type, TypeKind};
+use crate::utils::NewWithRef;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
@@ -139,17 +140,21 @@ impl Function {
     &self.params
   }
 
-  /// Immutably borrows the current function.
+  /// Immutably borrows the inner of the current function.
   ///
-  /// Panics if the function is currently mutably borrowed.
-  pub fn borrow(&self) -> Ref<FunctionInner> {
+  /// # Panics
+  ///
+  /// Panics if the inner function is currently mutably borrowed.
+  pub fn inner(&self) -> Ref<FunctionInner> {
     self.inner.borrow()
   }
 
-  /// Mutably borrows the current function.
+  /// Mutably borrows the inner of the current function.
   ///
-  /// Panics if the function is currently borrowed.
-  pub fn borrow_mut(&self) -> RefMut<FunctionInner> {
+  /// # Panics
+  ///
+  /// Panics if the inner function is currently borrowed.
+  pub fn inner_mut(&self) -> RefMut<FunctionInner> {
     self.inner.borrow_mut()
   }
 }
@@ -202,10 +207,11 @@ pub type BasicBlockRef = Weak<BasicBlock>;
 impl BasicBlock {
   /// Creates a new basic block.
   pub fn new(name: Option<String>) -> BasicBlockRc {
-    Rc::new(Self {
+    Rc::new_with_ref(|bb| Self {
       link: LinkedListLink::new(),
       name,
       inner: RefCell::new(BasicBlockInner {
+        bb,
         preds: Vec::new(),
         insts: LinkedList::default(),
       }),
@@ -217,22 +223,27 @@ impl BasicBlock {
     &self.name
   }
 
-  /// Immutably borrows the current basic block.
+  /// Immutably borrows the inner of the current basic block.
   ///
-  /// Panics if the basic block is currently mutably borrowed.
-  pub fn borrow(&self) -> Ref<BasicBlockInner> {
+  /// # Panics
+  ///
+  /// Panics if the inner basic block is currently mutably borrowed.
+  pub fn inner(&self) -> Ref<BasicBlockInner> {
     self.inner.borrow()
   }
 
-  /// Mutably borrows the current basic block.
+  /// Mutably borrows the inner of the current basic block.
   ///
-  /// Panics if the basic block is currently borrowed.
-  pub fn borrow_mut(&self) -> RefMut<BasicBlockInner> {
+  /// # Panics
+  ///
+  /// Panics if the inner basic block is currently borrowed.
+  pub fn inner_mut(&self) -> RefMut<BasicBlockInner> {
     self.inner.borrow_mut()
   }
 }
 
 pub struct BasicBlockInner {
+  bb: BasicBlockRef,
   preds: Vec<BasicBlockRef>,
   insts: LinkedList<ValueAdapter>,
 }
@@ -266,14 +277,72 @@ impl BasicBlockInner {
     &self.insts
   }
 
-  /// Gets the mutable instruction list.
-  pub fn insts_mut(&mut self) -> &mut LinkedList<ValueAdapter> {
-    &mut self.insts
+  /// Adds the specific instruction to the current basic block.
+  ///
+  /// # Panics
+  ///
+  /// Panics when `inst` is not an instruction, or the instruction
+  /// is already in another basic block.
+  pub fn add_inst(&mut self, inst: ValueRc) {
+    assert!(inst.is_inst(), "`inst` is not an instruction");
+    let mut inst_inner = inst.inner_mut();
+    assert!(
+      inst_inner.bb().is_none(),
+      "instruction is already in another basic block"
+    );
+    inst_inner.set_bb(Some(self.bb.clone()));
+    drop(inst_inner);
+    self.insts.push_back(inst);
   }
 
-  /// Adds the specific instruction to the current basic block.
-  pub fn add_inst(&mut self, inst: ValueRc) {
-    self.insts.push_back(inst);
+  /// Removes the specific instruction from the current basic block.
+  ///
+  /// # Panics
+  ///
+  /// Panics when the instruction is not in the current basic block.
+  pub fn remove_inst(&mut self, inst: &ValueRc) {
+    let mut inst_inner = inst.inner_mut();
+    assert!(
+      inst_inner
+        .bb()
+        .as_ref()
+        .map_or(false, |bb| self.bb.ptr_eq(bb)),
+      "instruction is not in the current basic block"
+    );
+    inst_inner.set_bb(None);
+    unsafe {
+      self.insts.cursor_mut_from_ptr(inst.as_ref()).remove();
+    }
+  }
+
+  /// Replaces the specific instruction with a new instruction.
+  ///
+  /// # Panics
+  ///
+  /// Panics when the instruction is not in the current basic block, or the new
+  /// value is not an instruction, or the new value is in another basic block.
+  pub fn replace_inst(&mut self, inst: &ValueRc, new: &ValueRc) {
+    todo!();
+  }
+
+  /// Inserts a new instruction before the specific instruction.
+  ///
+  /// # Panics
+  ///
+  /// Panics when the instruction is not in the current basic block, or the new
+  /// value is not an instruction, or the new value is in another basic block.
+  pub fn insert_before(&mut self, inst: &ValueRc, new: &ValueRc) {
+    todo!();
+  }
+
+  /// Inserts a new instruction after the specific instruction.
+  ///
+  /// # Panics
+  ///
+  /// Panics when the instruction is not in the current basic block, or the new
+  /// value is not an instruction, or the new value is in another basic block.
+  pub fn insert_after(&mut self, inst: &ValueRc, new: &ValueRc) {
+    todo!();
   }
 }
 
@@ -282,7 +351,7 @@ impl Drop for BasicBlockInner {
     // handle all phi functions manually to prevent circular references
     for inst in &self.insts {
       if let ValueKind::Phi(_) = inst.kind() {
-        inst.borrow_mut().replace_all_uses_with(None)
+        inst.inner_mut().replace_all_uses_with(None)
       }
     }
   }
