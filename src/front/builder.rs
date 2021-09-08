@@ -413,18 +413,19 @@ impl Builder {
   /// Generates the symbol by the symbol name.
   fn generate_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
     // try to find symbol in global scope
-    if let Some(value) = self.global_vars.get(symbol) {
-      Ok(value.clone())
-    } else {
-      // not found, find symbol in local definitions
-      self
-        .generate_local_symbol(span, bb_name, symbol)
-        .ok_or_else(|| return_error!(span, "symbol '{}' not found", symbol))
-    }
+    // if not found, find symbol in local definitions
+    self
+      .global_vars
+      .get(symbol)
+      .cloned()
+      .or_else(|| self.generate_local_symbol(span, bb_name, symbol))
+      .ok_or_else(|| return_error!(span, "symbol '{}' not found", symbol))
   }
 
   /// Generates the symbol locally by the symbol name.
   fn generate_local_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> Option<ValueRc> {
+    // find symbol in local scope of the current basic block
+    // if not found, try to find symbol in all predecessors
     let bb_info = &self.local_bbs[bb_name];
     bb_info.local_defs.get(symbol).cloned().or_else(|| {
       bb_info
@@ -681,14 +682,11 @@ impl Builder {
       );
     }
     // check if all operands are valid
-    if let Some(bb) = ast.oprs.iter().find_map(|(_, bb)| {
-      bb_info
-        .preds
-        .iter()
-        .find(|&p| p == bb)
-        .is_none()
-        .then(|| bb)
-    }) {
+    if let Some(bb) = ast
+      .oprs
+      .iter()
+      .find_map(|(_, bb)| (!bb_info.preds.iter().any(|p| p == bb)).then(|| bb))
+    {
       return_error!(
         span,
         "basic block '{}' is not a predecessor of the current basic block '{}'",
@@ -716,6 +714,12 @@ impl Builder {
   }
 }
 
+impl Default for Builder {
+  fn default() -> Self {
+    Builder::new()
+  }
+}
+
 /// Helper trait, for checking if the symbol name is a temporary name.
 trait Symbol {
   fn is_temp(&self) -> bool;
@@ -737,7 +741,7 @@ impl ToPlural for &str {
     if num > 1 {
       format!("{}s", self)
     } else {
-      format!("{}", self)
+      self.into()
     }
   }
 }
