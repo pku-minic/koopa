@@ -154,11 +154,11 @@ impl<T: Read> Lexer<T> {
     }
     // check the string
     if let Some(keyword) = KEYWORDS.get(&keyword) {
-      Ok(Token::new(span, TokenKind::Keyword(keyword.clone())))
+      Ok(Token::new(span, TokenKind::Keyword(*keyword)))
     } else if let Some(op) = BINARY_OPS.get(&keyword) {
-      Ok(Token::new(span, TokenKind::BinaryOp(op.clone())))
+      Ok(Token::new(span, TokenKind::BinaryOp(*op)))
     } else if let Some(op) = UNARY_OPS.get(&keyword) {
-      Ok(Token::new(span, TokenKind::UnaryOp(op.clone())))
+      Ok(Token::new(span, TokenKind::UnaryOp(*op)))
     } else {
       self.log_err_and_skip(span, "invalid keyword/operator")
     }

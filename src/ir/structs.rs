@@ -281,9 +281,8 @@ impl Drop for BasicBlockInner {
   fn drop(&mut self) {
     // handle all phi functions manually to prevent circular references
     for inst in &self.insts {
-      match inst.kind() {
-        ValueKind::Phi(_) => inst.borrow_mut().replace_all_uses_with(None),
-        _ => {}
+      if let ValueKind::Phi(_) = inst.kind() {
+        inst.borrow_mut().replace_all_uses_with(None)
       }
     }
   }

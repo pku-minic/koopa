@@ -48,9 +48,9 @@ impl Default for Error {
   }
 }
 
-impl<T> Into<Result<T, Error>> for Error {
-  fn into(self) -> Result<T, Error> {
-    Err(self)
+impl<T> From<Error> for Result<T, Error> {
+  fn from(error: Error) -> Self {
+    Err(error)
   }
 }
 
@@ -195,22 +195,22 @@ impl Span {
       if gs.err_num != 0 {
         msg += &format!("{} error", gs.err_num);
         if gs.err_num > 1 {
-          msg += &format!("s");
+          msg += "s";
         }
       }
       // seperator
       if gs.err_num != 0 && gs.warn_num != 0 {
-        msg += &format!(" and ");
+        msg += " and ";
       }
       // warning info
       if gs.warn_num != 0 {
         msg += &format!("{} warning", gs.warn_num);
         if gs.warn_num > 1 {
-          msg += &format!("s");
+          msg += "s";
         }
       }
       // ending
-      msg += &format!(" emitted");
+      msg += " emitted";
       eprintln!("{}", msg.bold());
     });
   }
