@@ -138,25 +138,70 @@ mod test {
       //! version: 0.0.1
 
       decl @getint(): i32
-      
+
       fun @main(): i32 {
       %entry:
         %ans_0 = call @getint()
         jump %while_entry
-      
+
       %while_entry: //! pred: %entry, %while_body
         %ind_var_0 = phi i32 (0, %entry), (%ind_var_1, %while_body)
         %ans_1 = phi i32 (%ans_0, %entry), (%ans_2, %while_body)
         %cond = lt %ind_var_0, 10
         br %cond, %while_body, %while_end
-      
+
       %while_body: //! pred: %while_entry
         %ans_2 = add %ans_1, %ind_var_0
         %ind_var_1 = add %ind_var_0, 1
         jump %while_entry
-      
+
       %while_end: //! pred: %while_entry
         ret %ans_1
+      }
+    "#
+    .into();
+    let _ = driver.generate_program().unwrap();
+    assert_eq!(Span::error_num() + Span::warning_num(), 0);
+  }
+
+  #[test]
+  fn generate_nested_loop() {
+    let driver: Driver<_> = r#"
+      decl @getint(): i32
+
+      fun @main(): i32 {
+      %args_0:
+        %7 = call @getint()
+        %8 = call @getint()
+        jump %while_cond_2
+
+      %while_end_1: //! preds: %while_cond_2
+        ret %9
+
+      %while_cond_2: //! preds: %args_0, %while_end_5
+        %9 = phi i32 (0, %args_0), (%10, %while_end_5)
+        %11 = phi i32 (0, %args_0), (%12, %while_end_5)
+        %13 = lt %11, %8
+        br %13, %while_body_3, %while_end_1
+
+      %while_body_3: //! preds: %while_cond_2
+        jump %while_cond_4
+
+      %while_cond_4: //! preds: %while_body_3, %while_body_6
+        %10 = phi i32 (%9, %while_body_3), (%14, %while_body_6)
+        %15 = phi i32 (0, %while_body_3), (%16, %while_body_6)
+        %17 = lt %15, %7
+        br %17, %while_body_6, %while_end_5
+
+      %while_end_5: //! preds: %while_cond_4
+        %12 = add %11, 1
+        jump %while_cond_2
+
+      %while_body_6: //! preds: %while_cond_4
+        %18 = add %10, %11
+        %14 = add %18, %15
+        %16 = add %15, 1
+        jump %while_cond_4
       }
     "#
     .into();
