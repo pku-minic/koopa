@@ -1,3 +1,5 @@
+#![allow(clippy::new_ret_no_self)]
+
 use crate::front::span::Span;
 use crate::ir::instructions::{BinaryOp, UnaryOp};
 use std::cmp::PartialEq;

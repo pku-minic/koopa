@@ -1,3 +1,5 @@
+#![allow(clippy::new_ret_no_self)]
+
 use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
 use crate::ir::types::{Type, TypeKind};
 use std::cell::RefCell;
