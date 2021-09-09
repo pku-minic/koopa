@@ -321,8 +321,34 @@ impl BasicBlockInner {
   ///
   /// Panics when the instruction is not in the current basic block, or the new
   /// value is not an instruction, or the new value is in another basic block.
-  pub fn replace_inst(&mut self, inst: &ValueRc, new: &ValueRc) {
-    todo!();
+  pub fn replace_inst(&mut self, inst: &ValueRc, new: ValueRc) {
+    // update `inst`
+    let mut inst_inner = inst.inner_mut();
+    assert!(
+      inst_inner
+        .bb()
+        .as_ref()
+        .map_or(false, |bb| self.bb.ptr_eq(bb)),
+      "`inst` is not in the current basic block"
+    );
+    inst_inner.set_bb(None);
+    // update `new`
+    let mut new_inner = new.inner_mut();
+    assert!(new.is_inst(), "`new` is not an instruction");
+    assert!(
+      new_inner.bb().is_none(),
+      "`new` is already in another basic block"
+    );
+    new_inner.set_bb(Some(self.bb.clone()));
+    drop(new_inner);
+    // update instruction list
+    unsafe {
+      let result = self
+        .insts
+        .cursor_mut_from_ptr(inst.as_ref())
+        .replace_with(new);
+      assert!(result.is_ok());
+    }
   }
 
   /// Inserts a new instruction before the specific instruction.
@@ -331,8 +357,32 @@ impl BasicBlockInner {
   ///
   /// Panics when the instruction is not in the current basic block, or the new
   /// value is not an instruction, or the new value is in another basic block.
-  pub fn insert_before(&mut self, inst: &ValueRc, new: &ValueRc) {
-    todo!();
+  pub fn insert_before(&mut self, inst: &ValueRc, new: ValueRc) {
+    // check `inst`
+    assert!(
+      inst
+        .inner()
+        .bb()
+        .as_ref()
+        .map_or(false, |bb| self.bb.ptr_eq(bb)),
+      "`inst` is not in the current basic block"
+    );
+    // update `new`
+    let mut new_inner = new.inner_mut();
+    assert!(new.is_inst(), "`new` is not an instruction");
+    assert!(
+      new_inner.bb().is_none(),
+      "`new` is already in another basic block"
+    );
+    new_inner.set_bb(Some(self.bb.clone()));
+    drop(new_inner);
+    // update instruction list
+    unsafe {
+      self
+        .insts
+        .cursor_mut_from_ptr(inst.as_ref())
+        .insert_before(new);
+    }
   }
 
   /// Inserts a new instruction after the specific instruction.
@@ -341,8 +391,32 @@ impl BasicBlockInner {
   ///
   /// Panics when the instruction is not in the current basic block, or the new
   /// value is not an instruction, or the new value is in another basic block.
-  pub fn insert_after(&mut self, inst: &ValueRc, new: &ValueRc) {
-    todo!();
+  pub fn insert_after(&mut self, inst: &ValueRc, new: ValueRc) {
+    // check `inst`
+    assert!(
+      inst
+        .inner()
+        .bb()
+        .as_ref()
+        .map_or(false, |bb| self.bb.ptr_eq(bb)),
+      "`inst` is not in the current basic block"
+    );
+    // update `new`
+    let mut new_inner = new.inner_mut();
+    assert!(new.is_inst(), "`new` is not an instruction");
+    assert!(
+      new_inner.bb().is_none(),
+      "`new` is already in another basic block"
+    );
+    new_inner.set_bb(Some(self.bb.clone()));
+    drop(new_inner);
+    // update instruction list
+    unsafe {
+      self
+        .insts
+        .cursor_mut_from_ptr(inst.as_ref())
+        .insert_after(new);
+    }
   }
 }
 
