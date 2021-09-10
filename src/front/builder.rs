@@ -14,9 +14,8 @@ struct BasicBlockInfo {
   bb: BasicBlockRc,
   preds: Vec<String>,
   local_defs: HashMap<String, ValueRc>,
-  insts: Vec<ValueRc>,
-  /// Indices of phi functions in instruction list (key) and statement list (value).
-  phis: HashMap<usize, usize>,
+  /// All uninitialized phi functions and there indices in statement list.
+  phis: Vec<(ValueRc, usize)>,
 }
 
 impl BasicBlockInfo {
@@ -25,8 +24,7 @@ impl BasicBlockInfo {
       bb,
       preds: Vec::new(),
       local_defs: HashMap::new(),
-      insts: Vec::new(),
-      phis: HashMap::new(),
+      phis: Vec::new(),
     }
   }
 }
@@ -153,7 +151,7 @@ impl Builder {
       self.build_on_block(&ret_ty, block);
     }
     // add generated instructions to basic blocks
-    self.add_insts_to_block(&bbs);
+    self.replace_phis(&bbs);
   }
 
   /// Builds on function declarations.
@@ -289,37 +287,30 @@ impl Builder {
     for (i, stmt) in ast.stmts.iter().enumerate() {
       if let Ok(stmt) = self.generate_stmt(&ast.name, ret_ty, &stmt) {
         let info = self.local_bbs.get_mut(&ast.name).unwrap();
-        // record the instruction index if the current statement is a phi function
+        // record `stmt` if the current statement is a phi function
         if matches!(stmt.kind(), ValueKind::Phi(..)) {
-          info.phis.insert(info.insts.len(), i);
+          info.phis.push((stmt.clone(), i));
         }
         // add statement to the current basic block
-        info.insts.push(stmt);
+        info.bb.inner_mut().add_inst(stmt);
       }
     }
   }
 
-  /// Adds all instruction of all basic blocks to the generated basic block.
-  ///
-  /// Also handles all uninitialized phi functions.
-  fn add_insts_to_block(&self, bbs: &[&ast::Block]) {
+  /// Handles all uninitialized phi functions, replaces them with correct phi functions.
+  fn replace_phis(&self, bbs: &[&ast::Block]) {
     let mut phis = Vec::new();
     for block in bbs {
       let info = &self.local_bbs[&block.name];
-      for (i, inst) in info.insts.iter().enumerate() {
-        if let Some(stmt_i) = info.phis.get(&i) {
-          // generate the current phi function
-          let ast = &block.stmts[*stmt_i];
-          let phi = unwrap_ast!(unwrap_ast!(ast, SymbolDef).value, Phi);
-          if let Ok(phi) = self.generate_phi(&ast.span, &block.name, phi) {
-            // store the old phi and the new phi
-            phis.push((inst.clone(), phi.clone()));
-            // add to basic block
-            info.bb.inner_mut().add_inst(phi);
-          }
-        } else {
-          // just add to basic block
-          info.bb.inner_mut().add_inst(inst.clone());
+      for (old, i) in &info.phis {
+        // generate the current phi function
+        let ast = &block.stmts[*i];
+        let phi = unwrap_ast!(unwrap_ast!(ast, SymbolDef).value, Phi);
+        if let Ok(new) = self.generate_phi(&ast.span, &block.name, phi) {
+          // store the old phi and the new phi
+          phis.push((old, new.clone()));
+          // replace the phi function in the current basic block
+          info.bb.inner_mut().replace_inst(old, new);
         }
       }
     }
