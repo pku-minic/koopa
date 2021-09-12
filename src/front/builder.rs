@@ -92,14 +92,15 @@ impl Builder {
         alloc.inner_mut().set_name(Some(ast.name.clone()));
       }
       // add to global variable map
-      if self
-        .global_vars
-        .insert(ast.name.clone(), alloc.clone())
-        .is_some()
+      if self.global_funcs.contains_key(&ast.name)
+        || self
+          .global_vars
+          .insert(ast.name.clone(), alloc.clone())
+          .is_some()
       {
         log_error!(
           span,
-          "global variable '{}' has already been defined",
+          "global symbol '{}' has already been defined",
           ast.name
         );
       }
@@ -131,12 +132,17 @@ impl Builder {
       ret_ty.clone(),
     );
     // add to global function map
-    if self
-      .global_funcs
-      .insert(ast.name.clone(), Rc::downgrade(&def))
-      .is_some()
+    if self.global_vars.contains_key(&ast.name)
+      || self
+        .global_funcs
+        .insert(ast.name.clone(), Rc::downgrade(&def))
+        .is_some()
     {
-      log_error!(span, "function '{}' has already been defined", ast.name);
+      log_error!(
+        span,
+        "global symbol '{}' has already been defined",
+        ast.name
+      );
     }
     // add to program
     self.program.add_func(def.clone());
@@ -167,12 +173,17 @@ impl Builder {
     // create function declaration
     let decl = structs::Function::new_decl(ast.name.clone(), ty);
     // add to global function map
-    if self
-      .global_funcs
-      .insert(ast.name.clone(), Rc::downgrade(&decl))
-      .is_some()
+    if self.global_vars.contains_key(&ast.name)
+      || self
+        .global_funcs
+        .insert(ast.name.clone(), Rc::downgrade(&decl))
+        .is_some()
     {
-      log_error!(span, "function '{}' has already been defined", ast.name);
+      log_error!(
+        span,
+        "global symbol '{}' has already been defined",
+        ast.name
+      );
     }
     // add to program
     self.program.add_func(decl);
