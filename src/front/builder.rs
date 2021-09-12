@@ -446,7 +446,7 @@ impl Builder {
       AstKind::Error(_) => Error::default().into(),
       AstKind::SymbolDef(def) => {
         // check if has already been defined
-        if self.global_vars.get(&def.name).is_some() || !self.local_symbols.insert(def.name.clone())
+        if self.global_vars.contains_key(&def.name) || !self.local_symbols.insert(def.name.clone())
         {
           log_error!(ast.span, "symbol '{}' has already been defined", def.name);
         }
