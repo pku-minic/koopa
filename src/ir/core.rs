@@ -97,7 +97,7 @@ impl Value {
   /// # Panics
   ///
   /// Panics if the inner value is currently mutably borrowed.
-  pub fn inner(&self) -> Ref<'_, ValueInner> {
+  pub fn inner(&self) -> Ref<ValueInner> {
     self.inner.borrow()
   }
 
@@ -106,7 +106,7 @@ impl Value {
   /// # Panics
   ///
   /// Panics if the inner value is currently borrowed.
-  pub fn inner_mut(&self) -> RefMut<'_, ValueInner> {
+  pub fn inner_mut(&self) -> RefMut<ValueInner> {
     self.inner.borrow_mut()
   }
 }
