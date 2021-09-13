@@ -72,33 +72,24 @@ impl NameManager {
   /// Gets the name of the specific value.
   pub fn get_value_name(&self, value: &Value) -> Rc<String> {
     match self.0.as_ref().borrow().cur_scope {
-      ScopeKind::Global => self.get_global_value_name(value),
-      _ => self.get_local_value_name(value),
+      ScopeKind::Global => self.get_value_name_impl(value, |r| &mut r.global_vars),
+      _ => self.get_value_name_impl(value, |r| r.values.as_mut().unwrap()),
     }
   }
 
-  /// Gets the name of the specific global value.
-  fn get_global_value_name(&self, value: &Value) -> Rc<String> {
+  fn get_value_name_impl<F>(&self, value: &Value, value_set: F) -> Rc<String>
+  where
+    F: for<'a> Fn(&'a mut RefMut<NameManagerImpl>) -> &'a mut HashMap<*const Value, Rc<String>>,
+  {
     let ptr: *const Value = value;
-    if let Some(name) = self.0.as_ref().borrow().global_vars.get(&ptr) {
+    let mut name_man = self.0.borrow_mut();
+    if let Some(name) = value_set(&mut name_man).get(&ptr) {
       name.clone()
     } else {
+      drop(name_man);
       let name = self.next_name(value.inner().name(), |r| &mut r.global_names);
       let mut name_man = self.0.borrow_mut();
-      name_man.global_vars.insert(ptr, name);
-      name_man.global_vars[&ptr].clone()
-    }
-  }
-
-  /// Gets the name of the specific local value.
-  fn get_local_value_name(&self, value: &Value) -> Rc<String> {
-    let ptr: *const Value = value;
-    if let Some(name) = self.0.as_ref().borrow().values.as_ref().unwrap().get(&ptr) {
-      name.clone()
-    } else {
-      let name = self.next_name(value.inner().name(), |r| &mut r.global_names);
-      let mut name_man = self.0.borrow_mut();
-      let values = name_man.values.as_mut().unwrap();
+      let values = value_set(&mut name_man);
       values.insert(ptr, name);
       values[&ptr].clone()
     }
