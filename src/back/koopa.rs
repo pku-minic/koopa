@@ -287,7 +287,7 @@ impl Visitor {
 
 #[cfg(test)]
 mod test {
-  use super::*;
+  use crate::back::KoopaGenerator;
   use crate::front::driver::Driver;
   use std::str;
 
@@ -306,7 +306,7 @@ fun @test(@i: i32): i32 {
 }
 "#;
     let driver: Driver<_> = src.into();
-    let mut gen = generator::Generator::<_, Visitor>::new(Vec::new());
+    let mut gen = KoopaGenerator::new(Vec::new());
     gen
       .generate_on(&driver.generate_program().unwrap())
       .unwrap();
@@ -338,7 +338,7 @@ fun @main(): i32 {
 }
 "#;
     let driver: Driver<_> = src.into();
-    let mut gen = generator::Generator::<_, Visitor>::new(Vec::new());
+    let mut gen = KoopaGenerator::new(Vec::new());
     gen
       .generate_on(&driver.generate_program().unwrap())
       .unwrap();
@@ -385,7 +385,7 @@ fun @main(): i32 {
 }
 "#;
     let driver: Driver<_> = src.into();
-    let mut gen = generator::Generator::<_, Visitor>::new(Vec::new());
+    let mut gen = KoopaGenerator::new(Vec::new());
     gen
       .generate_on(&driver.generate_program().unwrap())
       .unwrap();
