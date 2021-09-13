@@ -13,10 +13,7 @@ impl Alloc {
   ///
   /// The type of the created allocation will be `*ty`.
   pub fn new(ty: Type) -> ValueRc {
-    debug_assert!(
-      !matches!(ty.kind(), TypeKind::Unit),
-      "`ty` can not be unit!"
-    );
+    debug_assert!(!ty.is_unit(), "`ty` can not be unit!");
     Value::new(Type::get_pointer(ty), ValueKind::Alloc(Self))
   }
 }
@@ -121,10 +118,7 @@ impl GetPtr {
       matches!(src.ty().kind(), TypeKind::Pointer(..)),
       "`src` must be a pointer!"
     );
-    debug_assert!(
-      matches!(index.ty().kind(), TypeKind::Int32),
-      "``index` must be an integer!"
-    );
+    debug_assert!(index.ty().is_i32(), "``index` must be an integer!");
     Value::new_with_init(src.ty().clone(), |user| {
       ValueKind::GetPtr(Self {
         src: Use::new(Some(src), user.clone()),
@@ -156,10 +150,7 @@ impl GetElemPtr {
   /// The type of `src` must be some kind of pointer of array (`*[ty, len]`),
   /// and the type of the created `GetElemPtr` will be `*ty`.
   pub fn new(src: ValueRc, index: ValueRc) -> ValueRc {
-    debug_assert!(
-      matches!(index.ty().kind(), TypeKind::Int32),
-      "``index` must be an integer!"
-    );
+    debug_assert!(index.ty().is_i32(), "``index` must be an integer!");
     let ty = match src.ty().kind() {
       TypeKind::Pointer(ty) => match ty.kind() {
         TypeKind::Array(base, _) => Type::get_pointer(base.clone()),
@@ -200,7 +191,7 @@ impl Binary {
   pub fn new(op: BinaryOp, lhs: ValueRc, rhs: ValueRc) -> ValueRc {
     let ty = lhs.ty().clone();
     debug_assert!(
-      matches!(ty.kind(), TypeKind::Int32) && &ty == rhs.ty(),
+      ty.is_i32() && &ty == rhs.ty(),
       "both `lhs` and `rhs` must be integer!"
     );
     Value::new_with_init(ty, |user| {
@@ -278,10 +269,7 @@ impl Unary {
   /// The type of the created `Unary` will be `(opr.ty)`.
   pub fn new(op: UnaryOp, opr: ValueRc) -> ValueRc {
     let ty = opr.ty().clone();
-    debug_assert!(
-      matches!(ty.kind(), TypeKind::Int32),
-      "`opr` must be integer!"
-    );
+    debug_assert!(ty.is_i32(), "`opr` must be integer!");
     Value::new_with_init(ty, |user| {
       ValueKind::Unary(Self {
         op,
@@ -328,10 +316,7 @@ impl Branch {
   ///
   /// The type of `cond` must be integer.
   pub fn new(cond: ValueRc, true_bb: BasicBlockRef, false_bb: BasicBlockRef) -> ValueRc {
-    debug_assert!(
-      matches!(cond.ty().kind(), TypeKind::Int32),
-      "`cond` must be integer!"
-    );
+    debug_assert!(cond.ty().is_i32(), "`cond` must be integer!");
     Value::new_with_init(Type::get_unit(), |user| {
       ValueKind::Branch(Self {
         cond: Use::new(Some(cond), user),
@@ -429,9 +414,7 @@ impl Return {
   /// Creates a new return instruction.
   pub fn new(value: Option<ValueRc>) -> ValueRc {
     debug_assert!(
-      value
-        .as_ref()
-        .map_or(true, |v| !matches!(v.ty().kind(), TypeKind::Unit)),
+      value.as_ref().map_or(true, |v| !v.ty().is_unit()),
       "the type of `value` must not be `unit`!"
     );
     Value::new_with_init(Type::get_unit(), |user| {
@@ -464,10 +447,7 @@ impl Phi {
     );
     // check value type
     let ty = oprs[0].0.ty().clone();
-    debug_assert!(
-      !matches!(ty.kind(), TypeKind::Unit),
-      "value type must not be `unit`!"
-    );
+    debug_assert!(!ty.is_unit(), "value type must not be `unit`!");
     Value::new_with_init(ty, |user| {
       ValueKind::Phi(Self {
         oprs: oprs
@@ -483,10 +463,7 @@ impl Phi {
   /// This phi function must be replaced with a normal phi function afterwards.
   pub fn new_uninit(ty: Type) -> ValueRc {
     // check value type
-    debug_assert!(
-      !matches!(ty.kind(), TypeKind::Unit),
-      "value type must not be `unit`!"
-    );
+    debug_assert!(!ty.is_unit(), "value type must not be `unit`!");
     Value::new(ty, ValueKind::Phi(Self { oprs: Vec::new() }))
   }
 

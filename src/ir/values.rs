@@ -1,7 +1,7 @@
 #![allow(clippy::new_ret_no_self)]
 
 use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
-use crate::ir::types::{Type, TypeKind};
+use crate::ir::types::Type;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -49,10 +49,7 @@ impl ZeroInit {
   ///
   /// The type of the created zero initializer will be `ty`.
   pub fn get(ty: Type) -> ValueRc {
-    debug_assert!(
-      !matches!(ty.kind(), TypeKind::Unit),
-      "`ty` can not be unit!"
-    );
+    debug_assert!(!ty.is_unit(), "`ty` can not be unit!");
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&ty).cloned().unwrap_or_else(|| {
@@ -77,10 +74,7 @@ impl Undef {
   ///
   /// The type of the created undefined value will be `ty`.
   pub fn get(ty: Type) -> ValueRc {
-    debug_assert!(
-      !matches!(ty.kind(), TypeKind::Unit),
-      "`ty` can not be unit!"
-    );
+    debug_assert!(!ty.is_unit(), "`ty` can not be unit!");
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&ty).cloned().unwrap_or_else(|| {
@@ -118,10 +112,7 @@ impl Aggregate {
     );
     // check base type
     let base = elems[0].ty().clone();
-    debug_assert!(
-      !matches!(base.kind(), TypeKind::Unit),
-      "base type must not be `unit`!"
-    );
+    debug_assert!(!base.is_unit(), "base type must not be `unit`!");
     // create value
     let ty = Type::get_array(base, elems.len());
     Value::new_with_init(ty, |user| {
@@ -150,10 +141,7 @@ impl ArgRef {
   ///
   /// The type of the created argument reference will be `ty`.
   pub fn new(ty: Type, index: usize) -> ValueRc {
-    debug_assert!(
-      !matches!(ty.kind(), TypeKind::Unit),
-      "`ty` can not be unit!"
-    );
+    debug_assert!(!ty.is_unit(), "`ty` can not be unit!");
     Value::new(ty, ValueKind::ArgRef(Self { index }))
   }
 

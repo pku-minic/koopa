@@ -83,10 +83,7 @@ impl Function {
         .iter()
         .map(|p| {
           let ty = p.ty().clone();
-          debug_assert!(
-            !matches!(ty.kind(), TypeKind::Unit),
-            "parameter type must not be `unit`!"
-          );
+          debug_assert!(!ty.is_unit(), "parameter type must not be `unit`!");
           ty
         })
         .collect(),
@@ -108,7 +105,7 @@ impl Function {
     match ty.kind() {
       TypeKind::Function(params, _) => {
         debug_assert!(
-          params.iter().all(|p| !matches!(p.kind(), TypeKind::Unit)),
+          params.iter().all(|p| !p.is_unit()),
           "parameter type must not be `unit`!"
         )
       }

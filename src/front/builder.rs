@@ -354,7 +354,7 @@ impl Builder {
       AstKind::UndefVal(_) => Ok(values::Undef::get(ty.clone())),
       AstKind::ZeroInit(_) => Ok(values::ZeroInit::get(ty.clone())),
       AstKind::IntVal(int) => {
-        if !matches!(ty.kind(), TypeKind::Int32) {
+        if !ty.is_i32() {
           return_error!(
             ast.span,
             "expected type '{}', but it can not be applied to integers",
@@ -464,7 +464,7 @@ impl Builder {
         // generate the value of the instruction
         let inst = self.generate_inst(bb_name, &def.value)?;
         // check type
-        if matches!(inst.ty().kind(), TypeKind::Unit) {
+        if inst.ty().is_unit() {
           return_error!(
             ast.span,
             "symbol '{}' is defined as a unit type, which is not allowed",
@@ -634,15 +634,14 @@ impl Builder {
     ast: &ast::Return,
   ) -> ValueResult {
     // check return type
-    let has_ret = !matches!(ret_ty.kind(), TypeKind::Unit);
-    if has_ret && ast.value.is_none() {
+    if !ret_ty.is_unit() && ast.value.is_none() {
       return_error!(
         span,
         "expected return type '{}', but returned nothing",
         ret_ty
       );
     }
-    if !has_ret && ast.value.is_some() {
+    if ret_ty.is_unit() && ast.value.is_some() {
       return_error!(
         span,
         "function has no return value, but a value has been returned"
