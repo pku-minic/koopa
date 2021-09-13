@@ -2,6 +2,7 @@ use crate::ir::core::Value;
 use crate::ir::structs::{BasicBlock, Function, Program};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
 use std::io::{Result, Write};
 use std::rc::Rc;
 
@@ -226,6 +227,16 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
     self
       .visitor
       .visit_program(&mut self.writer, &mut self.name_man, program)
+  }
+}
+
+impl<V: Visitor<File>> Generator<File, V> {
+  /// Creates a new `Generator` from the specific path.
+  pub fn from_file(path: &str) -> Result<Self>
+  where
+    V: Default,
+  {
+    File::open(path).map(|f| Generator::new(f))
   }
 }
 
