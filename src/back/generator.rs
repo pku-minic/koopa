@@ -1,16 +1,13 @@
 use crate::ir::core::Value;
 use crate::ir::structs::{BasicBlock, Function};
 use std::borrow::Borrow;
-use std::cell::{RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// A manager for storing names and allocating unique temporary
 /// names of global variables, functions, basic blocks and values.
-pub struct NameManager(Rc<RefCell<NameManagerImpl>>);
-
 #[derive(Default)]
-struct NameManagerImpl {
+pub struct NameManager {
   next_id: usize,
   cur_scope: ScopeKind,
   global_names: HashSet<StringRc>,
@@ -24,72 +21,78 @@ struct NameManagerImpl {
 impl NameManager {
   /// Creates a new `NameManager`.
   pub fn new() -> Self {
-    Self(Rc::new(RefCell::new(NameManagerImpl::default())))
+    Self::default()
   }
 
-  /// Enters the function scope. Call this method when generating
-  /// basic blocks and local value.
+  /// Enters the function scope.
   ///
-  /// Returns a function scope guard which, when dropped, exits the function scope.
-  pub fn enter_func_scope(&self) -> FunctionScopeGuard {
-    let mut name_man = self.0.borrow_mut();
-    match name_man.cur_scope {
-      ScopeKind::Global => {
-        name_man.cur_scope = ScopeKind::Function;
-        name_man.values = Some(HashMap::new());
-        FunctionScopeGuard(self.0.clone())
-      }
-      _ => panic!("already in function scope"),
+  /// Call this method when generating basic blocks and local values.
+  pub fn enter_func_scope(&mut self) {
+    assert!(
+      matches!(self.cur_scope, ScopeKind::Global),
+      "already in function scope"
+    );
+    self.cur_scope = ScopeKind::Function;
+    self.values = Some(HashMap::new());
+  }
+
+  /// Exits the function scope.
+  pub fn exit_func_scope(&mut self) {
+    assert!(
+      matches!(self.cur_scope, ScopeKind::Function),
+      "not in function scope"
+    );
+    self.cur_scope = ScopeKind::Global;
+    self.bb_names.clear();
+    self.bbs.clear();
+    let values = self.values.take().unwrap();
+    for name in values.values() {
+      self.global_names.remove(name);
     }
   }
 
   /// Gets the name of the specific function.
-  pub fn get_func_name(&self, func: &Function) -> Rc<String> {
+  pub fn get_func_name(&mut self, func: &Function) -> Rc<String> {
     let ptr: *const Function = func;
-    if let Some(name) = self.0.as_ref().borrow().funcs.get(&ptr) {
+    if let Some(name) = self.funcs.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_name_str(func.name(), |r| &mut r.global_names);
-      let mut name_man = self.0.borrow_mut();
-      name_man.funcs.insert(ptr, name);
-      name_man.funcs[&ptr].clone()
+      let name = self.next_name_str(func.name(), |s| &mut s.global_names);
+      self.funcs.insert(ptr, name);
+      self.funcs[&ptr].clone()
     }
   }
 
   /// Gets the name of the specific basic block.
-  pub fn get_bb_name(&self, bb: &BasicBlock) -> Rc<String> {
+  pub fn get_bb_name(&mut self, bb: &BasicBlock) -> Rc<String> {
     let ptr: *const BasicBlock = bb;
-    if let Some(name) = self.0.as_ref().borrow().bbs.get(&ptr) {
+    if let Some(name) = self.bbs.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_name(bb.name(), |r| &mut r.bb_names);
-      let mut name_man = self.0.borrow_mut();
-      name_man.bbs.insert(ptr, name);
-      name_man.bbs[&ptr].clone()
+      let name = self.next_name(bb.name(), |s| &mut s.bb_names);
+      self.bbs.insert(ptr, name);
+      self.bbs[&ptr].clone()
     }
   }
 
   /// Gets the name of the specific value.
-  pub fn get_value_name(&self, value: &Value) -> Rc<String> {
-    match self.0.as_ref().borrow().cur_scope {
-      ScopeKind::Global => self.get_value_name_impl(value, |r| &mut r.global_vars),
-      _ => self.get_value_name_impl(value, |r| r.values.as_mut().unwrap()),
+  pub fn get_value_name(&mut self, value: &Value) -> Rc<String> {
+    match self.cur_scope {
+      ScopeKind::Global => self.get_value_name_impl(value, |s| &mut s.global_vars),
+      _ => self.get_value_name_impl(value, |s| s.values.as_mut().unwrap()),
     }
   }
 
-  fn get_value_name_impl<F>(&self, value: &Value, value_set: F) -> Rc<String>
+  fn get_value_name_impl<F>(&mut self, value: &Value, value_set: F) -> Rc<String>
   where
-    F: for<'a> Fn(&'a mut RefMut<NameManagerImpl>) -> &'a mut HashMap<*const Value, Rc<String>>,
+    F: for<'a> Fn(&'a mut Self) -> &'a mut HashMap<*const Value, Rc<String>>,
   {
     let ptr: *const Value = value;
-    let mut name_man = self.0.borrow_mut();
-    if let Some(name) = value_set(&mut name_man).get(&ptr) {
+    if let Some(name) = value_set(self).get(&ptr) {
       name.clone()
     } else {
-      drop(name_man);
-      let name = self.next_name(value.inner().name(), |r| &mut r.global_names);
-      let mut name_man = self.0.borrow_mut();
-      let values = value_set(&mut name_man);
+      let name = self.next_name(value.inner().name(), |s| &mut s.global_names);
+      let values = value_set(self);
       values.insert(ptr, name);
       values[&ptr].clone()
     }
@@ -97,19 +100,18 @@ impl NameManager {
 
   /// Generates the next name by the specific `Option<String>`
   /// and stores it to the specific name set.
-  fn next_name<F>(&self, name: &Option<String>, name_set: F) -> Rc<String>
+  fn next_name<F>(&mut self, name: &Option<String>, name_set: F) -> Rc<String>
   where
-    F: for<'a> FnOnce(&'a mut RefMut<NameManagerImpl>) -> &'a mut HashSet<StringRc>,
+    F: for<'a> FnOnce(&'a mut Self) -> &'a mut HashSet<StringRc>,
   {
     // check if there is a name
     if let Some(name) = name {
       self.next_name_str(name, name_set)
     } else {
       // generate a temporary name
-      let mut name_man = self.0.borrow_mut();
-      let name = format!("%{}", name_man.next_id);
-      name_man.next_id += 1;
-      let names = name_set(&mut name_man);
+      let name = format!("%{}", self.next_id);
+      self.next_id += 1;
+      let names = name_set(self);
       names.insert(name.clone().into());
       names.get(&name).unwrap().into_rc()
     }
@@ -117,12 +119,11 @@ impl NameManager {
 
   /// Generates the next name by the specific string
   /// and stores it to the specific name set.
-  fn next_name_str<F>(&self, name: &str, name_set: F) -> Rc<String>
+  fn next_name_str<F>(&mut self, name: &str, name_set: F) -> Rc<String>
   where
-    F: for<'a> FnOnce(&'a mut RefMut<NameManagerImpl>) -> &'a mut HashSet<StringRc>,
+    F: for<'a> FnOnce(&'a mut Self) -> &'a mut HashSet<StringRc>,
   {
-    let mut name_man = self.0.borrow_mut();
-    let names = name_set(&mut name_man);
+    let names = name_set(self);
     // check for duplicate names
     if !names.contains(name) {
       names.insert(name.into());
@@ -138,22 +139,6 @@ impl NameManager {
       }
       unreachable!()
     }
-  }
-}
-
-/// Scope guard of the function scope.
-pub struct FunctionScopeGuard(Rc<RefCell<NameManagerImpl>>);
-
-impl Drop for FunctionScopeGuard {
-  fn drop(&mut self) {
-    let mut name_man = self.0.borrow_mut();
-    let values = name_man.values.take().unwrap();
-    for name in values.values() {
-      name_man.global_names.remove(name);
-    }
-    name_man.cur_scope = ScopeKind::Global;
-    name_man.bb_names.clear();
-    name_man.bbs.clear();
   }
 }
 
