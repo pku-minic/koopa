@@ -316,8 +316,13 @@ impl Builder {
       for (old, i) in &info.phis {
         // generate the current phi function
         let ast = &block.stmts[*i];
-        let phi = unwrap_ast!(unwrap_ast!(ast, SymbolDef).value, Phi);
+        let def = unwrap_ast!(ast, SymbolDef);
+        let phi = unwrap_ast!(def.value, Phi);
         if let Ok(new) = self.generate_phi(&ast.span, &block.name, phi) {
+          // set value name
+          if !def.name.is_temp() {
+            new.inner_mut().set_name(Some(def.name.clone()));
+          }
           // store the old phi and the new phi
           phis.push((old, new.clone()));
           // replace the phi function in the current basic block
@@ -470,6 +475,10 @@ impl Builder {
             "symbol '{}' is defined as a unit type, which is not allowed",
             def.name
           );
+        }
+        // set value name
+        if !def.name.is_temp() {
+          inst.inner_mut().set_name(Some(def.name.clone()));
         }
         // add to local basic block
         self
