@@ -2,7 +2,7 @@ use crate::back::generator::{self, NameManager};
 use crate::ir::core::{Value, ValueKind};
 use crate::ir::instructions::*;
 use crate::ir::structs::{BasicBlock, BasicBlockRef, Function, Program};
-use crate::ir::types::Type;
+use crate::ir::types::{Type, TypeKind};
 use std::io::{Result, Write};
 
 /// Visitor for generating Koopa IR structures into text formatted Koopa IR.
@@ -24,8 +24,13 @@ impl<W: Write> generator::Visitor<W> for Visitor {
       write!(w, "global ")?;
       self.visit_inst(w, nm, var)?;
     }
-    writeln!(w)?;
-    for func in program.funcs() {
+    if !program.vars().is_empty() {
+      writeln!(w)?;
+    }
+    for (i, func) in program.funcs().iter().enumerate() {
+      if i != 0 {
+        writeln!(w)?;
+      }
       self.visit_func(w, nm, func)?;
     }
     Ok(())
@@ -57,8 +62,12 @@ impl Visitor {
     }
     write!(w, ")")?;
     // return type
-    if func.ty().is_unit() {
-      write!(w, ": {}", func.ty())?;
+    let ret_ty = match func.ty().kind() {
+      TypeKind::Function(_, ret) => ret,
+      _ => panic!("invalid function type"),
+    };
+    if !ret_ty.is_unit() {
+      write!(w, ": {}", ret_ty)?;
     }
     // function body
     if !func.inner().bbs().is_empty() {
@@ -132,9 +141,9 @@ impl Visitor {
   /// Generates memory store.
   fn visit_store(&mut self, w: &mut impl Write, nm: &mut NameManager, store: &Store) -> Result<()> {
     write!(w, "store ")?;
-    self.visit_value(w, nm, value!(store.dest()))?;
+    self.visit_value(w, nm, value!(store.value()))?;
     write!(w, ", ")?;
-    self.visit_value(w, nm, value!(store.value()))
+    self.visit_value(w, nm, value!(store.dest()))
   }
 
   /// Generates pointer calculation.
@@ -252,10 +261,14 @@ impl Visitor {
       ValueKind::ZeroInit(_) => write!(w, "zeroinit"),
       ValueKind::Undef(_) => write!(w, "undef"),
       ValueKind::Aggregate(v) => {
-        for elem in v.elems() {
+        write!(w, "{{")?;
+        for (i, elem) in v.elems().iter().enumerate() {
+          if i != 0 {
+            write!(w, ", ")?;
+          }
           self.visit_const(w, value!(elem))?;
         }
-        Ok(())
+        write!(w, "}}")
       }
       _ => panic!("invalid constant"),
     }
@@ -269,5 +282,113 @@ impl Visitor {
     bb: &BasicBlockRef,
   ) -> Result<()> {
     write!(w, "{}", nm.get_bb_name(bb.upgrade().unwrap().as_ref()))
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::front::driver::Driver;
+  use std::str;
+
+  #[test]
+  fn dump_ir() {
+    let src = r#"global @x = alloc [i32, 10], zeroinit
+
+fun @test(@i: i32): i32 {
+%entry:
+  %0 = getptr @x, 0
+  store {1, 2, 3, 4, 5, 0, 0, 0, 0, 10}, %0
+  %1 = getelemptr @x, @i
+  %2 = load %1
+  %3 = mul %2, 7
+  ret %3
+}
+"#;
+    let driver: Driver<_> = src.into();
+    let mut gen = generator::Generator::<_, Visitor>::new(Vec::new());
+    gen
+      .generate_on(&driver.generate_program().unwrap())
+      .unwrap();
+    assert_eq!(str::from_utf8(&gen.writer()).unwrap(), src);
+  }
+
+  #[test]
+  fn dump_ir_phi() {
+    let src = r#"decl @getint(): i32
+
+fun @main(): i32 {
+%entry:
+  %ans_0 = call @getint()
+  jump %while_entry
+
+%while_entry:
+  %ind_var_0 = phi i32 (0, %entry), (%ind_var_1, %while_body)
+  %ans_1 = phi i32 (%ans_0, %entry), (%ans_2, %while_body)
+  %cond = lt %ind_var_0, 10
+  br %cond, %while_body, %while_end
+
+%while_body:
+  %ans_2 = add %ans_1, %ind_var_0
+  %ind_var_1 = add %ind_var_0, 1
+  jump %while_entry
+
+%while_end:
+  ret %ans_1
+}
+"#;
+    let driver: Driver<_> = src.into();
+    let mut gen = generator::Generator::<_, Visitor>::new(Vec::new());
+    gen
+      .generate_on(&driver.generate_program().unwrap())
+      .unwrap();
+    assert_eq!(str::from_utf8(&gen.writer()).unwrap(), src);
+  }
+
+  #[test]
+  fn dump_nested_loop() {
+    let src = r#"decl @getint(): i32
+
+fun @main(): i32 {
+%args_0:
+  %0 = call @getint()
+  %1 = call @getint()
+  jump %while_cond_2
+
+%while_cond_2:
+  %2 = phi i32 (0, %args_0), (%3, %while_end_5)
+  %4 = phi i32 (0, %args_0), (%5, %while_end_5)
+  %6 = lt %4, %1
+  br %6, %while_body_3, %while_end_1
+
+%while_body_3:
+  jump %while_cond_4
+
+%while_end_1:
+  ret %2
+
+%while_cond_4:
+  %3 = phi i32 (%2, %while_body_3), (%7, %while_body_6)
+  %8 = phi i32 (0, %while_body_3), (%9, %while_body_6)
+  %10 = lt %8, %0
+  br %10, %while_body_6, %while_end_5
+
+%while_body_6:
+  %11 = add %3, %4
+  %7 = add %11, %8
+  %9 = add %8, 1
+  jump %while_cond_4
+
+%while_end_5:
+  %5 = add %4, 1
+  jump %while_cond_2
+}
+"#;
+    let driver: Driver<_> = src.into();
+    let mut gen = generator::Generator::<_, Visitor>::new(Vec::new());
+    gen
+      .generate_on(&driver.generate_program().unwrap())
+      .unwrap();
+    assert_eq!(str::from_utf8(&gen.writer()).unwrap(), src);
   }
 }
