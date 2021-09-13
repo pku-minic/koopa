@@ -237,7 +237,7 @@ pub trait Visitor<W: Write> {
   /// Generates the specific program.
   fn generate_program(
     &mut self,
-    writer: &mut W,
+    w: &mut W,
     nm: &mut NameManager,
     program: &Program,
   ) -> Result<Self::Output>;
@@ -245,7 +245,7 @@ pub trait Visitor<W: Write> {
   /// Generates the specific function.
   fn generate_func(
     &mut self,
-    writer: &mut W,
+    w: &mut W,
     nm: &mut NameManager,
     func: &Function,
   ) -> Result<Self::Output>;
@@ -253,7 +253,7 @@ pub trait Visitor<W: Write> {
   /// Generates the specific basic block.
   fn generate_bb(
     &mut self,
-    writer: &mut W,
+    w: &mut W,
     nm: &mut NameManager,
     bb: &BasicBlock,
   ) -> Result<Self::Output>;
@@ -261,7 +261,7 @@ pub trait Visitor<W: Write> {
   /// Generates the specific value.
   fn generate_value(
     &mut self,
-    writer: &mut W,
+    w: &mut W,
     nm: &mut NameManager,
     value: &Value,
   ) -> Result<Self::Output>;
@@ -269,7 +269,7 @@ pub trait Visitor<W: Write> {
   /// Generates the specific value reference.
   fn generate_value_ref(
     &mut self,
-    writer: &mut W,
+    w: &mut W,
     nm: &mut NameManager,
     value: &Value,
   ) -> Result<Self::Output>;
