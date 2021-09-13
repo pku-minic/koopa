@@ -253,3 +253,11 @@ pub trait Visitor<W: Write> {
     program: &Program,
   ) -> Result<Self::Output>;
 }
+
+/// Gets the value reference of the specific use.
+macro_rules! value {
+  ($use:expr) => {
+    $use.value().unwrap().as_ref()
+  };
+}
+pub(crate) use value;

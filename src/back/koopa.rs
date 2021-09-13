@@ -1,4 +1,4 @@
-use crate::back::generator::{self, NameManager};
+use crate::back::generator::{self, value, NameManager};
 use crate::ir::core::{Value, ValueKind};
 use crate::ir::instructions::*;
 use crate::ir::structs::{BasicBlock, BasicBlockRef, Function, Program};
@@ -8,13 +8,6 @@ use std::io::{Result, Write};
 /// Visitor for generating Koopa IR structures into text formatted Koopa IR.
 #[derive(Default)]
 pub struct Visitor;
-
-/// Gets the value reference of the specific use.
-macro_rules! value {
-  ($use:expr) => {
-    $use.value().unwrap().as_ref()
-  };
-}
 
 impl<W: Write> generator::Visitor<W> for Visitor {
   type Output = ();
