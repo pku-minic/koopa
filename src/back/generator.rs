@@ -1,7 +1,7 @@
 use crate::ir::core::Value;
 use crate::ir::structs::{BasicBlock, Function};
 use std::borrow::Borrow;
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -49,7 +49,7 @@ impl NameManager {
     if let Some(name) = self.0.as_ref().borrow().funcs.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_global_name_str(func.name());
+      let name = self.next_name_str(func.name(), |r| &mut r.global_names);
       let mut name_man = self.0.borrow_mut();
       name_man.funcs.insert(ptr, name);
       name_man.funcs[&ptr].clone()
@@ -62,7 +62,7 @@ impl NameManager {
     if let Some(name) = self.0.as_ref().borrow().bbs.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_bb_name(bb.name());
+      let name = self.next_name(bb.name(), |r| &mut r.bb_names);
       let mut name_man = self.0.borrow_mut();
       name_man.bbs.insert(ptr, name);
       name_man.bbs[&ptr].clone()
@@ -83,7 +83,7 @@ impl NameManager {
     if let Some(name) = self.0.as_ref().borrow().global_vars.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_global_name(value.inner().name());
+      let name = self.next_name(value.inner().name(), |r| &mut r.global_names);
       let mut name_man = self.0.borrow_mut();
       name_man.global_vars.insert(ptr, name);
       name_man.global_vars[&ptr].clone()
@@ -96,7 +96,7 @@ impl NameManager {
     if let Some(name) = self.0.as_ref().borrow().values.as_ref().unwrap().get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_global_name(value.inner().name());
+      let name = self.next_name(value.inner().name(), |r| &mut r.global_names);
       let mut name_man = self.0.borrow_mut();
       let values = name_man.values.as_mut().unwrap();
       values.insert(ptr, name);
@@ -104,79 +104,49 @@ impl NameManager {
     }
   }
 
-  /// Generates the next global name by the specific string
+  /// Generates the next name by the specific `Option<String>`
   /// and stores it to the specific name set.
-  fn next_global_name_str(&self, name: &str) -> Rc<String> {
+  fn next_name<F>(&self, name: &Option<String>, name_set: F) -> Rc<String>
+  where
+    F: for<'a> FnOnce(&'a mut RefMut<NameManagerImpl>) -> &'a mut HashSet<StringRc>,
+  {
+    // check if there is a name
+    if let Some(name) = name {
+      self.next_name_str(name, name_set)
+    } else {
+      // generate a temporary name
+      let mut name_man = self.0.borrow_mut();
+      let name = format!("%{}", name_man.next_id);
+      name_man.next_id += 1;
+      let names = name_set(&mut name_man);
+      names.insert(name.clone().into());
+      names.get(&name).unwrap().into_rc()
+    }
+  }
+
+  /// Generates the next name by the specific string
+  /// and stores it to the specific name set.
+  fn next_name_str<F>(&self, name: &str, name_set: F) -> Rc<String>
+  where
+    F: for<'a> FnOnce(&'a mut RefMut<NameManagerImpl>) -> &'a mut HashSet<StringRc>,
+  {
     let mut name_man = self.0.borrow_mut();
+    let names = name_set(&mut name_man);
     // check for duplicate names
-    if !name_man.global_names.contains(name) {
-      name_man.global_names.insert(name.into());
-      name_man.global_names.get(name).unwrap().into_rc()
+    if !names.contains(name) {
+      names.insert(name.into());
+      names.get(name).unwrap().into_rc()
     } else {
       // generate a new name
       for id in 0.. {
         let new_name = format!("{}_{}", name, id);
-        if !name_man.global_names.contains(&new_name) {
-          name_man.global_names.insert(new_name.clone().into());
-          return name_man.global_names.get(&new_name).unwrap().into_rc();
+        if !names.contains(&new_name) {
+          names.insert(new_name.clone().into());
+          return names.get(&new_name).unwrap().into_rc();
         }
       }
       unreachable!()
     }
-  }
-
-  /// Generates the next basic block name by the specific `Option<String>`
-  /// and stores it to the specific name set.
-  fn next_bb_name(&self, name: &Option<String>) -> Rc<String> {
-    // check if there is a name
-    if let Some(name) = name {
-      let name: &str = name;
-      let mut name_man = self.0.borrow_mut();
-      // check for duplicate names
-      if !name_man.bb_names.contains(name) {
-        name_man.bb_names.insert(name.into());
-        name_man.bb_names.get(name).unwrap().into_rc()
-      } else {
-        // generate a new name
-        for id in 0.. {
-          let new_name = format!("{}_{}", name, id);
-          if !name_man.bb_names.contains(&new_name) {
-            name_man.bb_names.insert(new_name.clone().into());
-            return name_man.bb_names.get(&new_name).unwrap().into_rc();
-          }
-        }
-        unreachable!()
-      }
-    } else {
-      // generate a temporary name
-      let name = self.next_temp_name();
-      let mut name_man = self.0.borrow_mut();
-      name_man.bb_names.insert(name.clone().into());
-      name_man.bb_names.get(&name).unwrap().into_rc()
-    }
-  }
-
-  /// Generates the next global name by the specific `Option<String>`
-  /// and stores it to the specific name set.
-  fn next_global_name(&self, name: &Option<String>) -> Rc<String> {
-    // check if there is a name
-    if let Some(name) = name {
-      self.next_global_name_str(name)
-    } else {
-      // generate a temporary name
-      let name = self.next_temp_name();
-      let mut name_man = self.0.borrow_mut();
-      name_man.global_names.insert(name.clone().into());
-      name_man.global_names.get(&name).unwrap().into_rc()
-    }
-  }
-
-  /// Generates the next temporary name.
-  fn next_temp_name(&self) -> String {
-    let mut name_man = self.0.borrow_mut();
-    let name = format!("%{}", name_man.next_id);
-    name_man.next_id += 1;
-    name
   }
 }
 
