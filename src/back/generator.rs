@@ -225,7 +225,7 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
   pub fn generate_on(&mut self, program: &Program) -> Result<V::Output> {
     self
       .visitor
-      .generate_program(&mut self.writer, &mut self.name_man, program)
+      .visit_program(&mut self.writer, &mut self.name_man, program)
   }
 }
 
@@ -234,43 +234,11 @@ pub trait Visitor<W: Write> {
   /// The output type of all visitor methods.
   type Output;
 
-  /// Generates the specific program.
-  fn generate_program(
+  /// Visits the specific program.
+  fn visit_program(
     &mut self,
     w: &mut W,
     nm: &mut NameManager,
     program: &Program,
-  ) -> Result<Self::Output>;
-
-  /// Generates the specific function.
-  fn generate_func(
-    &mut self,
-    w: &mut W,
-    nm: &mut NameManager,
-    func: &Function,
-  ) -> Result<Self::Output>;
-
-  /// Generates the specific basic block.
-  fn generate_bb(
-    &mut self,
-    w: &mut W,
-    nm: &mut NameManager,
-    bb: &BasicBlock,
-  ) -> Result<Self::Output>;
-
-  /// Generates the specific value.
-  fn generate_value(
-    &mut self,
-    w: &mut W,
-    nm: &mut NameManager,
-    value: &Value,
-  ) -> Result<Self::Output>;
-
-  /// Generates the specific value reference.
-  fn generate_value_ref(
-    &mut self,
-    w: &mut W,
-    nm: &mut NameManager,
-    value: &Value,
   ) -> Result<Self::Output>;
 }
