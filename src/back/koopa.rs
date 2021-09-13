@@ -288,7 +288,7 @@ impl Visitor {
 #[cfg(test)]
 mod test {
   use crate::back::KoopaGenerator;
-  use crate::front::driver::Driver;
+  use crate::front::Driver;
   use std::str;
 
   #[test]
