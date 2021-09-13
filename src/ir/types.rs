@@ -35,7 +35,7 @@ impl fmt::Display for TypeKind {
           write!(f, "{}", param)?;
           first = false;
         }
-        if !matches!(ret.0.as_ref(), TypeKind::Unit) {
+        if !ret.is_unit() {
           write!(f, "): {}", ret)
         } else {
           write!(f, ")")
@@ -96,6 +96,16 @@ impl Type {
   /// Gets the kind of the current `Type`.
   pub fn kind(&self) -> &TypeKind {
     &self.0
+  }
+
+  /// Checks if the current type is an integer type.
+  pub fn is_i32(&self) -> bool {
+    matches!(self.0.as_ref(), TypeKind::Int32)
+  }
+
+  /// Checks if the current type is a unit type.
+  pub fn is_unit(&self) -> bool {
+    matches!(self.0.as_ref(), TypeKind::Unit)
   }
 }
 
