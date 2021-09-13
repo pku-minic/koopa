@@ -1,7 +1,8 @@
 use crate::ir::core::Value;
-use crate::ir::structs::{BasicBlock, Function};
+use crate::ir::structs::{BasicBlock, Function, Program};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
+use std::io::{Result, Write};
 use std::rc::Rc;
 
 /// A manager for storing names and allocating unique temporary
@@ -195,17 +196,81 @@ impl Borrow<str> for StringRc {
   }
 }
 
-// /// Koopa IR generator.
-// pub trait Generator {
-//   /// The output type of all generator methods.
-//   type Output;
+/// Koopa IR generator
+pub struct Generator<W: Write, V: Visitor<W>> {
+  writer: W,
+  visitor: V,
+  name_man: NameManager,
+}
 
-//   fn generate_on(program: &Program) {
-//     for var in program.vars() {
-//       //
-//     }
-//     for func in program.funcs() {
-//       //
-//     }
-//   }
-// }
+impl<W: Write, V: Visitor<W>> Generator<W, V> {
+  /// Creates a new generator
+  pub fn new(writer: W) -> Self
+  where
+    V: Default,
+  {
+    Self {
+      writer,
+      visitor: V::default(),
+      name_man: NameManager::new(),
+    }
+  }
+
+  /// Consumes and gets the writer inside of the current generator.
+  pub fn writer(self) -> W {
+    self.writer
+  }
+
+  /// Generates on the specific IR program.
+  pub fn generate_on(&mut self, program: &Program) -> Result<V::Output> {
+    self
+      .visitor
+      .generate_program(&mut self.writer, &mut self.name_man, program)
+  }
+}
+
+/// Koopa IR visitor.
+pub trait Visitor<W: Write> {
+  /// The output type of all visitor methods.
+  type Output;
+
+  /// Generates the specific program.
+  fn generate_program(
+    &mut self,
+    writer: &mut W,
+    nm: &mut NameManager,
+    program: &Program,
+  ) -> Result<Self::Output>;
+
+  /// Generates the specific function.
+  fn generate_func(
+    &mut self,
+    writer: &mut W,
+    nm: &mut NameManager,
+    func: &Function,
+  ) -> Result<Self::Output>;
+
+  /// Generates the specific basic block.
+  fn generate_bb(
+    &mut self,
+    writer: &mut W,
+    nm: &mut NameManager,
+    bb: &BasicBlock,
+  ) -> Result<Self::Output>;
+
+  /// Generates the specific value.
+  fn generate_value(
+    &mut self,
+    writer: &mut W,
+    nm: &mut NameManager,
+    value: &Value,
+  ) -> Result<Self::Output>;
+
+  /// Generates the specific value reference.
+  fn generate_value_ref(
+    &mut self,
+    writer: &mut W,
+    nm: &mut NameManager,
+    value: &Value,
+  ) -> Result<Self::Output>;
+}
