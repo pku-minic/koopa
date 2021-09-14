@@ -6,6 +6,7 @@ edition = "2018"
 description = "Library for generating/parsing/optimizing Koopa IR."
 readme = "README.md"
 repository = "https://github.com/pku-minic/koopa"
+documentation = "https://docs.rs/koopa"
 license = "GPL-3.0"
 keywords = ["compiler", "ir"]
 
