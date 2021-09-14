@@ -54,7 +54,7 @@ impl Visitor {
       TypeKind::Function(_, ret) => ret,
       _ => panic!("invalid function type"),
     };
-    write!(w, " ");
+    write!(w, " ")?;
     self.visit_type(w, ret_ty)?;
     // function name
     write!(w, " {}(", nm.get_func_name(func))?;
@@ -288,7 +288,7 @@ impl Visitor {
     self.visit_type(w, ty)?;
     write!(
       w,
-      "{}(",
+      " {}(",
       nm.get_func_name(call.callee().upgrade().unwrap().as_ref())
     )?;
     for (i, arg) in call.args().iter().enumerate() {
@@ -414,5 +414,198 @@ impl Visitor {
         write!(w, ")*")
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use crate::back::LlvmGenerator;
+  use crate::front::Driver;
+  use std::str;
+
+  #[test]
+  fn dump_ir() {
+    let driver: Driver<_> = r#"
+      global @x = alloc [i32, 10], zeroinit
+
+      fun @test(@i: i32): i32 {
+      %entry:
+        %0 = getptr @x, 0
+        store {1, 2, 3, 4, 5, 0, 0, 0, 0, 10}, %0
+        %1 = getelemptr @x, @i
+        %2 = load %1
+        %3 = mul %2, 7
+        ret %3
+      }
+    "#
+    .into();
+    let mut gen = LlvmGenerator::new(Vec::new());
+    gen
+      .generate_on(&driver.generate_program().unwrap())
+      .unwrap();
+    assert_eq!(
+      str::from_utf8(&gen.writer()).unwrap(),
+      r#"@x = global [10 x i32] zeroinitializer
+
+define i32 @test(i32 %i) {
+_entry:
+  %_0 = getelementptr inbounds [10 x i32], [10 x i32]* @x, i32 0
+  store [10 x i32] [i32 1, i32 2, i32 3, i32 4, i32 5, i32 0, i32 0, i32 0, i32 0, i32 10], [10 x i32]* %_0
+  %_1 = getelementptr inbounds [10 x i32], [10 x i32]* @x, i32 0, i32 %i
+  %_2 = load i32, i32* %_1
+  %_3 = mul i32 %_2, 7
+  ret i32 %_3
+}
+"#
+    );
+  }
+
+  #[test]
+  fn dump_ir_phi() {
+    let driver: Driver<_> = r#"
+      decl @getint(): i32
+
+      fun @main(): i32 {
+      %entry:
+        %ans_0 = call @getint()
+        jump %while_entry
+
+      %while_entry:
+        %ind_var_0 = phi i32 (0, %entry), (%ind_var_1, %while_body)
+        %ans_1 = phi i32 (%ans_0, %entry), (%ans_2, %while_body)
+        %cond = lt %ind_var_0, 10
+        br %cond, %while_body, %while_end
+
+      %while_body:
+        %ans_2 = add %ans_1, %ind_var_0
+        %ind_var_1 = add %ind_var_0, 1
+        jump %while_entry
+
+      %while_end:
+        ret %ans_1
+      }
+    "#
+    .into();
+    let mut gen = LlvmGenerator::new(Vec::new());
+    gen
+      .generate_on(&driver.generate_program().unwrap())
+      .unwrap();
+    assert_eq!(
+      str::from_utf8(&gen.writer()).unwrap(),
+      r#"declare i32 @getint()
+
+define i32 @main() {
+_entry:
+  %_ans_0 = call i32 @getint()
+  br label %_while_entry
+
+_while_entry:
+  %_ind_var_0 = phi i32 [ 0, %_entry ], [ %_ind_var_1, %_while_body ]
+  %_ans_1 = phi i32 [ %_ans_0, %_entry ], [ %_ans_2, %_while_body ]
+  %_0 = icmp slt i32 %_ind_var_0, 10
+  %_cond = zext i1 %_0 to i32
+  %_1 = trunc i32 %_cond to i1
+  br i1 %_1, label %_while_body, label %_while_end
+
+_while_body:
+  %_ans_2 = add i32 %_ans_1, %_ind_var_0
+  %_ind_var_1 = add i32 %_ind_var_0, 1
+  br label %_while_entry
+
+_while_end:
+  ret i32 %_ans_1
+}
+"#
+    );
+  }
+
+  #[test]
+  fn dump_nested_loop() {
+    let src = r#"decl @getint(): i32
+
+fun @main(): i32 {
+%args_0:
+  %0 = call @getint()
+  %1 = call @getint()
+  jump %while_cond_2
+
+%while_cond_2:
+  %2 = phi i32 (0, %args_0), (%3, %while_end_5)
+  %4 = phi i32 (0, %args_0), (%5, %while_end_5)
+  %6 = lt %4, %1
+  br %6, %while_body_3, %while_end_1
+
+%while_body_3:
+  jump %while_cond_4
+
+%while_end_1:
+  ret %2
+
+%while_cond_4:
+  %3 = phi i32 (%2, %while_body_3), (%7, %while_body_6)
+  %8 = phi i32 (0, %while_body_3), (%9, %while_body_6)
+  %10 = lt %8, %0
+  br %10, %while_body_6, %while_end_5
+
+%while_body_6:
+  %11 = add %3, %4
+  %7 = add %11, %8
+  %9 = add %8, 1
+  jump %while_cond_4
+
+%while_end_5:
+  %5 = add %4, 1
+  jump %while_cond_2
+}
+"#;
+    let driver: Driver<_> = src.into();
+    let mut gen = LlvmGenerator::new(Vec::new());
+    gen
+      .generate_on(&driver.generate_program().unwrap())
+      .unwrap();
+    assert_eq!(
+      str::from_utf8(&gen.writer()).unwrap(),
+      r#"declare i32 @getint()
+
+define i32 @main() {
+_args_0:
+  %_0 = call i32 @getint()
+  %_1 = call i32 @getint()
+  br label %_while_cond_2
+
+_while_cond_2:
+  %_2 = phi i32 [ 0, %_args_0 ], [ %_3, %_while_end_5 ]
+  %_4 = phi i32 [ 0, %_args_0 ], [ %_5, %_while_end_5 ]
+  %_6 = icmp slt i32 %_4, %_1
+  %_7 = zext i1 %_6 to i32
+  %_8 = trunc i32 %_7 to i1
+  br i1 %_8, label %_while_body_3, label %_while_end_1
+
+_while_body_3:
+  br label %_while_cond_4
+
+_while_end_1:
+  ret i32 %_2
+
+_while_cond_4:
+  %_3 = phi i32 [ %_2, %_while_body_3 ], [ %_9, %_while_body_6 ]
+  %_10 = phi i32 [ 0, %_while_body_3 ], [ %_11, %_while_body_6 ]
+  %_12 = icmp slt i32 %_10, %_0
+  %_13 = zext i1 %_12 to i32
+  %_14 = trunc i32 %_13 to i1
+  br i1 %_14, label %_while_body_6, label %_while_end_5
+
+_while_body_6:
+  %_15 = add i32 %_3, %_4
+  %_9 = add i32 %_15, %_10
+  %_11 = add i32 %_10, 1
+  br label %_while_cond_4
+
+_while_end_5:
+  %_5 = add i32 %_4, 1
+  br label %_while_cond_2
+}
+"#
+    );
   }
 }
