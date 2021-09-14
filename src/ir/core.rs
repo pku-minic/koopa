@@ -50,7 +50,7 @@ impl Value {
     Rc::new_with_ref(|value| Self {
       link: LinkedListLink::new(),
       ty,
-      kind: init(value.clone()),
+      kind: init(value),
       inner: RefCell::new(ValueInner {
         name: None,
         uses: LinkedList::default(),

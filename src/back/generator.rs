@@ -1,3 +1,6 @@
+// TODO: remove this attribute after https://github.com/rust-lang/rust-clippy/pull/7640 is merged.
+#![allow(clippy::mutable_key_type)]
+
 use crate::ir::core::Value;
 use crate::ir::structs::{BasicBlock, Function, Program};
 use std::borrow::Borrow;
@@ -126,7 +129,7 @@ impl NameManager {
       self.next_id += 1;
       let names = name_set(self);
       names.insert(name.clone().into());
-      names.get(&name).unwrap().into_rc()
+      names.get(&name).unwrap().as_rc()
     }
   }
 
@@ -141,14 +144,14 @@ impl NameManager {
     // check for duplicate names
     if !names.contains(&name) {
       names.insert(name.clone().into());
-      names.get(&name).unwrap().into_rc()
+      names.get(&name).unwrap().as_rc()
     } else {
       // generate a new name
       for id in 0.. {
         let new_name = format!("{}_{}", name, id);
         if !names.contains(&new_name) {
           names.insert(new_name.clone().into());
-          return names.get(&new_name).unwrap().into_rc();
+          return names.get(&new_name).unwrap().as_rc();
         }
       }
       unreachable!()
@@ -184,8 +187,8 @@ impl Prefix {
     match self {
       Prefix::Default => name.into(),
       Prefix::Custom { named, temp } => {
-        if name.starts_with('@') {
-          format!("{}{}", named, &name[1..])
+        if let Some(name) = name.strip_prefix('@') {
+          format!("{}{}", named, name)
         } else {
           format!("{}{}", temp, &name[1..])
         }
@@ -213,7 +216,7 @@ impl Default for Prefix {
 struct StringRc(Rc<String>);
 
 impl StringRc {
-  fn into_rc(&self) -> Rc<String> {
+  fn as_rc(&self) -> Rc<String> {
     self.0.clone()
   }
 }
@@ -287,7 +290,7 @@ impl<V: Visitor<File>> Generator<File, V> {
   where
     V: Default,
   {
-    File::open(path).map(|f| Generator::new(f))
+    File::open(path).map(Generator::new)
   }
 }
 
