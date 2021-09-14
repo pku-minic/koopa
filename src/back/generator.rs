@@ -12,6 +12,7 @@ use std::rc::Rc;
 pub struct NameManager {
   next_id: usize,
   cur_scope: ScopeKind,
+  prefix: Prefix,
   global_names: HashSet<StringRc>,
   bb_names: HashSet<StringRc>,
   global_vars: HashMap<*const Value, Rc<String>>,
@@ -51,6 +52,11 @@ impl NameManager {
     for name in values.values() {
       self.global_names.remove(name);
     }
+  }
+
+  /// Sets the prefix of generated names.
+  pub fn set_prefix(&mut self, prefix: Prefix) {
+    self.prefix = prefix;
   }
 
   /// Gets the name of the specific function.
@@ -100,6 +106,11 @@ impl NameManager {
     }
   }
 
+  /// Gets a temporary value name.
+  pub fn get_temp_value_name(&mut self) -> Rc<String> {
+    self.next_name(&None, |s| &mut s.global_names)
+  }
+
   /// Generates the next name by the specific `Option<String>`
   /// and stores it to the specific name set.
   fn next_name<F>(&mut self, name: &Option<String>, name_set: F) -> Rc<String>
@@ -111,7 +122,7 @@ impl NameManager {
       self.next_name_str(name, name_set)
     } else {
       // generate a temporary name
-      let name = format!("%{}", self.next_id);
+      let name = self.prefix.get_temp_name(self.next_id);
       self.next_id += 1;
       let names = name_set(self);
       names.insert(name.clone().into());
@@ -125,11 +136,12 @@ impl NameManager {
   where
     F: for<'a> FnOnce(&'a mut Self) -> &'a mut HashSet<StringRc>,
   {
+    let name = self.prefix.get_name(name);
     let names = name_set(self);
     // check for duplicate names
-    if !names.contains(name) {
-      names.insert(name.into());
-      names.get(name).unwrap().into_rc()
+    if !names.contains(&name) {
+      names.insert(name.clone().into());
+      names.get(&name).unwrap().into_rc()
     } else {
       // generate a new name
       for id in 0.. {
@@ -154,6 +166,45 @@ enum ScopeKind {
 impl Default for ScopeKind {
   fn default() -> Self {
     Self::Global
+  }
+}
+
+/// Prefix of name.
+pub enum Prefix {
+  /// Default prefix,
+  /// named variables start with '@' and temporary variables start with '%'.
+  Default,
+  /// Custom prefix.
+  Custom { named: String, temp: String },
+}
+
+impl Prefix {
+  /// Gets the name according to the prefix setting.
+  fn get_name(&self, name: &str) -> String {
+    match self {
+      Prefix::Default => name.into(),
+      Prefix::Custom { named, temp } => {
+        if name.starts_with('@') {
+          format!("{}{}", named, &name[1..])
+        } else {
+          format!("{}{}", temp, &name[1..])
+        }
+      }
+    }
+  }
+
+  /// Gets a temp name by the specific id.
+  fn get_temp_name(&self, id: usize) -> String {
+    match self {
+      Prefix::Default => format!("%{}", id),
+      Prefix::Custom { temp, .. } => format!("{}{}", temp, id),
+    }
+  }
+}
+
+impl Default for Prefix {
+  fn default() -> Self {
+    Prefix::Default
   }
 }
 
