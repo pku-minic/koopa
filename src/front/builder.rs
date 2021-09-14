@@ -230,7 +230,7 @@ impl Builder {
           }
         };
         match &last_stmt.kind {
-          AstKind::Branch(ast::Branch { cond: _, tbb, fbb }) => {
+          AstKind::Branch(ast::Branch { tbb, fbb, .. }) => {
             add_target(tbb);
             add_target(fbb);
           }
@@ -282,7 +282,7 @@ impl Builder {
           .push(block.name.clone());
       };
       match &last_inst.kind {
-        AstKind::Branch(ast::Branch { cond: _, tbb, fbb }) => {
+        AstKind::Branch(ast::Branch { tbb, fbb, .. }) => {
           add_pred(tbb);
           add_pred(fbb);
         }
