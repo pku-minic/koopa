@@ -1,0 +1,26 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'skip-ci')"
+    timeout-minutes: 30
+    steps:
+    - name: Checkout Koopa
+      uses: actions/checkout@v2
+
+    - name: Build
+      run: cargo check
+      run: cargo check --features no-front-logger
+
+    - name: Clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Test
+      run: cargo test --all-features
