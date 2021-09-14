@@ -10,7 +10,7 @@ pub enum Pass {
 /// Module pass, runs on IR programs.
 pub trait ModulePass {
   /// Runs on the specific IR program.
-  fn run_on(&mut self, program: &Program);
+  fn run_on(&mut self, program: &mut Program);
 }
 
 /// Function pass, runs on functions.
