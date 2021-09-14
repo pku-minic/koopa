@@ -176,7 +176,7 @@ mod test {
 
   #[test]
   fn aggregate_use_value() {
-    let array = Aggregate::new((0..10).map(|i| Integer::get(i)).collect());
+    let array = Aggregate::new((0..10).map(Integer::get).collect());
     assert_eq!(array.ty(), &Type::get_array(Type::get_i32(), 10));
     match array.kind() {
       ValueKind::Aggregate(agg) => {

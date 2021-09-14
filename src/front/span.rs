@@ -550,7 +550,7 @@ mod test {
     pos.update(' ');
     pos.update(' ');
     let sp2 = sp1.into_updated(pos);
-    assert_eq!(sp1.is_in_same_line_as(&sp2), true);
+    assert!(sp1.is_in_same_line_as(&sp2));
     log_error!(sp2, "test error");
     log_warning!(sp2, "test warning");
     log_warning!(sp2, "test warning 2");
@@ -559,9 +559,9 @@ mod test {
     assert_eq!(format!("{}", sp2.end), "1:3");
     let mut sp = Span::new(Pos { line: 10, col: 10 });
     sp.update(Pos { line: 10, col: 15 });
-    assert_eq!(sp2.is_in_same_line_as(&sp), false);
+    assert!(!sp2.is_in_same_line_as(&sp));
     let sp3 = sp2.into_updated_span(sp);
-    assert_eq!(sp2.is_in_same_line_as(&sp3), true);
+    assert!(sp2.is_in_same_line_as(&sp3));
     assert_eq!(format!("{}", sp3.start), "1:1");
     assert_eq!(format!("{}", sp3.end), "10:15");
   }
