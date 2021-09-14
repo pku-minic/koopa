@@ -125,6 +125,11 @@ impl ValueInner {
 
   /// Sets the name of the current `Value`
   pub fn set_name(&mut self, name: Option<String>) {
+    assert!(
+      name.as_ref().map_or(true, |n| n.len() > 1
+        && (n.starts_with('%') || n.starts_with('@'))),
+      "invalid value name"
+    );
     self.name = name;
   }
 

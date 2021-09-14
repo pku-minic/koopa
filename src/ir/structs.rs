@@ -78,6 +78,10 @@ pub type FunctionRef = Weak<Function>;
 impl Function {
   /// Creates a new function definition.
   pub fn new(name: String, params: Vec<ValueRc>, ret_ty: Type) -> FunctionRc {
+    assert!(
+      name.len() > 1 && (name.starts_with('%') || name.starts_with('@')),
+      "invalid function name"
+    );
     let ty = Type::get_function(
       params
         .iter()
@@ -102,6 +106,10 @@ impl Function {
 
   /// Creates a new function declaration.
   pub fn new_decl(name: String, ty: Type) -> FunctionRc {
+    assert!(
+      name.len() > 1 && (name.starts_with('%') || name.starts_with('@')),
+      "invalid function name"
+    );
     match ty.kind() {
       TypeKind::Function(params, _) => {
         debug_assert!(
@@ -204,6 +212,11 @@ pub type BasicBlockRef = Weak<BasicBlock>;
 impl BasicBlock {
   /// Creates a new basic block.
   pub fn new(name: Option<String>) -> BasicBlockRc {
+    assert!(
+      name.as_ref().map_or(true, |n| n.len() > 1
+        && (n.starts_with('%') || n.starts_with('@'))),
+      "invalid basic block name"
+    );
     Rc::new_with_ref(|bb| Self {
       link: LinkedListLink::new(),
       name,
