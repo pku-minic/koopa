@@ -16,8 +16,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Build
-      run: cargo check
-      run: cargo check --features no-front-logger
+      run: cargo check && cargo check --features no-front-logger
 
     - name: Clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
