@@ -296,7 +296,7 @@ impl Builder {
   fn build_on_block(&mut self, ret_ty: &Type, ast: &ast::Block) {
     // generate each statements
     for (i, stmt) in ast.stmts.iter().enumerate() {
-      if let Ok(stmt) = self.generate_stmt(&ast.name, ret_ty, &stmt) {
+      if let Ok(stmt) = self.generate_stmt(&ast.name, ret_ty, stmt) {
         let info = self.local_bbs.get_mut(&ast.name).unwrap();
         // record `stmt` if the current statement is a phi function
         if matches!(stmt.kind(), ValueKind::Phi(..)) {
