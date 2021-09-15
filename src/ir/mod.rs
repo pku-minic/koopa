@@ -3,3 +3,7 @@ pub mod instructions;
 pub mod structs;
 pub mod types;
 pub mod values;
+
+pub use self::core::{Value, ValueKind, ValueRc};
+pub use structs::{BasicBlock, BasicBlockRc, Function, FunctionRc, Program};
+pub use types::{Type, TypeKind};
