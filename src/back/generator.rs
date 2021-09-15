@@ -286,7 +286,7 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
 
 impl<V: Visitor<File>> Generator<File, V> {
   /// Creates a new `Generator` from the specific path.
-  pub fn from_file<P>(path: P) -> Result<Self>
+  pub fn from_path<P>(path: P) -> Result<Self>
   where
     V: Default,
     P: AsRef<Path>,

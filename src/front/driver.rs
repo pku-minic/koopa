@@ -58,7 +58,7 @@ impl<T: Read> Driver<T> {
 
 impl Driver<File> {
   /// Creates a new `Driver` from the specific path.
-  pub fn from_file<P>(path: P) -> io::Result<Self>
+  pub fn from_path<P>(path: P) -> io::Result<Self>
   where
     P: AsRef<Path> + Clone,
   {
