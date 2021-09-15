@@ -157,7 +157,7 @@ impl ValueInner {
   /// This method will not handle the values in basic blocks.
   /// To replace those values, using `BasicBlockInnwe::replace_inst`.
   pub fn replace_all_uses_with(&mut self, value: Option<ValueRc>) {
-    debug_assert!(
+    assert!(
       value
         .as_ref()
         .map_or(true, |v| !std::ptr::eq(&v.inner().uses, &self.uses)),

@@ -49,7 +49,7 @@ impl ZeroInit {
   ///
   /// The type of the created zero initializer will be `ty`.
   pub fn get(ty: Type) -> ValueRc {
-    debug_assert!(!ty.is_unit(), "`ty` can not be unit!");
+    assert!(!ty.is_unit(), "`ty` can not be unit!");
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&ty).cloned().unwrap_or_else(|| {
@@ -74,7 +74,7 @@ impl Undef {
   ///
   /// The type of the created undefined value will be `ty`.
   pub fn get(ty: Type) -> ValueRc {
-    debug_assert!(!ty.is_unit(), "`ty` can not be unit!");
+    assert!(!ty.is_unit(), "`ty` can not be unit!");
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
       pool.get(&ty).cloned().unwrap_or_else(|| {
@@ -99,20 +99,20 @@ impl Aggregate {
   /// The type of the created aggregate will be `(elems[0].ty)[elems.len]`.
   pub fn new(elems: Vec<ValueRc>) -> ValueRc {
     // element list should not be empty
-    debug_assert!(!elems.is_empty(), "`elems` must not be empty!");
+    assert!(!elems.is_empty(), "`elems` must not be empty!");
     // check if all elements are constant
-    debug_assert!(
+    assert!(
       elems.iter().all(|e| e.is_const()),
       "`elems` must all be constants!"
     );
     // check if all elements have the same type
-    debug_assert!(
+    assert!(
       elems.windows(2).all(|e| e[0].ty() == e[1].ty()),
       "type mismatch in `elems`!"
     );
     // check base type
     let base = elems[0].ty().clone();
-    debug_assert!(!base.is_unit(), "base type must not be `unit`!");
+    assert!(!base.is_unit(), "base type must not be `unit`!");
     // create value
     let ty = Type::get_array(base, elems.len());
     Value::new_with_init(ty, |user| {
@@ -141,7 +141,7 @@ impl ArgRef {
   ///
   /// The type of the created argument reference will be `ty`.
   pub fn new(ty: Type, index: usize) -> ValueRc {
-    debug_assert!(!ty.is_unit(), "`ty` can not be unit!");
+    assert!(!ty.is_unit(), "`ty` can not be unit!");
     Value::new(ty, ValueKind::ArgRef(Self { index }))
   }
 

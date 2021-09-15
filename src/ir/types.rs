@@ -79,7 +79,7 @@ impl Type {
 
   /// Gets an array type.
   pub fn get_array(base: Type, len: usize) -> Type {
-    debug_assert!(len != 0, "`len` can not be zero!");
+    assert!(len != 0, "`len` can not be zero!");
     Type::get(TypeKind::Array(base, len))
   }
 

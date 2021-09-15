@@ -43,7 +43,7 @@ impl Program {
 
   /// Adds the specific global variable to the current program.
   pub fn add_var(&mut self, value: ValueRc) {
-    debug_assert!(
+    assert!(
       matches!(value.kind(), ValueKind::GlobalAlloc(..)),
       "`value` must be a global allocation!"
     );
@@ -97,7 +97,7 @@ impl Function {
         .iter()
         .map(|p| {
           let ty = p.ty().clone();
-          debug_assert!(!ty.is_unit(), "parameter type must not be `unit`!");
+          assert!(!ty.is_unit(), "parameter type must not be `unit`!");
           ty
         })
         .collect(),
@@ -122,7 +122,7 @@ impl Function {
     );
     match ty.kind() {
       TypeKind::Function(params, _) => {
-        debug_assert!(
+        assert!(
           params.iter().all(|p| !p.is_unit()),
           "parameter type must not be `unit`!"
         )
