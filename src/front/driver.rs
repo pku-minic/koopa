@@ -7,6 +7,7 @@ use crate::ir::Program;
 use crate::log_raw_error;
 use std::fs::File;
 use std::io::{self, Read};
+use std::path::Path;
 
 /// Driver can convert IR in string form to structures.
 pub struct Driver<T: Read> {
@@ -57,8 +58,11 @@ impl<T: Read> Driver<T> {
 
 impl Driver<File> {
   /// Creates a new `Driver` from the specific path.
-  pub fn from_file(path: &str) -> io::Result<Self> {
-    File::open(path).map(|f| Driver::new(FileType::File(path.into()), f))
+  pub fn from_file<P>(path: P) -> io::Result<Self>
+  where
+    P: AsRef<Path> + Clone,
+  {
+    File::open(path.clone()).map(|f| Driver::new(FileType::File(path.as_ref().to_path_buf()), f))
   }
 }
 
