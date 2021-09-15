@@ -297,7 +297,7 @@ impl BasicBlockInner {
     &self.insts
   }
 
-  /// Adds the specific instruction to the current basic block.
+  /// Adds the specific instruction to the end of the current basic block.
   ///
   /// # Panics
   ///
@@ -441,7 +441,7 @@ impl Drop for BasicBlockInner {
     // handle all phi functions manually to prevent circular references
     for inst in &self.insts {
       if matches!(inst.kind(), ValueKind::Phi(_)) {
-        inst.inner_mut().replace_all_uses_with(None)
+        inst.inner_mut().replace_all_uses_with(None);
       }
     }
   }
