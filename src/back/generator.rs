@@ -128,7 +128,7 @@ impl NameManager {
       self.next_id += 1;
       let names = name_set(self);
       names.insert(name.clone().into());
-      names.get(&name).unwrap().as_rc()
+      names.get(&name).unwrap().to_rc()
     }
   }
 
@@ -143,14 +143,14 @@ impl NameManager {
     // check for duplicate names
     if !names.contains(&name) {
       names.insert(name.clone().into());
-      names.get(&name).unwrap().as_rc()
+      names.get(&name).unwrap().to_rc()
     } else {
       // generate a new name
       for id in 0.. {
         let new_name = format!("{}_{}", name, id);
         if !names.contains(&new_name) {
           names.insert(new_name.clone().into());
-          return names.get(&new_name).unwrap().as_rc();
+          return names.get(&new_name).unwrap().to_rc();
         }
       }
       unreachable!()
@@ -215,7 +215,7 @@ impl Default for Prefix {
 struct StringRc(Rc<String>);
 
 impl StringRc {
-  fn as_rc(&self) -> Rc<String> {
+  fn to_rc(&self) -> Rc<String> {
     self.0.clone()
   }
 }
