@@ -26,9 +26,19 @@ impl Program {
     &self.vars
   }
 
+  /// Gets the mutable global variables.
+  pub fn vars_mut(&mut self) -> &mut LinkedList<ValueAdapter> {
+    &mut self.vars
+  }
+
   /// Gets the function definitions.
   pub fn funcs(&self) -> &LinkedList<FunctionAdapter> {
     &self.funcs
+  }
+
+  /// Gets the mutable function definitions.
+  pub fn funcs_mut(&mut self) -> &mut LinkedList<FunctionAdapter> {
+    &mut self.funcs
   }
 
   /// Adds the specific global variable to the current program.
