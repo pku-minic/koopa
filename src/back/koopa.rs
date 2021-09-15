@@ -100,7 +100,6 @@ impl Visitor {
       ValueKind::GetPtr(v) => self.visit_getptr(w, nm, v),
       ValueKind::GetElemPtr(v) => self.visit_getelemptr(w, nm, v),
       ValueKind::Binary(v) => self.visit_binary(w, nm, v),
-      ValueKind::Unary(v) => self.visit_unary(w, nm, v),
       ValueKind::Branch(v) => self.visit_branch(w, nm, v),
       ValueKind::Jump(v) => self.visit_jump(w, nm, v),
       ValueKind::Call(v) => self.visit_call(w, nm, v),
@@ -164,12 +163,6 @@ impl Visitor {
     self.visit_value(w, nm, value!(bin.lhs()))?;
     write!(w, ", ")?;
     self.visit_value(w, nm, value!(bin.rhs()))
-  }
-
-  /// Generates unary operation.
-  fn visit_unary(&mut self, w: &mut impl Write, nm: &mut NameManager, unary: &Unary) -> Result<()> {
-    write!(w, "{} ", unary.op())?;
-    self.visit_value(w, nm, value!(unary.opr()))
   }
 
   /// Generates branch.

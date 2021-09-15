@@ -116,7 +116,6 @@ impl Visitor {
       ValueKind::GetPtr(v) => self.visit_getptr(w, nm, v),
       ValueKind::GetElemPtr(v) => self.visit_getelemptr(w, nm, v),
       ValueKind::Binary(v) => self.visit_binary(w, nm, inst, v),
-      ValueKind::Unary(v) => self.visit_unary(w, nm, v),
       ValueKind::Branch(v) => self.visit_branch(w, nm, v),
       ValueKind::Jump(v) => self.visit_jump(w, nm, v),
       ValueKind::Call(v) => self.visit_call(w, nm, inst.ty(), v),
@@ -243,15 +242,6 @@ impl Visitor {
       write!(w, "\n  {} = zext i1 {} to i32", nm.get_value_name(value), t)?;
     }
     Ok(())
-  }
-
-  /// Generates unary operation.
-  fn visit_unary(&mut self, w: &mut impl Write, nm: &mut NameManager, unary: &Unary) -> Result<()> {
-    match unary.op() {
-      UnaryOp::Neg => write!(w, "sub i32 0, "),
-      UnaryOp::Not => write!(w, "xor i32 -1, "),
-    }?;
-    self.visit_value(w, nm, false, value!(unary.opr()))
   }
 
   /// Generates branch.
