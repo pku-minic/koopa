@@ -21,8 +21,7 @@ impl FunctionPass for ConstantFolding {
             _ => continue,
           };
           // update the current instruction
-          if ans.is_some() {
-            inst.inner_mut().replace_all_uses_with(ans);
+          if ans.is_some() && inst.inner_mut().replace_all_uses_with(ans) {
             changed = true;
           }
         }

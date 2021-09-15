@@ -29,13 +29,14 @@ impl DeadCodeElimination {
     // iterate through all blocks to find critical instructions
     for bb in func.inner().bbs() {
       let bb = bb.inner();
-      let cur = bb.insts().front();
+      let mut cur = bb.insts().front();
       while let Some(inst) = cur.clone_pointer() {
         if Self::is_critical_inst(&inst) {
           // mark as undead
           self.liveset.insert(inst.as_ref());
           self.worklist.push(inst);
         }
+        cur.move_next();
       }
     }
     // mark more instructions
