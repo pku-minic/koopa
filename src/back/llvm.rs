@@ -261,9 +261,9 @@ impl Visitor {
     // generate condition
     let cond = br.cond().value().unwrap();
     let temp = nm.get_temp_value_name();
-    write!(w, "{} = trunc i32 ", temp)?;
+    write!(w, "{} = icmp ne i32 ", temp)?;
     self.visit_value(w, nm, false, cond.as_ref())?;
-    write!(w, " to i1\n  br i1 {}, label ", temp)?;
+    write!(w, ", 0\n  br i1 {}, label ", temp)?;
     // generate targets
     self.visit_bb_ref(w, nm, br.true_bb())?;
     write!(w, ", label ")?;
@@ -504,7 +504,7 @@ _while_entry:
   %_ans_1 = phi i32 [ %_ans_0, %_entry ], [ %_ans_2, %_while_body ]
   %_0 = icmp slt i32 %_ind_var_0, 10
   %_cond = zext i1 %_0 to i32
-  %_1 = trunc i32 %_cond to i1
+  %_1 = icmp ne i32 %_cond, 0
   br i1 %_1, label %_while_body, label %_while_end
 
 _while_body:
@@ -578,7 +578,7 @@ _while_cond_2:
   %_4 = phi i32 [ 0, %_args_0 ], [ %_5, %_while_end_5 ]
   %_6 = icmp slt i32 %_4, %_1
   %_7 = zext i1 %_6 to i32
-  %_8 = trunc i32 %_7 to i1
+  %_8 = icmp ne i32 %_7, 0
   br i1 %_8, label %_while_body_3, label %_while_end_1
 
 _while_body_3:
@@ -592,7 +592,7 @@ _while_cond_4:
   %_10 = phi i32 [ 0, %_while_body_3 ], [ %_11, %_while_body_6 ]
   %_12 = icmp slt i32 %_10, %_0
   %_13 = zext i1 %_12 to i32
-  %_14 = trunc i32 %_13 to i1
+  %_14 = icmp ne i32 %_13, 0
   br i1 %_14, label %_while_body_6, label %_while_end_5
 
 _while_body_6:
