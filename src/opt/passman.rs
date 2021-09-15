@@ -1,4 +1,4 @@
-use crate::ir::structs::Program;
+use crate::ir::Program;
 use crate::opt::pass::Pass;
 
 /// Manages all registed passes.

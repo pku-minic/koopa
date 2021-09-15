@@ -1,4 +1,4 @@
-use crate::ir::structs::{BasicBlock, Function, Program};
+use crate::ir::{BasicBlock, Function, Program};
 
 /// A Koopa IR pass.
 pub enum Pass {

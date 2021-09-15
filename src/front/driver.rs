@@ -3,7 +3,7 @@ use crate::front::builder::Builder;
 use crate::front::lexer::Lexer;
 use crate::front::parser::Parser;
 use crate::front::span::{Error, FileType, Span};
-use crate::ir::structs::Program;
+use crate::ir::Program;
 use crate::log_raw_error;
 use std::fs::File;
 use std::io::{self, Read};
@@ -86,8 +86,7 @@ impl<'a> From<&'a str> for Driver<io::Cursor<&'a str>> {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::ir::core::ValueKind;
-  use crate::ir::types::Type;
+  use crate::ir::{Type, ValueKind};
 
   #[test]
   fn generate_ir() {

@@ -1,8 +1,7 @@
 // TODO: remove this attribute after https://github.com/rust-lang/rust-clippy/pull/7640 is merged.
 #![allow(clippy::mutable_key_type)]
 
-use crate::ir::core::Value;
-use crate::ir::structs::{BasicBlock, Function, Program};
+use crate::ir::{BasicBlock, Function, Program, Value};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;

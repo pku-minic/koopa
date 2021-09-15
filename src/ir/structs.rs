@@ -1,5 +1,5 @@
-use crate::ir::core::{ValueAdapter, ValueKind, ValueRc};
-use crate::ir::types::{Type, TypeKind};
+use crate::ir::core::ValueAdapter;
+use crate::ir::{Type, TypeKind, ValueKind, ValueRc};
 use crate::utils::NewWithRef;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 use std::cell::{Ref, RefCell, RefMut};

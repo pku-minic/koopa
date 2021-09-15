@@ -1,7 +1,7 @@
 #![allow(clippy::new_ret_no_self)]
 
-use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
-use crate::ir::types::Type;
+use crate::ir::core::{Use, UseBox};
+use crate::ir::{Type, Value, ValueKind, ValueRc};
 use std::cell::RefCell;
 use std::collections::HashMap;
 

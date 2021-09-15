@@ -1,10 +1,8 @@
 use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::{Error, Span};
-use crate::ir::core::{ValueKind, ValueRc};
-use crate::ir::instructions as inst;
-use crate::ir::structs::{self, BasicBlockRc, BasicBlockRef, FunctionRc, FunctionRef, Program};
-use crate::ir::types::{Type, TypeKind};
-use crate::ir::values;
+use crate::ir::structs::{self, BasicBlockRef, FunctionRef};
+use crate::ir::{instructions as inst, values};
+use crate::ir::{BasicBlockRc, FunctionRc, Program, Type, TypeKind, ValueKind, ValueRc};
 use crate::{log_error, log_warning, return_error};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;

@@ -1,7 +1,4 @@
-use crate::ir::instructions::*;
-use crate::ir::structs::BasicBlockRef;
-use crate::ir::types::Type;
-use crate::ir::values::*;
+use crate::ir::{instructions::*, structs::BasicBlockRef, values::*, Type};
 use crate::utils::NewWithRef;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
 use std::cell::{Cell, Ref, RefCell, RefMut};

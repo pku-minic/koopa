@@ -1,8 +1,8 @@
 #![allow(clippy::new_ret_no_self)]
 
-use crate::ir::core::{Use, UseBox, Value, ValueKind, ValueRc};
+use crate::ir::core::{Use, UseBox};
 use crate::ir::structs::{BasicBlockRef, FunctionRef};
-use crate::ir::types::{Type, TypeKind};
+use crate::ir::{Type, TypeKind, Value, ValueKind, ValueRc};
 use std::fmt;
 
 /// Local memory allocation.
