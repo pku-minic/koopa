@@ -5,14 +5,13 @@ use koopa::opt::FunctionPass;
 use std::rc::Rc;
 
 /// Performs constant folding.
-pub struct ConstantFolding {
-  changed: bool,
-}
+pub struct ConstantFolding;
 
 impl FunctionPass for ConstantFolding {
   fn run_on(&mut self, func: &Function) {
-    while self.changed {
-      self.changed = false;
+    let mut changed = true;
+    while changed {
+      changed = false;
       // scan all basic blocks
       for bb in func.inner().bbs() {
         for inst in bb.inner().insts() {
@@ -24,7 +23,7 @@ impl FunctionPass for ConstantFolding {
           // update the current instruction
           if ans.is_some() {
             inst.inner_mut().replace_all_uses_with(ans);
-            self.changed = true;
+            changed = true;
           }
         }
       }
@@ -34,7 +33,7 @@ impl FunctionPass for ConstantFolding {
 
 impl ConstantFolding {
   pub fn new() -> Self {
-    ConstantFolding { changed: true }
+    Self
   }
 
   fn handle_binary(&mut self, binary: &Binary) -> Option<ValueRc> {
