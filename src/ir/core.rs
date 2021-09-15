@@ -158,22 +158,25 @@ impl ValueInner {
   }
 
   /// Replaces all uses of the current `Value` to another `Value`.
+  /// Returns `true` if any value has been replaced.
   ///
   /// This method will not handle the values in basic blocks.
   /// To replace those values, using `BasicBlockInnwe::replace_inst`.
-  pub fn replace_all_uses_with(&mut self, value: Option<ValueRc>) {
+  pub fn replace_all_uses_with(&mut self, value: Option<ValueRc>) -> bool {
     assert!(
       value
         .as_ref()
         .map_or(true, |v| !std::ptr::eq(&v.inner().uses, &self.uses)),
       "`value` can not be the same as `self`!"
     );
+    let ans = !self.uses.is_empty();
     while let Some(u) = self.uses.front_mut().remove() {
       u.as_ref().value.set(value.clone());
       if let Some(v) = value.clone() {
         v.inner_mut().add_use(u);
       }
     }
+    ans
   }
 
   /// Gets the parent basic block of the current `Value`.
