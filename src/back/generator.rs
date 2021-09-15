@@ -6,6 +6,7 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Result, Write};
+use std::path::Path;
 use std::rc::Rc;
 
 /// A manager for storing names and allocating unique temporary
@@ -285,9 +286,10 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
 
 impl<V: Visitor<File>> Generator<File, V> {
   /// Creates a new `Generator` from the specific path.
-  pub fn from_file(path: &str) -> Result<Self>
+  pub fn from_file<P>(path: P) -> Result<Self>
   where
     V: Default,
+    P: AsRef<Path>,
   {
     File::open(path).map(Generator::new)
   }
