@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::fmt::{self, Arguments};
+use std::path::PathBuf;
 
 #[cfg(not(feature = "no-front-logger"))]
 use colored::*;
@@ -453,7 +454,7 @@ struct GlobalState {
 
 /// Type of input file.
 pub enum FileType {
-  File(String),
+  File(PathBuf),
   Stdin,
   Buffer,
 }
@@ -461,7 +462,7 @@ pub enum FileType {
 impl fmt::Display for FileType {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      FileType::File(file) => f.write_str(file),
+      FileType::File(path) => write!(f, "{}", path.display()),
       FileType::Stdin => f.write_str("<stdin>"),
       FileType::Buffer => f.write_str("<buffer>"),
     }
