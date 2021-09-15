@@ -106,6 +106,14 @@ impl Value {
   pub fn inner_mut(&self) -> RefMut<ValueInner> {
     self.inner.borrow_mut()
   }
+
+  /// Returns an iterator of all uses held by the current value.
+  pub fn uses(&self) -> Uses {
+    Uses {
+      value: self,
+      index: 0,
+    }
+  }
 }
 
 pub struct ValueInner {
@@ -264,6 +272,59 @@ impl Drop for Use {
     let s = &*self;
     if let Some(v) = s.value.take() {
       v.inner_mut().remove_use(s)
+    }
+  }
+}
+
+/// An iterator over all uses of a `Value`.
+pub struct Uses<'a> {
+  value: &'a Value,
+  index: usize,
+}
+
+impl<'a> Iterator for Uses<'a> {
+  type Item = &'a UseBox;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    macro_rules! vec_use {
+      ($vec:expr $(,$($field:tt)+)?) => {
+        if self.index < $vec.len() {
+          self.index += 1;
+          Some(&$vec[self.index - 1]$(.$($field)+)?)
+        } else {
+          None
+        }
+      };
+    }
+    macro_rules! field_use {
+      ($($field:expr),+) => {
+        field_use!(@expand 0 $(,$field)+)
+      };
+      (@expand $index:expr) => {
+        None
+      };
+      (@expand $index:expr, $head:expr $(,$tail:expr)*) => {
+        if self.index == $index {
+          self.index += 1;
+          Some($head)
+        } else {
+          field_use!(@expand $index + 1 $(,$tail)*)
+        }
+      };
+    }
+    match &self.value.kind {
+      ValueKind::Aggregate(v) => vec_use!(v.elems()),
+      ValueKind::GlobalAlloc(v) => field_use!(v.init()),
+      ValueKind::Load(v) => field_use!(v.src()),
+      ValueKind::Store(v) => field_use!(v.value(), v.dest()),
+      ValueKind::GetPtr(v) => field_use!(v.src(), v.index()),
+      ValueKind::GetElemPtr(v) => field_use!(v.src(), v.index()),
+      ValueKind::Binary(v) => field_use!(v.lhs(), v.rhs()),
+      ValueKind::Branch(v) => field_use!(v.cond()),
+      ValueKind::Call(v) => vec_use!(v.args()),
+      ValueKind::Return(v) => field_use!(v.value()),
+      ValueKind::Phi(v) => vec_use!(v.oprs(), 0),
+      _ => None,
     }
   }
 }
