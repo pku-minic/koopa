@@ -193,7 +193,6 @@ pub enum ValueKind {
   GetPtr(GetPtr),
   GetElemPtr(GetElemPtr),
   Binary(Binary),
-  Unary(Unary),
   Branch(Branch),
   Jump(Jump),
   Call(Call),

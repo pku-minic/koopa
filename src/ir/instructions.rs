@@ -257,54 +257,6 @@ impl fmt::Display for BinaryOp {
   }
 }
 
-/// Unary operation
-pub struct Unary {
-  op: UnaryOp,
-  opr: UseBox,
-}
-
-impl Unary {
-  /// Creates a unary operation.
-  ///
-  /// The type of the created `Unary` will be `(opr.ty)`.
-  pub fn new(op: UnaryOp, opr: ValueRc) -> ValueRc {
-    let ty = opr.ty().clone();
-    assert!(ty.is_i32(), "`opr` must be integer!");
-    Value::new_with_init(ty, |user| {
-      ValueKind::Unary(Self {
-        op,
-        opr: Use::new(Some(opr), user),
-      })
-    })
-  }
-
-  /// Gets the unary operator.
-  pub fn op(&self) -> &UnaryOp {
-    &self.op
-  }
-
-  /// Gets the operand.
-  pub fn opr(&self) -> &UseBox {
-    &self.opr
-  }
-}
-
-/// Supported unary operators.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum UnaryOp {
-  Neg, // negation
-  Not, // bitwise not
-}
-
-impl fmt::Display for UnaryOp {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      UnaryOp::Neg => f.write_str("neg"),
-      UnaryOp::Not => f.write_str("not"),
-    }
-  }
-}
-
 /// Branching.
 pub struct Branch {
   cond: UseBox,
