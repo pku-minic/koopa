@@ -2,11 +2,11 @@
 *.DS_Store
 
 # Cargo
-/target
+target
 Cargo.lock
 
 # VS Code
 .vscode
 
 # Debugging
-/debug
+debug
