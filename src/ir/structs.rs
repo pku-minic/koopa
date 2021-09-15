@@ -1,5 +1,5 @@
 use crate::ir::core::ValueAdapter;
-use crate::ir::{Type, TypeKind, ValueKind, ValueRc};
+use crate::ir::{Type, TypeKind, Value, ValueKind, ValueRc};
 use crate::utils::NewWithRef;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 use std::cell::{Ref, RefCell, RefMut};
@@ -320,7 +320,7 @@ impl BasicBlockInner {
   /// # Panics
   ///
   /// Panics when the instruction is not in the current basic block.
-  pub fn remove_inst(&mut self, inst: &ValueRc) {
+  pub fn remove_inst(&mut self, inst: &Value) {
     let mut inst_inner = inst.inner_mut();
     assert!(
       inst_inner
@@ -329,9 +329,14 @@ impl BasicBlockInner {
         .map_or(false, |bb| self.bb.ptr_eq(bb)),
       "instruction is not in the current basic block"
     );
+    // break circular references if the instruction is a phi function
+    if matches!(inst.kind(), ValueKind::Phi(_)) {
+      inst_inner.replace_all_uses_with(None);
+    }
+    // remove from the current basic block
     inst_inner.set_bb(None);
     unsafe {
-      self.insts.cursor_mut_from_ptr(inst.as_ref()).remove();
+      self.insts.cursor_mut_from_ptr(inst).remove();
     }
   }
 
@@ -341,7 +346,7 @@ impl BasicBlockInner {
   ///
   /// Panics when the instruction is not in the current basic block, or the new
   /// value is not an instruction, or the new value is in another basic block.
-  pub fn replace_inst(&mut self, inst: &ValueRc, new: ValueRc) {
+  pub fn replace_inst(&mut self, inst: &Value, new: ValueRc) {
     // update `inst`
     let mut inst_inner = inst.inner_mut();
     assert!(
@@ -363,10 +368,7 @@ impl BasicBlockInner {
     drop(new_inner);
     // update instruction list
     unsafe {
-      let result = self
-        .insts
-        .cursor_mut_from_ptr(inst.as_ref())
-        .replace_with(new);
+      let result = self.insts.cursor_mut_from_ptr(inst).replace_with(new);
       assert!(result.is_ok());
     }
   }
@@ -377,7 +379,7 @@ impl BasicBlockInner {
   ///
   /// Panics when the instruction is not in the current basic block, or the new
   /// value is not an instruction, or the new value is in another basic block.
-  pub fn insert_before(&mut self, inst: &ValueRc, new: ValueRc) {
+  pub fn insert_before(&mut self, inst: &Value, new: ValueRc) {
     // check `inst`
     assert!(
       inst
@@ -398,10 +400,7 @@ impl BasicBlockInner {
     drop(new_inner);
     // update instruction list
     unsafe {
-      self
-        .insts
-        .cursor_mut_from_ptr(inst.as_ref())
-        .insert_before(new);
+      self.insts.cursor_mut_from_ptr(inst).insert_before(new);
     }
   }
 
@@ -411,7 +410,7 @@ impl BasicBlockInner {
   ///
   /// Panics when the instruction is not in the current basic block, or the new
   /// value is not an instruction, or the new value is in another basic block.
-  pub fn insert_after(&mut self, inst: &ValueRc, new: ValueRc) {
+  pub fn insert_after(&mut self, inst: &Value, new: ValueRc) {
     // check `inst`
     assert!(
       inst
@@ -432,10 +431,7 @@ impl BasicBlockInner {
     drop(new_inner);
     // update instruction list
     unsafe {
-      self
-        .insts
-        .cursor_mut_from_ptr(inst.as_ref())
-        .insert_after(new);
+      self.insts.cursor_mut_from_ptr(inst).insert_after(new);
     }
   }
 }
@@ -444,7 +440,7 @@ impl Drop for BasicBlockInner {
   fn drop(&mut self) {
     // handle all phi functions manually to prevent circular references
     for inst in &self.insts {
-      if let ValueKind::Phi(_) = inst.kind() {
+      if matches!(inst.kind(), ValueKind::Phi(_)) {
         inst.inner_mut().replace_all_uses_with(None)
       }
     }
