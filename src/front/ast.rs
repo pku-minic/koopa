@@ -1,7 +1,7 @@
 #![allow(clippy::new_ret_no_self)]
 
 use crate::front::span::Span;
-use crate::ir::instructions::{BinaryOp, UnaryOp};
+use crate::ir::instructions::BinaryOp;
 use std::cmp::PartialEq;
 
 /// AST of Koopa IR.
@@ -49,7 +49,6 @@ pub enum AstKind {
   GetPointer(GetPointer),
   GetElementPointer(GetElementPointer),
   BinaryExpr(BinaryExpr),
-  UnaryExpr(UnaryExpr),
   Branch(Branch),
   Jump(Jump),
   FunCall(FunCall),
@@ -297,20 +296,6 @@ impl BinaryExpr {
   /// Creates a new box of `BinaryExpr` AST.
   pub fn new(span: Span, op: BinaryOp, lhs: AstBox, rhs: AstBox) -> AstBox {
     Ast::new(span, AstKind::BinaryExpr(Self { op, lhs, rhs }))
-  }
-}
-
-/// Unary expression.
-#[derive(Debug, PartialEq)]
-pub struct UnaryExpr {
-  pub op: UnaryOp,
-  pub opr: AstBox,
-}
-
-impl UnaryExpr {
-  /// Creates a new box of `UnaryExpr` AST.
-  pub fn new(span: Span, op: UnaryOp, opr: AstBox) -> AstBox {
-    Ast::new(span, AstKind::UnaryExpr(Self { op, opr }))
   }
 }
 

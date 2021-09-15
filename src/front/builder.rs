@@ -499,7 +499,6 @@ impl Builder {
       AstKind::GetPointer(gp) => self.generate_get_pointer(&ast.span, bb_name, gp),
       AstKind::GetElementPointer(gep) => self.generate_get_element_pointer(&ast.span, bb_name, gep),
       AstKind::BinaryExpr(ast) => self.generate_binary_expr(bb_name, ast),
-      AstKind::UnaryExpr(ast) => self.generate_unary_expr(bb_name, ast),
       AstKind::FunCall(call) => self.generate_fun_call(&ast.span, bb_name, call),
       AstKind::Phi(ast) => self.generate_uninit_phi(ast),
       _ => panic!("invalid instruction"),
@@ -573,13 +572,6 @@ impl Builder {
     let lhs = self.generate_value(bb_name, &ty, &ast.lhs)?;
     let rhs = self.generate_value(bb_name, &ty, &ast.rhs)?;
     Ok(inst::Binary::new(ast.op, lhs, rhs))
-  }
-
-  /// Generates unary expressions.
-  fn generate_unary_expr(&self, bb_name: &str, ast: &ast::UnaryExpr) -> ValueResult {
-    // get operand
-    let opr = self.generate_value(bb_name, &Type::get_i32(), &ast.opr)?;
-    Ok(inst::Unary::new(ast.op, opr))
   }
 
   /// Generates branchs.

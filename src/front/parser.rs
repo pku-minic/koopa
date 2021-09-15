@@ -295,7 +295,6 @@ impl<T: Read> Parser<T> {
       TokenKind::Keyword(Keyword::GetPtr) => self.parse_get_pointer(),
       TokenKind::Keyword(Keyword::GetElemPtr) => self.parse_get_element_pointer(),
       TokenKind::BinaryOp(_) => self.parse_binary_expr(),
-      TokenKind::UnaryOp(_) => self.parse_unary_expr(),
       TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
       TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
       _ => return_error!(sp, "expected expression, found {}", kind),
@@ -389,17 +388,6 @@ impl<T: Read> Parser<T> {
     self
       .parse_value()
       .map(|rhs| ast::BinaryExpr::new(span.into_updated_span(rhs.span), op, lhs, rhs))
-  }
-
-  /// Parses unary expressions.
-  fn parse_unary_expr(&mut self) -> Result {
-    let span = self.span();
-    // get operator
-    let op = read!(self, TokenKind::UnaryOp, "unary operator")?;
-    // get operand
-    self
-      .parse_value()
-      .map(|opr| ast::UnaryExpr::new(span.into_updated_span(opr.span), op, opr))
   }
 
   /// Parses branches.

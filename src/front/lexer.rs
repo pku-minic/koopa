@@ -1,6 +1,6 @@
 use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
-use crate::ir::instructions::{BinaryOp, UnaryOp};
+use crate::ir::instructions::BinaryOp;
 use crate::{log_raw_fatal_error, return_error};
 use phf::phf_map;
 use std::io::Read;
@@ -157,8 +157,6 @@ impl<T: Read> Lexer<T> {
       Ok(Token::new(span, TokenKind::Keyword(*keyword)))
     } else if let Some(op) = BINARY_OPS.get(&keyword) {
       Ok(Token::new(span, TokenKind::BinaryOp(*op)))
-    } else if let Some(op) = UNARY_OPS.get(&keyword) {
-      Ok(Token::new(span, TokenKind::UnaryOp(*op)))
     } else {
       self.log_err_and_skip(span, "invalid keyword/operator")
     }
@@ -254,12 +252,6 @@ static BINARY_OPS: phf::Map<&'static str, BinaryOp> = phf_map! {
   "shl" => BinaryOp::Shl,
   "shr" => BinaryOp::Shr,
   "sar" => BinaryOp::Sar,
-};
-
-/// All supported unary operators.
-static UNARY_OPS: phf::Map<&'static str, UnaryOp> = phf_map! {
-  "neg" => UnaryOp::Neg,
-  "not" => UnaryOp::Not,
 };
 
 #[cfg(test)]
