@@ -291,7 +291,7 @@ impl<V: Visitor<File>> Generator<File, V> {
     V: Default,
     P: AsRef<Path>,
   {
-    File::open(path).map(Generator::new)
+    File::create(path).map(Generator::new)
   }
 }
 
