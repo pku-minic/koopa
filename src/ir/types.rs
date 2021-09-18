@@ -129,7 +129,7 @@ impl fmt::Debug for Type {
 
 impl hash::Hash for Type {
   fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.0.hash(state)
+    self.0.hash(state);
   }
 }
 
