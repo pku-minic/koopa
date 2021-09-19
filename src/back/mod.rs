@@ -2,7 +2,7 @@ pub mod generator;
 pub mod koopa;
 pub mod llvm;
 
-use generator::Generator;
+pub use generator::{Generator, NameManager, Prefix, Visitor};
 
 /// Generator for generating Koopa IR structures into text formatted Koopa IR.
 pub type KoopaGenerator<W> = Generator<W, koopa::Visitor>;
