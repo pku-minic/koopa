@@ -158,7 +158,7 @@ fn generate_main(input: impl io::Read, mut env: Environment) -> Result<FunctionR
   // generate end basic block
   let end = BasicBlock::new(Some("%end".into()));
   bb.inner_mut()
-    .add_inst(insts::Jump::new(Rc::downgrade(&bb)));
+    .add_inst(insts::Jump::new(Rc::downgrade(&end)));
   end
     .inner_mut()
     .add_inst(insts::Return::new(Some(values::Integer::get(0))));
