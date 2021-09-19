@@ -9,3 +9,7 @@ A simple Koopa IR optimizer that uses `koopa::front::Driver` to parse Koopa IR, 
 ## [`brainfuck`](brainfuck)
 
 A brainfuck to Koopa IR compiler.
+
+## [`interpreter`](interpreter)
+
+A simple Koopa IR interpreter, based on `koopa::back::Generator` and `koopa::back::Visitor`.
