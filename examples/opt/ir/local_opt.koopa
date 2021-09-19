@@ -1,4 +1,4 @@
-fun @unopt(): i32 {
+fun @local(): i32 {
 %entry:
   %0 = add 1, 1
   %1 = mul %0, 2
