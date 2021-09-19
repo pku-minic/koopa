@@ -37,26 +37,37 @@ impl Visitor {
     func: &Function,
   ) -> Result<()> {
     // header
-    if func.inner().bbs().is_empty() {
+    let is_decl = func.inner().bbs().is_empty();
+    if is_decl {
       write!(w, "decl")?;
     } else {
       write!(w, "fun")?;
     }
     // function name
     write!(w, " {}(", nm.get_func_name(func))?;
+    // unwrap function type
+    let (param_ty, ret_ty) = match func.ty().kind() {
+      TypeKind::Function(param, ret) => (param, ret),
+      _ => panic!("invalid function type"),
+    };
     // parameters
-    for (i, param) in func.params().iter().enumerate() {
-      if i != 0 {
-        write!(w, ", ")?;
+    if is_decl {
+      for (i, ty) in param_ty.iter().enumerate() {
+        if i != 0 {
+          write!(w, ", ")?;
+        }
+        write!(w, "{}", ty)?;
       }
-      write!(w, "{}: {}", nm.get_value_name(param), param.ty())?;
+    } else {
+      for (i, param) in func.params().iter().enumerate() {
+        if i != 0 {
+          write!(w, ", ")?;
+        }
+        write!(w, "{}: {}", nm.get_value_name(param), param.ty())?;
+      }
     }
     write!(w, ")")?;
     // return type
-    let ret_ty = match func.ty().kind() {
-      TypeKind::Function(_, ret) => ret,
-      _ => panic!("invalid function type"),
-    };
     if !ret_ty.is_unit() {
       write!(w, ": {}", ret_ty)?;
     }
@@ -112,7 +123,11 @@ impl Visitor {
 
   /// Generates allocation.
   fn visit_alloc(&mut self, w: &mut impl Write, ty: &Type) -> Result<()> {
-    write!(w, "alloc {}", ty)
+    let base = match ty.kind() {
+      TypeKind::Pointer(base) => base,
+      _ => panic!("invalid pointer type"),
+    };
+    write!(w, "alloc {}", base)
   }
 
   /// Generates global allocation.
