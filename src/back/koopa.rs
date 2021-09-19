@@ -1,4 +1,4 @@
-use crate::back::generator::{self, value, NameManager};
+use crate::back::{self, generator::value, NameManager};
 use crate::ir::{instructions::*, structs::BasicBlockRef};
 use crate::ir::{BasicBlock, Function, Program, Type, TypeKind, Value, ValueKind};
 use std::io::{Result, Write};
@@ -7,7 +7,7 @@ use std::io::{Result, Write};
 #[derive(Default)]
 pub struct Visitor;
 
-impl<W: Write> generator::Visitor<W> for Visitor {
+impl<W: Write> back::Visitor<W> for Visitor {
   type Output = ();
 
   fn visit_program(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<()> {
