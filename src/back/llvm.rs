@@ -144,7 +144,7 @@ impl Visitor {
       _ => panic!("invalid pointer type"),
     };
     write!(w, "alloca ")?;
-    self.visit_type(w, &base)
+    self.visit_type(w, base)
   }
 
   /// Generates global allocation.
