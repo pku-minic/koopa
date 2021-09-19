@@ -42,16 +42,18 @@ impl Visitor {
     func: &Function,
   ) -> Result<()> {
     // header
-    if func.inner().bbs().is_empty() {
+    let is_decl = func.inner().bbs().is_empty();
+    if is_decl {
       write!(w, "declare")?;
     } else {
       write!(w, "define")?;
     }
-    // return type
-    let ret_ty = match func.ty().kind() {
-      TypeKind::Function(_, ret) => ret,
+    // unwrap function type
+    let (param_ty, ret_ty) = match func.ty().kind() {
+      TypeKind::Function(param, ret) => (param, ret),
       _ => panic!("invalid function type"),
     };
+    // return type
     write!(w, " ")?;
     self.visit_type(w, ret_ty)?;
     // function name
@@ -62,12 +64,21 @@ impl Visitor {
       temp: "%_".into(),
     });
     // parameters
-    for (i, param) in func.params().iter().enumerate() {
-      if i != 0 {
-        write!(w, ", ")?;
+    if is_decl {
+      for (i, ty) in param_ty.iter().enumerate() {
+        if i != 0 {
+          write!(w, ", ")?;
+        }
+        self.visit_type(w, ty)?;
       }
-      self.visit_type(w, param.ty())?;
-      write!(w, " {}", nm.get_value_name(param))?;
+    } else {
+      for (i, param) in func.params().iter().enumerate() {
+        if i != 0 {
+          write!(w, ", ")?;
+        }
+        self.visit_type(w, param.ty())?;
+        write!(w, " {}", nm.get_value_name(param))?;
+      }
     }
     write!(w, ")")?;
     // function body
@@ -128,8 +139,12 @@ impl Visitor {
 
   /// Generates allocation.
   fn visit_alloc(&mut self, w: &mut impl Write, ty: &Type) -> Result<()> {
+    let base = match ty.kind() {
+      TypeKind::Pointer(base) => base,
+      _ => panic!("invalid pointer type"),
+    };
     write!(w, "alloca ")?;
-    self.visit_type(w, ty)
+    self.visit_type(w, &base)
   }
 
   /// Generates global allocation.
