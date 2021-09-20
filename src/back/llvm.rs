@@ -10,7 +10,7 @@ pub struct Visitor;
 impl<W: Write> back::Visitor<W> for Visitor {
   type Output = ();
 
-  fn visit_program(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<()> {
+  fn visit(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<()> {
     // global variables
     nm.set_prefix(Prefix::Custom {
       named: "@".into(),

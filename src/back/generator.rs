@@ -280,7 +280,7 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
   pub fn generate_on(&mut self, program: &Program) -> Result<V::Output> {
     self
       .visitor
-      .visit_program(&mut self.writer, &mut self.name_man, program)
+      .visit(&mut self.writer, &mut self.name_man, program)
   }
 }
 
@@ -301,12 +301,7 @@ pub trait Visitor<W: Write> {
   type Output;
 
   /// Visits the specific program.
-  fn visit_program(
-    &mut self,
-    w: &mut W,
-    nm: &mut NameManager,
-    program: &Program,
-  ) -> Result<Self::Output>;
+  fn visit(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<Self::Output>;
 }
 
 /// Gets the value reference of the specific use.
