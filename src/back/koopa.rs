@@ -1,6 +1,7 @@
-use crate::back::{self, generator::value, NameManager};
+use crate::back::{self, NameManager};
 use crate::ir::{instructions::*, structs::BasicBlockRef};
 use crate::ir::{BasicBlock, Function, Program, Type, TypeKind, Value, ValueKind};
+use crate::value;
 use std::io::{Result, Write};
 
 /// Visitor for generating Koopa IR structures into text formatted Koopa IR.
