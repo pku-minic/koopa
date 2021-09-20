@@ -334,7 +334,9 @@ impl<T: Read> Parser<T> {
       kind: TokenKind::Symbol(symbol),
     } = &self.cur_token
     {
-      ast::SymbolRef::new(*span, symbol.clone())
+      let sym = ast::SymbolRef::new(*span, symbol.clone());
+      self.next_token()?;
+      sym
     } else {
       self.parse_init()?
     };
