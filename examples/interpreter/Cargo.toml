@@ -7,3 +7,4 @@ publish = false
 
 [dependencies]
 koopa = { path = "../.." }
+libloading = "0.7"
