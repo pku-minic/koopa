@@ -22,6 +22,7 @@ impl<'lib> ExternFuncs<'lib> {
   }
 
   pub unsafe fn call(&'lib mut self, func: &Function, args: Vec<Val>) -> IoResult<Val> {
+    assert!(func.inner().bbs().is_empty(), "expected function declaration");
     let name = func.name();
     let ret_ty = match func.ty().kind() {
       TypeKind::Function(_, ret) => ret,
@@ -103,7 +104,12 @@ impl<'lib> ExternFuncs<'lib> {
       26 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A A A A A A A A A A A A A A A),
       27 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A A A A A A A A A A A A A A A A),
       28 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A A A A A A A A A A A A A A A A A),
-      _ => panic!("argument number exceeded in external function call"),
+      _ => {
+        return Err(IoError::new(
+          ErrorKind::Other,
+          format!("argument number exceeded in external function call"),
+        ))
+      }
     };
     Ok(Self::usize_to_val(ret, ret_ty))
   }
