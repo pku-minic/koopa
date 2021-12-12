@@ -22,8 +22,12 @@ impl<'lib> ExternFuncs<'lib> {
   }
 
   pub unsafe fn call(&'lib mut self, func: &Function, args: Vec<Val>) -> IoResult<Val> {
-    assert!(func.inner().bbs().is_empty(), "expected function declaration");
-    let name = func.name();
+    assert!(
+      func.inner().bbs().is_empty(),
+      "expected function declaration"
+    );
+    assert!(!func.name().is_empty(), "invalid function name");
+    let name = &func.name()[1..];
     let ret_ty = match func.ty().kind() {
       TypeKind::Function(_, ret) => ret,
       _ => panic!("invalid function"),
