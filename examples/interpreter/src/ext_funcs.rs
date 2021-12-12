@@ -1,27 +1,24 @@
 use super::{Function, NonNull, Type, TypeKind, Val};
 use libloading::{Error, Library, Symbol};
-use std::collections::HashMap;
 use std::ffi::CString;
 use std::io::{Error as IoError, ErrorKind, Result as IoResult};
 use std::mem::transmute;
 
-pub(crate) struct ExternFuncs<'lib> {
+pub(crate) struct ExternFuncs {
   libs: Vec<Library>,
-  funcs: HashMap<String, Symbol<'lib, *const ()>>,
 }
 
-impl<'lib> ExternFuncs<'lib> {
+impl ExternFuncs {
   pub unsafe fn new(lib_files: &[&str]) -> Result<Self, Error> {
     Ok(Self {
       libs: lib_files
         .iter()
         .map(|f| Library::new(f))
         .collect::<Result<_, _>>()?,
-      funcs: HashMap::new(),
     })
   }
 
-  pub unsafe fn call(&'lib mut self, func: &Function, args: Vec<Val>) -> IoResult<Val> {
+  pub unsafe fn call(&mut self, func: &Function, args: Vec<Val>) -> IoResult<Val> {
     assert!(
       func.inner().bbs().is_empty(),
       "expected function declaration"
@@ -32,28 +29,23 @@ impl<'lib> ExternFuncs<'lib> {
       TypeKind::Function(_, ret) => ret,
       _ => panic!("invalid function"),
     };
-    if let Some(sym) = self.funcs.get(name) {
-      Self::call_ext_func(sym, args, ret_ty)
-    } else {
-      let sym_name =
-        CString::new(name).map_err(|e| IoError::new(ErrorKind::Other, format!("{}", e)))?;
-      let sym = self
-        .libs
-        .iter()
-        .find_map(|l| l.get(sym_name.to_bytes_with_nul()).ok())
-        .ok_or_else(|| {
-          IoError::new(
-            ErrorKind::Other,
-            format!("external function '{}' not found", name),
-          )
-        })?;
-      self.funcs.insert(name.into(), sym);
-      Self::call_ext_func(&self.funcs[name], args, ret_ty)
-    }
+    let sym_name =
+      CString::new(name).map_err(|e| IoError::new(ErrorKind::Other, format!("{}", e)))?;
+    let sym = self
+      .libs
+      .iter()
+      .find_map(|l| l.get(sym_name.to_bytes_with_nul()).ok())
+      .ok_or_else(|| {
+        IoError::new(
+          ErrorKind::Other,
+          format!("external function '{}' not found", name),
+        )
+      })?;
+    Self::call_ext_func(sym, args, ret_ty)
   }
 
   unsafe fn call_ext_func(
-    sym: &Symbol<'lib, *const ()>,
+    sym: Symbol<'_, *const ()>,
     args: Vec<Val>,
     ret_ty: &Type,
   ) -> IoResult<Val> {
