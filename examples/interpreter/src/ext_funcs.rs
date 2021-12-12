@@ -5,7 +5,7 @@ use std::ffi::CString;
 use std::io::{Error as IoError, ErrorKind, Result as IoResult};
 use std::mem::transmute;
 
-struct ExternFuncs<'lib> {
+pub(crate) struct ExternFuncs<'lib> {
   libs: Vec<Library>,
   funcs: HashMap<String, Symbol<'lib, *const ()>>,
 }
