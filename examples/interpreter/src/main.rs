@@ -112,28 +112,28 @@ impl Interpreter {
       // evaluate the entry basic block
       let ret = self.eval_bb(bb);
       self.envs.pop();
-      Ok(ret)
+      ret
     } else {
       // call the external function
       unsafe { self.ext_funcs.call(func, args) }
     }
   }
 
-  fn eval_bb(&mut self, bb: &BasicBlock) -> Val {
+  fn eval_bb(&mut self, bb: &BasicBlock) -> Result<Val> {
     // evaluate on all instructions
     for inst in bb.inner().insts() {
       match inst.kind() {
         ValueKind::Alloc(_) => self.eval_alloc(inst),
-        ValueKind::Load(v) => self.eval_load(inst, v),
-        ValueKind::Store(v) => self.eval_store(inst, v),
-        ValueKind::GetPtr(v) => self.eval_getptr(inst, v),
-        ValueKind::GetElemPtr(v) => self.eval_getelemptr(inst, v),
+        ValueKind::Load(v) => self.eval_load(inst, v)?,
+        ValueKind::Store(v) => self.eval_store(v)?,
+        ValueKind::GetPtr(v) => self.eval_getptr(inst, v)?,
+        ValueKind::GetElemPtr(v) => self.eval_getelemptr(inst, v)?,
         ValueKind::Binary(v) => self.eval_binary(inst, v),
-        ValueKind::Call(v) => self.eval_call(inst, v),
+        ValueKind::Call(v) => self.eval_call(inst, v)?,
         ValueKind::Phi(v) => self.eval_phi(inst, v),
         ValueKind::Branch(v) => return self.eval_branch(bb, v),
         ValueKind::Jump(v) => return self.eval_jump(bb, v),
-        ValueKind::Return(v) => return self.eval_return(v),
+        ValueKind::Return(v) => return Ok(self.eval_return(v)),
         _ => panic!("invalid instruction"),
       }
     }
@@ -145,44 +145,105 @@ impl Interpreter {
       TypeKind::Pointer(base) => base,
       _ => panic!("invalid pointer type"),
     };
-    let env = self.envs.first_mut().unwrap();
+    let env = self.envs.last_mut().unwrap();
     env.allocs.push(Box::new(Self::new_zeroinit(base)));
     env
       .vals
       .insert(inst, Val::new_val_pointer(env.allocs.last()));
   }
 
-  fn eval_load(&mut self, inst: &Value, load: &Load) {
+  fn eval_load(&mut self, inst: &Value, load: &Load) -> Result<()> {
+    let val = match self.eval_value(value!(load.src())) {
+      Val::Pointer { ptr, .. } => ptr.map(|p| unsafe { p.as_ref().clone() }),
+      Val::UnsafePointer(ptr) => todo!(),
+      _ => panic!("invalid pointer"),
+    }
+    .ok_or_else(|| new_error("accessing null pointer"))?;
+    self.envs.last_mut().unwrap().vals.insert(inst, val);
+    Ok(())
+  }
+
+  fn eval_store(&self, store: &Store) -> Result<()> {
+    let val = self.eval_value(value!(store.value()));
+    match self.eval_value(value!(store.dest())) {
+      Val::Pointer { ptr, .. } => ptr.map(|p| unsafe { *p.as_ptr() = val }),
+      Val::UnsafePointer(ptr) => todo!(),
+      _ => panic!("invalid pointer"),
+    }
+    .ok_or_else(|| new_error("accessing null pointer"))
+  }
+
+  fn eval_getptr(&mut self, inst: &Value, gp: &GetPtr) -> Result<()> {
     todo!()
   }
 
-  fn eval_store(&mut self, inst: &Value, store: &Store) {
-    todo!()
-  }
-
-  fn eval_getptr(&mut self, inst: &Value, gp: &GetPtr) {
-    todo!()
-  }
-
-  fn eval_getelemptr(&mut self, inst: &Value, gep: &GetElemPtr) {
+  fn eval_getelemptr(&mut self, inst: &Value, gep: &GetElemPtr) -> Result<()> {
     todo!()
   }
 
   fn eval_binary(&mut self, inst: &Value, bin: &Binary) {
-    todo!()
+    // evaluate lhs & rhs
+    let lhs = self.eval_value(value!(bin.lhs()));
+    let rhs = self.eval_value(value!(bin.rhs()));
+    let (lv, rv) = match (lhs, rhs) {
+      (Val::Int(lv), Val::Int(rv)) => (lv, rv),
+      _ => panic!("invalid lhs or rhs"),
+    };
+    // perform binary operation
+    let ans = match bin.op() {
+      BinaryOp::NotEq => (lv != rv) as i32,
+      BinaryOp::Eq => (lv == rv) as i32,
+      BinaryOp::Gt => (lv > rv) as i32,
+      BinaryOp::Lt => (lv < rv) as i32,
+      BinaryOp::Ge => (lv >= rv) as i32,
+      BinaryOp::Le => (lv <= rv) as i32,
+      BinaryOp::Add => lv + rv,
+      BinaryOp::Sub => lv - rv,
+      BinaryOp::Mul => lv * rv,
+      BinaryOp::Div => lv / rv,
+      BinaryOp::Mod => lv % rv,
+      BinaryOp::And => lv & rv,
+      BinaryOp::Or => lv | rv,
+      BinaryOp::Xor => lv ^ rv,
+      BinaryOp::Shl => lv << rv,
+      BinaryOp::Shr => ((lv as u32) >> rv) as i32,
+      BinaryOp::Sar => lv >> rv,
+    };
+    self
+      .envs
+      .last_mut()
+      .unwrap()
+      .vals
+      .insert(inst, Val::Int(ans));
   }
 
-  fn eval_call(&mut self, inst: &Value, call: &Call) {
-    todo!()
+  fn eval_call(&mut self, inst: &Value, call: &Call) -> Result<()> {
+    // evaluate arguments
+    let args = call
+      .args()
+      .iter()
+      .map(|u| self.eval_value(value!(u)))
+      .collect();
+    // perform function call
+    let ret = self.eval_func(call.callee().upgrade().unwrap().as_ref(), args)?;
+    self.envs.last_mut().unwrap().vals.insert(inst, ret);
+    Ok(())
   }
 
   fn eval_phi(&mut self, inst: &Value, phi: &Phi) {
-    todo!()
+    let val = phi
+      .oprs()
+      .iter()
+      .find_map(|(o, b)| {
+        (self.envs.last().unwrap().last_bb == b.as_ptr()).then(|| self.eval_value(value!(o)))
+      })
+      .unwrap();
+    self.envs.last_mut().unwrap().vals.insert(inst, val);
   }
 
-  fn eval_branch(&mut self, cur_bb: &BasicBlock, br: &Branch) -> Val {
+  fn eval_branch(&mut self, cur_bb: &BasicBlock, br: &Branch) -> Result<Val> {
     // update last basic block
-    self.envs.first_mut().unwrap().last_bb = cur_bb;
+    self.envs.last_mut().unwrap().last_bb = cur_bb;
     // evaluate on condition
     let cond = self.eval_value(value!(br.cond()));
     // perform branching
@@ -193,9 +254,9 @@ impl Interpreter {
     }
   }
 
-  fn eval_jump(&mut self, cur_bb: &BasicBlock, jump: &Jump) -> Val {
+  fn eval_jump(&mut self, cur_bb: &BasicBlock, jump: &Jump) -> Result<Val> {
     // update last basic block
-    self.envs.first_mut().unwrap().last_bb = cur_bb;
+    self.envs.last_mut().unwrap().last_bb = cur_bb;
     // just jump
     self.eval_bb(jump.target().upgrade().unwrap().as_ref())
   }
@@ -208,7 +269,6 @@ impl Interpreter {
   }
 
   fn eval_value(&self, value: &Value) -> Val {
-    // TODO: &mut self -> &self
     if value.is_const() {
       Self::eval_const(value)
     } else {
