@@ -2,25 +2,24 @@ mod ext_funcs;
 
 use ext_funcs::ExternFuncs;
 use koopa::back::{Generator, NameManager, Visitor};
-use koopa::ir::structs::BasicBlockRef;
-use koopa::ir::{Function, Program, Type, TypeKind, Value, ValueKind};
+use koopa::ir::{BasicBlock, Function, Program, Type, TypeKind, Value, ValueKind};
 use koopa::value;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result, Write};
-use std::ptr::NonNull;
+use std::ptr::{null, NonNull};
 use std::rc::Rc;
 
 fn main() {
   println!("Hello, world!");
 }
 
-struct Interpreter<'lib> {
+struct Interpreter {
   vars: HashMap<*const Value, Box<Val>>,
-  env: Option<Environment>,
-  ext_funcs: ExternFuncs<'lib>,
+  envs: Vec<Environment>,
+  ext_funcs: ExternFuncs,
 }
 
-impl<'lib, W: Write> Visitor<W> for Interpreter<'lib> {
+impl<W: Write> Visitor<W> for Interpreter {
   type Output = i32;
 
   fn visit(&mut self, _: &mut W, _: &mut NameManager, program: &Program) -> Result<Self::Output> {
@@ -51,11 +50,11 @@ impl<'lib, W: Write> Visitor<W> for Interpreter<'lib> {
   }
 }
 
-impl<'lib> Interpreter<'lib> {
-  fn new(ext_funcs: ExternFuncs<'lib>) -> Self {
+impl Interpreter {
+  fn new(ext_funcs: ExternFuncs) -> Self {
     Self {
-      vars: HashMap::default(),
-      env: Option::default(),
+      vars: HashMap::new(),
+      envs: Vec::new(),
       ext_funcs,
     }
   }
@@ -94,39 +93,49 @@ impl<'lib> Interpreter<'lib> {
 
   fn eval_func(&mut self, func: &Function, args: Vec<Val>) -> Result<Val> {
     // check if is a function declaration
-    // TODO
-    // setup the environment
-    assert_eq!(
-      func.params().len(),
-      args.len(),
-      "{} parameters required but got {} in function '{}'",
-      func.params().len(),
-      args.len(),
-      func.name(),
-    );
-    self.env = Some(Environment::new(
-      func
-        .params()
-        .iter()
-        .map(|p| Rc::as_ptr(p))
-        .zip(args.into_iter().map(Box::new))
-        .collect(),
-    ));
-    func.inner().bbs();
+    if let Some(bb) = func.inner().bbs().front().get() {
+      // setup the environment
+      if func.params().len() != args.len() {
+        return Err(Self::new_error(&format!(
+          "{} parameters required but got {} in function '{}'",
+          func.params().len(),
+          args.len(),
+          func.name(),
+        )));
+      }
+      self.envs.push(Environment::new(
+        func
+          .params()
+          .iter()
+          .map(|p| Rc::as_ptr(p))
+          .zip(args.into_iter().map(Box::new))
+          .collect(),
+      ));
+      // evaluate the entry basic block
+      let ret = self.eval_bb(bb);
+      self.envs.pop();
+      ret
+    } else {
+      // call the external function
+      unsafe { self.ext_funcs.call(func, args) }
+    }
+  }
+
+  fn eval_bb(&mut self, bb: &BasicBlock) -> Result<Val> {
     todo!()
   }
 }
 
 struct Environment {
   allocs: HashMap<*const Value, Box<Val>>,
-  last_bb: BasicBlockRef,
+  last_bb: *const BasicBlock,
 }
 
 impl Environment {
   fn new(allocs: HashMap<*const Value, Box<Val>>) -> Self {
     Self {
       allocs,
-      last_bb: BasicBlockRef::default(),
+      last_bb: null(),
     }
   }
 }
