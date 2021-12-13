@@ -1,7 +1,7 @@
-use super::{Function, NonNull, Type, TypeKind, Val};
+use super::{new_error, Function, NonNull, Type, TypeKind, Val};
 use libloading::{Error, Library, Symbol};
 use std::ffi::CString;
-use std::io::{Error as IoError, ErrorKind, Result as IoResult};
+use std::io::Result as IoResult;
 use std::mem::transmute;
 
 pub(crate) struct ExternFuncs {
@@ -29,18 +29,12 @@ impl ExternFuncs {
       TypeKind::Function(_, ret) => ret,
       _ => panic!("invalid function"),
     };
-    let sym_name =
-      CString::new(name).map_err(|e| IoError::new(ErrorKind::Other, format!("{}", e)))?;
+    let sym_name = CString::new(name).map_err(|e| new_error(&format!("{}", e)))?;
     let sym = self
       .libs
       .iter()
       .find_map(|l| l.get(sym_name.to_bytes_with_nul()).ok())
-      .ok_or_else(|| {
-        IoError::new(
-          ErrorKind::Other,
-          format!("external function '{}' not found", name),
-        )
-      })?;
+      .ok_or_else(|| new_error(&format!("external function '{}' not found", name)))?;
     Self::call_ext_func(sym, args, ret_ty)
   }
 
@@ -101,10 +95,9 @@ impl ExternFuncs {
       27 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A A A A A A A A A A A A A A A A),
       28 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A A A A A A A A A A A A A A A A A),
       _ => {
-        return Err(IoError::new(
-          ErrorKind::Other,
-          format!("argument number exceeded in external function call"),
-        ))
+        return Err(new_error(&format!(
+          "argument number exceeded in external function call"
+        )))
       }
     };
     Ok(Self::usize_to_val(ret, ret_ty))
