@@ -14,6 +14,10 @@ fn main() {
   println!("Hello, world!");
 }
 
+fn new_error(message: &str) -> Error {
+  Error::new(ErrorKind::Other, message)
+}
+
 struct Interpreter {
   global_allocs: Vec<Box<Val>>,
   vars: HashMap<*const Value, Val>,
@@ -29,7 +33,7 @@ impl<W: Write> Visitor<W> for Interpreter {
     for var in program.vars() {
       match var.kind() {
         ValueKind::GlobalAlloc(ga) => {
-          let val = Self::eval_const(value!(ga.init()))?;
+          let val = Self::eval_const(value!(ga.init()));
           self.global_allocs.push(Box::new(val));
           self
             .vars
@@ -43,13 +47,13 @@ impl<W: Write> Visitor<W> for Interpreter {
       .funcs()
       .iter()
       .find(|f| f.name() == "@main")
-      .ok_or_else(|| Self::new_error("function '@main' not found"))
+      .ok_or_else(|| new_error("function '@main' not found"))
       .and_then(|f| self.eval_func(f, Vec::new()))
       .and_then(|v| {
         if let Val::Int(i) = v {
           Ok(i)
         } else {
-          Err(Self::new_error("function '@main' must return an integer"))
+          Err(new_error("function '@main' must return an integer"))
         }
       })
   }
@@ -65,34 +69,28 @@ impl Interpreter {
     }
   }
 
-  fn new_error(message: &str) -> Error {
-    Error::new(ErrorKind::Other, message)
-  }
-
-  fn eval_const(value: &Value) -> Result<Val> {
+  fn eval_const(value: &Value) -> Val {
     match value.kind() {
-      ValueKind::Integer(v) => Ok(Val::Int(v.value())),
+      ValueKind::Integer(v) => Val::Int(v.value()),
       ValueKind::ZeroInit(_) => Self::new_zeroinit(value.ty()),
-      ValueKind::Undef(_) => Ok(Val::Undef),
-      ValueKind::Aggregate(v) => Ok(Val::Array(
+      ValueKind::Undef(_) => Val::Undef,
+      ValueKind::Aggregate(v) => Val::Array(
         v.elems()
           .iter()
           .map(|e| Self::eval_const(value!(e)))
-          .collect::<Result<_>>()?,
-      )),
+          .collect(),
+      ),
       _ => panic!("invalid constant"),
     }
   }
 
-  fn new_zeroinit(ty: &Type) -> Result<Val> {
+  fn new_zeroinit(ty: &Type) -> Val {
     match ty.kind() {
-      TypeKind::Int32 => Ok(Val::Int(0)),
-      TypeKind::Array(base, len) => Ok(Val::Array(
-        (0..*len)
-          .map(|_| Self::new_zeroinit(base))
-          .collect::<Result<_>>()?,
-      )),
-      TypeKind::Pointer(_) => Ok(Val::new_val_pointer(None)),
+      TypeKind::Int32 => Val::Int(0),
+      TypeKind::Array(base, len) => {
+        Val::Array((0..*len).map(|_| Self::new_zeroinit(base)).collect())
+      }
+      TypeKind::Pointer(_) => Val::new_val_pointer(None),
       _ => panic!("invalid type of zero initializer"),
     }
   }
@@ -114,25 +112,25 @@ impl Interpreter {
       // evaluate the entry basic block
       let ret = self.eval_bb(bb);
       self.envs.pop();
-      ret
+      Ok(ret)
     } else {
       // call the external function
       unsafe { self.ext_funcs.call(func, args) }
     }
   }
 
-  fn eval_bb(&mut self, bb: &BasicBlock) -> Result<Val> {
+  fn eval_bb(&mut self, bb: &BasicBlock) -> Val {
     // evaluate on all instructions
     for inst in bb.inner().insts() {
       match inst.kind() {
-        ValueKind::Alloc(_) => self.eval_alloc(inst)?,
-        ValueKind::Load(v) => self.eval_load(inst, v)?,
-        ValueKind::Store(v) => self.eval_store(inst, v)?,
-        ValueKind::GetPtr(v) => self.eval_getptr(inst, v)?,
-        ValueKind::GetElemPtr(v) => self.eval_getelemptr(inst, v)?,
-        ValueKind::Binary(v) => self.eval_binary(inst, v)?,
-        ValueKind::Call(v) => self.eval_call(inst, v)?,
-        ValueKind::Phi(v) => self.eval_phi(inst, v)?,
+        ValueKind::Alloc(_) => self.eval_alloc(inst),
+        ValueKind::Load(v) => self.eval_load(inst, v),
+        ValueKind::Store(v) => self.eval_store(inst, v),
+        ValueKind::GetPtr(v) => self.eval_getptr(inst, v),
+        ValueKind::GetElemPtr(v) => self.eval_getelemptr(inst, v),
+        ValueKind::Binary(v) => self.eval_binary(inst, v),
+        ValueKind::Call(v) => self.eval_call(inst, v),
+        ValueKind::Phi(v) => self.eval_phi(inst, v),
         ValueKind::Branch(v) => return self.eval_branch(bb, v),
         ValueKind::Jump(v) => return self.eval_jump(bb, v),
         ValueKind::Return(v) => return self.eval_return(v),
@@ -142,52 +140,51 @@ impl Interpreter {
     unreachable!()
   }
 
-  fn eval_alloc(&mut self, inst: &Value) -> Result<()> {
+  fn eval_alloc(&mut self, inst: &Value) {
     let base = match inst.ty().kind() {
       TypeKind::Pointer(base) => base,
       _ => panic!("invalid pointer type"),
     };
     let env = self.envs.first_mut().unwrap();
-    env.allocs.push(Box::new(Self::new_zeroinit(base)?));
+    env.allocs.push(Box::new(Self::new_zeroinit(base)));
     env
       .vals
       .insert(inst, Val::new_val_pointer(env.allocs.last()));
-    Ok(())
   }
 
-  fn eval_load(&mut self, inst: &Value, load: &Load) -> Result<()> {
+  fn eval_load(&mut self, inst: &Value, load: &Load) {
     todo!()
   }
 
-  fn eval_store(&mut self, inst: &Value, store: &Store) -> Result<()> {
+  fn eval_store(&mut self, inst: &Value, store: &Store) {
     todo!()
   }
 
-  fn eval_getptr(&mut self, inst: &Value, gp: &GetPtr) -> Result<()> {
+  fn eval_getptr(&mut self, inst: &Value, gp: &GetPtr) {
     todo!()
   }
 
-  fn eval_getelemptr(&mut self, inst: &Value, gep: &GetElemPtr) -> Result<()> {
+  fn eval_getelemptr(&mut self, inst: &Value, gep: &GetElemPtr) {
     todo!()
   }
 
-  fn eval_binary(&mut self, inst: &Value, bin: &Binary) -> Result<()> {
+  fn eval_binary(&mut self, inst: &Value, bin: &Binary) {
     todo!()
   }
 
-  fn eval_call(&mut self, inst: &Value, call: &Call) -> Result<()> {
+  fn eval_call(&mut self, inst: &Value, call: &Call) {
     todo!()
   }
 
-  fn eval_phi(&mut self, inst: &Value, phi: &Phi) -> Result<()> {
+  fn eval_phi(&mut self, inst: &Value, phi: &Phi) {
     todo!()
   }
 
-  fn eval_branch(&mut self, cur_bb: &BasicBlock, br: &Branch) -> Result<Val> {
+  fn eval_branch(&mut self, cur_bb: &BasicBlock, br: &Branch) -> Val {
     // update last basic block
     self.envs.first_mut().unwrap().last_bb = cur_bb;
     // evaluate on condition
-    let cond = self.eval_value(value!(br.cond()))?;
+    let cond = self.eval_value(value!(br.cond()));
     // perform branching
     if cond.as_bool() {
       self.eval_bb(br.true_bb().upgrade().unwrap().as_ref())
@@ -196,24 +193,33 @@ impl Interpreter {
     }
   }
 
-  fn eval_jump(&mut self, cur_bb: &BasicBlock, jump: &Jump) -> Result<Val> {
+  fn eval_jump(&mut self, cur_bb: &BasicBlock, jump: &Jump) -> Val {
     // update last basic block
     self.envs.first_mut().unwrap().last_bb = cur_bb;
     // just jump
     self.eval_bb(jump.target().upgrade().unwrap().as_ref())
   }
 
-  fn eval_return(&mut self, ret: &Return) -> Result<Val> {
+  fn eval_return(&self, ret: &Return) -> Val {
     ret
       .value()
       .value()
-      .map_or(Ok(Val::Undef), |v| self.eval_value(v.as_ref()))
+      .map_or(Val::Undef, |v| self.eval_value(v.as_ref()))
   }
 
-  fn eval_value(&mut self, val: &Value) -> Result<Val> {
+  fn eval_value(&self, value: &Value) -> Val {
     // TODO: &mut self -> &self
-    // TODO: do not use `Result` as return type
-    todo!()
+    if value.is_const() {
+      Self::eval_const(value)
+    } else {
+      let v = value as *const Value;
+      self
+        .vars
+        .get(&v)
+        .or_else(|| self.envs.last().unwrap().vals.get(&v))
+        .unwrap()
+        .clone()
+    }
   }
 }
 
@@ -233,6 +239,7 @@ impl Environment {
   }
 }
 
+#[derive(Clone)]
 enum Val {
   Undef,
   Int(i32),
