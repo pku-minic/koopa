@@ -2,6 +2,7 @@ use crate::ir::Program;
 use crate::opt::pass::Pass;
 
 /// Manages all registed passes.
+#[derive(Default)]
 pub struct PassManager {
   passes: Vec<Pass>,
 }
@@ -9,7 +10,7 @@ pub struct PassManager {
 impl PassManager {
   /// Creates a new `PassManager`.
   pub fn new() -> Self {
-    Self { passes: Vec::new() }
+    Self::default()
   }
 
   /// Registers a new pass to the current pass manager.
@@ -36,12 +37,6 @@ impl PassManager {
         }
       }
     }
-  }
-}
-
-impl Default for PassManager {
-  fn default() -> Self {
-    Self::new()
   }
 }
 
