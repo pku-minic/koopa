@@ -67,16 +67,16 @@ impl ExternFuncs {
     }
     let func_ptr = *sym.clone();
     let ret = match args.len() {
-      0_ => call_func_ptr!(func_ptr, args,),
-      1_ => call_func_ptr!(func_ptr, args, A),
-      2_ => call_func_ptr!(func_ptr, args, A A),
-      3_ => call_func_ptr!(func_ptr, args, A A A),
-      4_ => call_func_ptr!(func_ptr, args, A A A A),
-      5_ => call_func_ptr!(func_ptr, args, A A A A A),
-      6_ => call_func_ptr!(func_ptr, args, A A A A A A),
-      7_ => call_func_ptr!(func_ptr, args, A A A A A A A),
-      8_ => call_func_ptr!(func_ptr, args, A A A A A A A A),
-      9_ => call_func_ptr!(func_ptr, args, A A A A A A A A A),
+      0 => call_func_ptr!(func_ptr, args,),
+      1 => call_func_ptr!(func_ptr, args, A),
+      2 => call_func_ptr!(func_ptr, args, A A),
+      3 => call_func_ptr!(func_ptr, args, A A A),
+      4 => call_func_ptr!(func_ptr, args, A A A A),
+      5 => call_func_ptr!(func_ptr, args, A A A A A),
+      6 => call_func_ptr!(func_ptr, args, A A A A A A),
+      7 => call_func_ptr!(func_ptr, args, A A A A A A A),
+      8 => call_func_ptr!(func_ptr, args, A A A A A A A A),
+      9 => call_func_ptr!(func_ptr, args, A A A A A A A A A),
       10 => call_func_ptr!(func_ptr, args, A A A A A A A A A A),
       11 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A),
       12 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A),
@@ -97,9 +97,9 @@ impl ExternFuncs {
       27 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A A A A A A A A A A A A A A A A),
       28 => call_func_ptr!(func_ptr, args, A A A A A A A A A A A A A A A A A A A A A A A A A A A A),
       _ => {
-        return Err(new_error(&format!(
-          "argument number exceeded in external function call"
-        )))
+        return Err(new_error(
+          "argument number exceeded in external function call",
+        ))
       }
     };
     Self::usize_to_val(ret, ret_ty)

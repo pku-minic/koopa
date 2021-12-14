@@ -1,3 +1,8 @@
+// Use `Vec<Box<T>>` to prevent reallocation.
+#![allow(clippy::vec_box)]
+// For convenience.
+#![allow(clippy::borrowed_box)]
+
 use super::ext_funcs::ExternFuncs;
 use koopa::back::{NameManager, Visitor};
 use koopa::ir::instructions::*;
@@ -127,7 +132,7 @@ impl Interpreter {
         func
           .params()
           .iter()
-          .map(|p| Rc::as_ptr(p))
+          .map(Rc::as_ptr)
           .zip(args.into_iter())
           .collect(),
       ));
@@ -420,27 +425,27 @@ impl Val {
   fn store_to_unsafe_ptr(&self, ptr: Option<NonNull<()>>, ty: &Type) -> Result<()> {
     ptr
       .map(|p| match self {
-        Val::Int(i) => Ok(unsafe { *(p.as_ptr() as *mut i32) = *i }),
+        Val::Int(i) => {
+          unsafe { *(p.as_ptr() as *mut i32) = *i };
+          Ok(())
+        }
         Val::Array(arr) => {
           let base = match ty.kind() {
             TypeKind::Array(base, _) => base,
             _ => panic!("invalid array type"),
           };
-          arr
-            .iter()
-            .enumerate()
-            .map(|(i, v)| {
-              v.store_to_unsafe_ptr(
-                Some(unsafe {
-                  NonNull::new_unchecked((p.as_ptr() as usize + base.size() * i) as *mut ())
-                }),
-                base,
-              )
-            })
-            .collect()
+          arr.iter().enumerate().try_for_each(|(i, v)| {
+            v.store_to_unsafe_ptr(
+              Some(unsafe {
+                NonNull::new_unchecked((p.as_ptr() as usize + base.size() * i) as *mut ())
+              }),
+              base,
+            )
+          })
         }
         Val::UnsafePointer(ptr) => {
-          Ok(unsafe { *(p.as_ptr() as *mut *const ()) = ptr.map_or(null(), |p| p.as_ptr()) })
+          unsafe { *(p.as_ptr() as *mut *const ()) = ptr.map_or(null(), |p| p.as_ptr()) };
+          Ok(())
         }
         _ => Err(new_error("incompatible type of value")),
       })
