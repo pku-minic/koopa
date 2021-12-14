@@ -10,6 +10,7 @@ All notable changes to the Koopa will be documented in this file.
 * Example `opt`, `brainfuck` and `interpreter`.
 * Method `Value::uses` and iterator of `Use`.
 * Method `Type::size`.
+* Method `Generator::new_with_visitor` for visitors that has internal state.
 
 # Changed
 
