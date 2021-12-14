@@ -115,7 +115,11 @@ impl Interpreter {
 
   fn eval_func(&mut self, func: &Function, args: Vec<Val>) -> Result<Val> {
     // check parameter count
-    assert_eq!(func.params().len(), args.len(), "parameter count mismatch");
+    let param_len = match func.ty().kind() {
+      TypeKind::Function(params, _) => params.len(),
+      _ => panic!("invalid function"),
+    };
+    assert_eq!(param_len, args.len(), "parameter count mismatch");
     // check if is a function declaration
     if let Some(bb) = func.inner().bbs().front().get() {
       // setup the environment
