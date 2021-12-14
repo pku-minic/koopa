@@ -419,25 +419,36 @@ impl Builder {
   fn generate_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
     // try to find symbol in global scope
     // if not found, find symbol in local definitions
+    let mut visited_bbs = HashSet::new();
     self
       .global_vars
       .get(symbol)
       .cloned()
-      .or_else(|| self.generate_local_symbol(bb_name, symbol))
+      .or_else(|| self.generate_local_symbol(&mut visited_bbs, bb_name, symbol))
       .ok_or_else(|| return_error!(span, "symbol '{}' not found", symbol))
   }
 
   /// Generates the symbol locally by the symbol name.
-  fn generate_local_symbol(&self, bb_name: &str, symbol: &str) -> Option<ValueRc> {
+  fn generate_local_symbol<'a>(
+    &'a self,
+    visited_bbs: &mut HashSet<&'a str>,
+    bb_name: &'a str,
+    symbol: &str,
+  ) -> Option<ValueRc> {
     // find symbol in local scope of the current basic block
     // if not found, try to find symbol in all predecessors
-    let bb_info = &self.local_bbs[bb_name];
-    bb_info.local_defs.get(symbol).cloned().or_else(|| {
-      bb_info
-        .preds
-        .iter()
-        .find_map(|pred| self.generate_local_symbol(pred, symbol))
-    })
+    visited_bbs
+      .insert(bb_name)
+      .then(|| {
+        let bb_info = &self.local_bbs[bb_name];
+        bb_info.local_defs.get(symbol).cloned().or_else(|| {
+          bb_info
+            .preds
+            .iter()
+            .find_map(|pred| self.generate_local_symbol(visited_bbs, pred, symbol))
+        })
+      })
+      .flatten()
   }
 
   /// Generates the basic block reference by the basic block name.
