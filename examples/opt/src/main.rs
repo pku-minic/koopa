@@ -17,8 +17,8 @@ fn main() {
 enum Error {
   InvalidFile(io::Error),
   InvalidArgs,
-  ParseError,
-  IoError(io::Error),
+  Parse,
+  Io(io::Error),
 }
 
 impl fmt::Display for Error {
@@ -26,8 +26,8 @@ impl fmt::Display for Error {
     match self {
       Error::InvalidFile(error) => write!(f, "invalid file operation: {}", error),
       Error::InvalidArgs => write!(f, "usage: opt INPUT OUTPUT"),
-      Error::ParseError => write!(f, "error occurred when parsing the input"),
-      Error::IoError(error) => write!(f, "IO error: {}", error),
+      Error::Parse => write!(f, "error occurred when parsing the input"),
+      Error::Io(error) => write!(f, "IO error: {}", error),
     }
   }
 }
@@ -38,21 +38,21 @@ fn try_main() -> Result<(), Error> {
   args.next();
   let (driver, output) = match (args.next(), args.next(), args.next()) {
     (Some(input), Some(output), None) => (
-      Driver::from_path(input).map_err(|e| Error::InvalidFile(e))?,
+      Driver::from_path(input).map_err(Error::InvalidFile)?,
       output,
     ),
     _ => return Err(Error::InvalidArgs),
   };
   // parse input file
-  let mut program = driver.generate_program().map_err(|_| Error::ParseError)?;
+  let mut program = driver.generate_program().map_err(|_| Error::Parse)?;
   // run passes
   let mut passman = PassManager::new();
   passman.register(Pass::Function(Box::new(const_fold::ConstantFolding::new())));
   passman.register(Pass::Function(Box::new(dce::DeadCodeElimination::new())));
   passman.run_passes(&mut program);
   // dump the output
-  let mut generator = KoopaGenerator::from_path(output).map_err(|e| Error::InvalidFile(e))?;
+  let mut generator = KoopaGenerator::from_path(output).map_err(Error::InvalidFile)?;
   generator
     .generate_on(&program)
-    .map_err(|e| Error::IoError(e))
+    .map_err(Error::Io)
 }
