@@ -220,10 +220,7 @@ impl Interpreter {
     };
     // perform pointer calculation
     let base_size = match inst.ty().kind() {
-      TypeKind::Pointer(base) => match base.kind() {
-        TypeKind::Array(ty, _) => ty.size(),
-        _ => panic!("invalid array pointer"),
-      },
+      TypeKind::Pointer(base) => base.size(),
       _ => panic!("invalid pointer"),
     };
     let ptr = match self.eval_value(value!(gep.src())) {
