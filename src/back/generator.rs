@@ -271,6 +271,15 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
     }
   }
 
+  /// Creates a new generator with the specific visitor.
+  pub fn new_with_visitor(writer: W, visitor: V) -> Self {
+    Self {
+      writer,
+      visitor,
+      name_man: NameManager::new(),
+    }
+  }
+
   /// Consumes and gets the writer inside of the current generator.
   pub fn writer(self) -> W {
     self.writer
