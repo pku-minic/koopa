@@ -1,7 +1,7 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::{cmp, fmt, hash};
+use std::{cmp, fmt, hash, mem};
 
 /// Kind of type.
 #[derive(Hash, Clone, PartialEq, Eq)]
@@ -53,6 +53,9 @@ impl Type {
   thread_local! {
     /// Pool of all created types.
     static POOL: RefCell<HashMap<TypeKind, Type>> = RefCell::new(HashMap::new());
+
+    /// Size of pointers.
+    static PTR_SIZE: Cell<usize> = Cell::new(mem::size_of::<*const ()>());
   }
 
   /// Gets a specific type.
@@ -93,6 +96,11 @@ impl Type {
     Type::get(TypeKind::Function(params, ret))
   }
 
+  /// Sets the size of pointers.
+  pub fn set_ptr_size(size: usize) {
+    Self::PTR_SIZE.with(|ptr_size| ptr_size.set(size));
+  }
+
   /// Gets the kind of the current `Type`.
   pub fn kind(&self) -> &TypeKind {
     &self.0
@@ -106,6 +114,17 @@ impl Type {
   /// Checks if the current type is a unit type.
   pub fn is_unit(&self) -> bool {
     matches!(self.0.as_ref(), TypeKind::Unit)
+  }
+
+  /// Gets the size of the current type in bytes.
+  pub fn size(&self) -> usize {
+    match self.kind() {
+      TypeKind::Int32 => 4,
+      TypeKind::Unit => 0,
+      TypeKind::Array(ty, len) => ty.size() * len,
+      TypeKind::Pointer(..) => Self::PTR_SIZE.with(|s| s.get()),
+      TypeKind::Function(..) => Self::PTR_SIZE.with(|s| s.get()),
+    }
   }
 }
 
@@ -186,6 +205,34 @@ mod test {
     assert_ne!(
       Type::get_array(Type::get_i32(), 6),
       Type::get_array(Type::get_i32(), 7)
+    );
+  }
+
+  #[test]
+  fn type_size() {
+    assert_eq!(Type::get_i32().size(), 4);
+    assert_eq!(Type::get_unit().size(), 0);
+    assert_eq!(Type::get_array(Type::get_i32(), 5).size(), 4 * 5);
+    assert_eq!(
+      Type::get_array(Type::get_array(Type::get_i32(), 6), 5).size(),
+      4 * 6 * 5
+    );
+    assert_eq!(
+      Type::get_pointer(Type::get_array(Type::get_i32(), 5)).size(),
+      mem::size_of::<usize>()
+    );
+    assert_eq!(
+      Type::get_array(Type::get_pointer(Type::get_i32()), 5).size(),
+      mem::size_of::<usize>() * 5
+    );
+    assert_eq!(
+      Type::get_function(vec![Type::get_i32(), Type::get_i32()], Type::get_unit()).size(),
+      mem::size_of::<usize>()
+    );
+    Type::set_ptr_size(4);
+    assert_eq!(
+      Type::get_array(Type::get_pointer(Type::get_i32()), 5).size(),
+      4 * 5
     );
   }
 }
