@@ -7,8 +7,9 @@ All notable changes to the Koopa will be documented in this file.
 # Added
 
 * More re-imports.
-* Example `opt`.
+* Example `opt`, `brainfuck` and `interpreter`.
 * Method `Value::uses` and iterator of `Use`.
+* Method `Type::size`.
 
 # Changed
 
