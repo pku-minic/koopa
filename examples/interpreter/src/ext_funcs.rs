@@ -1,15 +1,17 @@
-use super::{new_error, Function, NonNull, Type, TypeKind, Val};
+use super::interpreter::{new_error, Val};
+use koopa::ir::{Function, Type, TypeKind};
 use libloading::{Error, Library, Symbol};
-use std::ffi::CString;
+use std::ffi::{CString, OsStr};
 use std::io::Result as IoResult;
 use std::mem::transmute;
+use std::ptr::NonNull;
 
-pub(crate) struct ExternFuncs {
+pub struct ExternFuncs {
   libs: Vec<Library>,
 }
 
 impl ExternFuncs {
-  pub unsafe fn new(lib_files: &[&str]) -> Result<Self, Error> {
+  pub unsafe fn new<T: AsRef<OsStr>>(lib_files: &[T]) -> Result<Self, Error> {
     Ok(Self {
       libs: lib_files
         .iter()
