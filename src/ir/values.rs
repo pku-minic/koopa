@@ -193,7 +193,7 @@ mod test {
       _ => unreachable!(),
     }
     drop(array);
-    for value in (0..10).map(|i| Integer::get(i)) {
+    for value in (0..10).map(Integer::get) {
       assert!(value.inner().uses().is_empty());
     }
   }
