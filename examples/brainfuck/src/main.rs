@@ -22,7 +22,7 @@ fn try_main() -> Result<(), Error> {
   } = parse_cmd_args()?;
   // build Koopa IR program by parsing the input
   let program = if let Some(file) = input {
-    build_program(File::open(file).map_err(|e| Error::InvalidFile(e))?)?
+    build_program(File::open(file).map_err(Error::InvalidFile)?)?
   } else {
     build_program(io::stdin())?
   };
@@ -30,7 +30,7 @@ fn try_main() -> Result<(), Error> {
   if let Some(file) = output {
     emit_ir(
       &program,
-      File::create(file).map_err(|e| Error::InvalidFile(e))?,
+      File::create(file).map_err(Error::InvalidFile)?,
       emit_llvm,
     )
   } else {
@@ -41,8 +41,8 @@ fn try_main() -> Result<(), Error> {
 enum Error {
   InvalidArgs,
   InvalidFile(io::Error),
-  ParseError,
-  IoError(io::Error),
+  Parse,
+  Io(io::Error),
 }
 
 impl fmt::Display for Error {
@@ -57,8 +57,8 @@ Options:
   -ll       emit LLVM IR instead of Koopa IR"#
       ),
       Error::InvalidFile(error) => write!(f, "invalid file operation: {}", error),
-      Error::ParseError => write!(f, "invalid brainfuck input"),
-      Error::IoError(error) => write!(f, "IO error: {}", error),
+      Error::Parse => write!(f, "invalid brainfuck input"),
+      Error::Io(error) => write!(f, "IO error: {}", error),
     }
   }
 }
@@ -126,7 +126,7 @@ fn emit_ir(program: &Program, output: impl io::Write, emit_llvm: bool) -> Result
   } else {
     KoopaGenerator::new(output).generate_on(program)
   }
-  .map_err(|e| Error::IoError(e))
+  .map_err(Error::Io)
 }
 
 // =========================================================== //
@@ -176,10 +176,9 @@ fn generate_bbs(
   entry
     .inner_mut()
     .add_inst(insts::Jump::new(Rc::downgrade(&bb)));
-  let mut bytes = input.bytes();
   let mut loop_info = Vec::new();
-  while let Some(result) = bytes.next() {
-    bb = match result.map_err(|e| Error::IoError(e))? {
+  for result in input.bytes() {
+    bb = match result.map_err(Error::Io)? {
       b'>' => generate_ptr_op(env, bb, 1),
       b'<' => generate_ptr_op(env, bb, -1),
       b'+' => generate_data_op(env, bb, 1),
@@ -256,7 +255,7 @@ fn generate_end(
   bb: BasicBlockRc,
   loop_info: &mut Vec<(BasicBlockRc, BasicBlockRc)>,
 ) -> Result<BasicBlockRc, Error> {
-  let (cond_bb, end_bb) = loop_info.pop().ok_or(Error::ParseError)?;
+  let (cond_bb, end_bb) = loop_info.pop().ok_or(Error::Parse)?;
   bb.inner_mut()
     .add_inst(insts::Jump::new(Rc::downgrade(&cond_bb)));
   env.main.inner_mut().add_bb(end_bb.clone());
