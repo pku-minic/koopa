@@ -56,7 +56,7 @@ impl ExternFuncs {
       };
       (@args $func:expr, $args:expr, $i:expr, ($($t:tt)*), $head:ident $(,$tail:ident)*) => {
         call_func_ptr!(@args
-          $func, $args, $i + 1, ($($t)* Self::val_to_usize(&$args[$i]),) $(,$tail)*
+          $func, $args, $i + 1, ($($t)* Self::val_to_usize(&$args[$i])?,) $(,$tail)*
         )
       };
       (@call $func:expr, $($args:tt)*) => {
@@ -100,27 +100,27 @@ impl ExternFuncs {
         )))
       }
     };
-    Ok(Self::usize_to_val(ret, ret_ty))
+    Self::usize_to_val(ret, ret_ty)
   }
 
-  fn val_to_usize(val: &Val) -> usize {
+  fn val_to_usize(val: &Val) -> IoResult<usize> {
     match val {
-      Val::Undef => 0,
-      Val::Int(i) => *i as usize,
-      Val::Array(a) => a.as_ptr() as usize,
-      Val::Pointer { ptr: Some(p), .. } => p.as_ptr() as usize,
-      Val::Pointer { ptr: None, .. } => 0,
-      Val::UnsafePointer(Some(p)) => p.as_ptr() as usize,
-      Val::UnsafePointer(None) => 0,
+      Val::Undef => Ok(0),
+      Val::Int(i) => Ok(*i as usize),
+      Val::Pointer { ptr: Some(p), .. } => Ok(p.as_ptr() as usize),
+      Val::Pointer { ptr: None, .. } => Ok(0),
+      Val::UnsafePointer(Some(p)) => Ok(p.as_ptr() as usize),
+      Val::UnsafePointer(None) => Ok(0),
+      _ => Err(new_error("unsupported value")),
     }
   }
 
-  fn usize_to_val(u: usize, ty: &Type) -> Val {
+  fn usize_to_val(u: usize, ty: &Type) -> IoResult<Val> {
     match ty.kind() {
-      TypeKind::Int32 => Val::Int(u as i32),
-      TypeKind::Unit => Val::Undef,
-      TypeKind::Array(..) | TypeKind::Pointer(..) => Val::UnsafePointer(NonNull::new(u as *mut ())),
-      _ => panic!("unsupported value type"),
+      TypeKind::Int32 => Ok(Val::Int(u as i32)),
+      TypeKind::Unit => Ok(Val::Undef),
+      TypeKind::Pointer(_) => Ok(Val::UnsafePointer(NonNull::new(u as *mut ()))),
+      _ => Err(new_error("unsupported value type")),
     }
   }
 }
