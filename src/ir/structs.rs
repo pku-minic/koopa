@@ -275,7 +275,7 @@ impl BasicBlockInner {
   }
 
   /// Gets the mutable predecessor list.
-  pub fn preds_mut(&mut self) -> &Vec<BasicBlockRef> {
+  pub fn preds_mut(&mut self) -> &mut Vec<BasicBlockRef> {
     &mut self.preds
   }
 
