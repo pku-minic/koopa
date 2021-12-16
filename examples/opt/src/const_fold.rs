@@ -77,14 +77,15 @@ impl ConstantFolding {
 
   fn handle_phi(&mut self, phi: &Phi) -> Option<ValueRc> {
     // check if all phi operands are the same value
-    if phi.oprs().windows(2).all(|it| {
-      let pa = it[0].0.value().unwrap();
-      let pb = it[1].0.value().unwrap();
-      Rc::ptr_eq(&pa, &pb)
-    }) {
-      phi.oprs().first().unwrap().0.value()
-    } else {
-      None
-    }
+    phi
+      .oprs()
+      .windows(2)
+      .all(|it| {
+        let pa = it[0].0.value().unwrap();
+        let pb = it[1].0.value().unwrap();
+        Rc::ptr_eq(&pa, &pb)
+      })
+      .then(|| phi.oprs().first().unwrap().0.value())
+      .flatten()
   }
 }
