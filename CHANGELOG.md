@@ -25,5 +25,6 @@ All notable changes to the Koopa will be documented in this file.
 * Fault about creating file in `Generator::from_path`.
 * Fault about generating Koopa IR and LLVM IR.
 * Infinite loop problem in `Builder::generate_local_symbol`.
+* Fault about updating `BasicBlockInner::preds`.
 
 ## 0.0.1 - 2021-09-14
