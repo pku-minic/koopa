@@ -274,9 +274,22 @@ impl BasicBlockInner {
     &self.preds
   }
 
-  /// Gets the mutable predecessor list.
-  pub fn preds_mut(&mut self) -> &mut Vec<BasicBlockRef> {
-    &mut self.preds
+  /// Adds the specific basic block to the predecessor list.
+  pub(crate) fn add_pred(&mut self, bb: BasicBlockRef) {
+    // update predecessor list
+    self.preds.push(bb);
+  }
+
+  /// Removes the specific basic block from the predecessor list.
+  pub(crate) fn remove_pred(&mut self, bb: &BasicBlockRef) {
+    if let Some(i) = self
+      .preds
+      .iter()
+      .enumerate()
+      .find_map(|(i, b)| b.ptr_eq(bb).then(|| i))
+    {
+      self.preds.swap_remove(i);
+    }
   }
 
   /// Gets the successors list.
@@ -311,6 +324,7 @@ impl BasicBlockInner {
       "instruction is already in another basic block"
     );
     inst_inner.set_bb(Some(self.bb.clone()));
+    inst.add_pred(self.bb.clone(), self);
     drop(inst_inner);
     self.insts.push_back(inst);
   }
@@ -335,6 +349,7 @@ impl BasicBlockInner {
     }
     // remove from the current basic block
     inst_inner.set_bb(None);
+    inst.remove_pred(&self.bb.clone(), self);
     unsafe {
       self.insts.cursor_mut_from_ptr(inst).remove();
     }
@@ -357,6 +372,7 @@ impl BasicBlockInner {
       "`inst` is not in the current basic block"
     );
     inst_inner.set_bb(None);
+    inst.remove_pred(&self.bb.clone(), self);
     // update `new`
     let mut new_inner = new.inner_mut();
     assert!(new.is_inst(), "`new` is not an instruction");
@@ -365,6 +381,7 @@ impl BasicBlockInner {
       "`new` is already in another basic block"
     );
     new_inner.set_bb(Some(self.bb.clone()));
+    new.add_pred(self.bb.clone(), self);
     drop(new_inner);
     // update instruction list
     unsafe {
@@ -397,6 +414,7 @@ impl BasicBlockInner {
       "`new` is already in another basic block"
     );
     new_inner.set_bb(Some(self.bb.clone()));
+    new.add_pred(self.bb.clone(), self);
     drop(new_inner);
     // update instruction list
     unsafe {
@@ -428,6 +446,7 @@ impl BasicBlockInner {
       "`new` is already in another basic block"
     );
     new_inner.set_bb(Some(self.bb.clone()));
+    new.add_pred(self.bb.clone(), self);
     drop(new_inner);
     // update instruction list
     unsafe {
