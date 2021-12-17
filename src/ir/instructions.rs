@@ -1,7 +1,7 @@
 #![allow(clippy::new_ret_no_self)]
 
 use crate::ir::core::{Use, UseBox};
-use crate::ir::structs::{BasicBlockRef, FunctionRef};
+use crate::ir::structs::{BasicBlockInner, BasicBlockRef, FunctionRef};
 use crate::ir::{Type, TypeKind, Value, ValueKind, ValueRc};
 use std::fmt;
 
@@ -295,6 +295,28 @@ impl Branch {
   pub fn targets(&self) -> &[BasicBlockRef] {
     &self.targets
   }
+
+  /// Adds the specific basic block to the predecessor lists of all targets.
+  pub(crate) fn add_pred(&self, bb: BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+    for target in &self.targets {
+      if target.ptr_eq(&bb) {
+        bb_inner.add_pred(bb.clone());
+      } else {
+        target.upgrade().unwrap().inner_mut().add_pred(bb.clone());
+      }
+    }
+  }
+
+  /// Removes the specific basic block from the predecessor lists of all targets.
+  pub(crate) fn remove_pred(&self, bb: &BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+    for target in &self.targets {
+      if target.ptr_eq(bb) {
+        bb_inner.remove_pred(bb);
+      } else {
+        target.upgrade().unwrap().inner_mut().remove_pred(bb);
+      }
+    }
+  }
 }
 
 /// Jumping.
@@ -311,6 +333,24 @@ impl Jump {
   /// Gets the target basic block.
   pub fn target(&self) -> &BasicBlockRef {
     &self.target
+  }
+
+  /// Adds the specific basic block to the predecessor list of target.
+  pub(crate) fn add_pred(&self, bb: BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+    if self.target.ptr_eq(&bb) {
+      bb_inner.add_pred(bb);
+    } else {
+      self.target.upgrade().unwrap().inner_mut().add_pred(bb);
+    }
+  }
+
+  /// Removes the specific basic block from the predecessor list of target.
+  pub(crate) fn remove_pred(&self, bb: &BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+    if self.target.ptr_eq(bb) {
+      bb_inner.remove_pred(bb);
+    } else {
+      self.target.upgrade().unwrap().inner_mut().remove_pred(bb);
+    }
   }
 }
 
