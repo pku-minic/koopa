@@ -1,4 +1,5 @@
-use crate::ir::{instructions::*, structs::BasicBlockRef, values::*, Type};
+use crate::ir::structs::{BasicBlockInner, BasicBlockRef};
+use crate::ir::{instructions::*, values::*, Type};
 use crate::utils::NewWithRef;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
 use std::cell::{Cell, Ref, RefCell, RefMut};
@@ -112,6 +113,24 @@ impl Value {
     Uses {
       value: self,
       index: 0,
+    }
+  }
+
+  /// Checks and performs 'add_pred' operation on branches and jumps.
+  pub(crate) fn add_pred(&self, bb: BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+    match &self.kind {
+      ValueKind::Branch(br) => br.add_pred(bb, bb_inner),
+      ValueKind::Jump(jump) => jump.add_pred(bb, bb_inner),
+      _ => (),
+    }
+  }
+
+  /// Checks and performs 'remove_pred' operation on branches and jumps.
+  pub(crate) fn remove_pred(&self, bb: &BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+    match &self.kind {
+      ValueKind::Branch(br) => br.remove_pred(bb, bb_inner),
+      ValueKind::Jump(jump) => jump.remove_pred(bb, bb_inner),
+      _ => (),
     }
   }
 }
