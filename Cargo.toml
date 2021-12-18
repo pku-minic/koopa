@@ -9,6 +9,7 @@ repository = "https://github.com/pku-minic/koopa"
 documentation = "https://docs.rs/koopa"
 license = "GPL-3.0"
 keywords = ["compiler", "ir"]
+exclude = ["/.github", "/examples"]
 
 [features]
 # disables the front-end logger, returns error messages as strings
