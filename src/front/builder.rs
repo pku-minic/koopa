@@ -324,7 +324,12 @@ impl Builder {
           // store the old phi and the new phi
           phis.push((old, new.clone()));
           // replace the phi function in the current basic block
-          info.bb.inner_mut().replace_inst(old, new);
+          assert!(info
+            .bb
+            .inner_mut()
+            .cursor_mut_from_inst(old)
+            .replace_with(new)
+            .is_ok());
         }
       }
     }
