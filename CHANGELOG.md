@@ -11,6 +11,7 @@ All notable changes to the Koopa will be documented in this file.
 * Method `Value::uses` and iterator of `Use`.
 * Method `Type::size`.
 * Method `Generator::new_with_visitor` for visitors that has internal state.
+* `ValueCursorMut` for instruction list in basic blocks.
 
 # Changed
 
