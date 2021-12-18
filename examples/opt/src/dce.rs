@@ -57,18 +57,14 @@ impl DeadCodeElimination {
   fn sweep(&mut self, func: &Function) {
     // iterate through all blocks
     for bb in func.inner().bbs() {
-      let bb_inner = bb.inner();
-      let mut cur = bb_inner.insts().front();
-      let mut insts = Vec::new();
-      while let Some(inst) = cur.clone_pointer() {
-        if !self.liveset.contains(&(inst.as_ref() as *const Value)) {
-          insts.push(inst);
+      let mut bb_inner = bb.inner_mut();
+      let mut cur = bb_inner.front_mut();
+      while let Some(inst) = cur.get() {
+        if !self.liveset.contains(&(inst as *const Value)) {
+          cur.remove();
+        } else {
+          cur.move_next();
         }
-        cur.move_next();
-      }
-      drop(bb_inner);
-      for inst in insts {
-        bb.inner_mut().remove_inst(inst.as_ref());
       }
     }
   }
