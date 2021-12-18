@@ -1,6 +1,7 @@
 use crate::ir::core::ValueAdapter;
 use crate::ir::{Type, TypeKind, Value, ValueKind, ValueRc};
 use crate::utils::NewWithRef;
+use intrusive_collections::linked_list::{Cursor, CursorMut};
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
@@ -232,7 +233,7 @@ impl BasicBlock {
       name,
       inner: RefCell::new(BasicBlockInner {
         bb,
-        preds: Vec::new(),
+        preds: PredList(Vec::new()),
         insts: LinkedList::default(),
       }),
     })
@@ -264,32 +265,19 @@ impl BasicBlock {
 
 pub struct BasicBlockInner {
   bb: BasicBlockRef,
-  preds: Vec<BasicBlockRef>,
+  preds: PredList,
   insts: LinkedList<ValueAdapter>,
 }
 
 impl BasicBlockInner {
   /// Gets the predecessor list.
   pub fn preds(&self) -> &[BasicBlockRef] {
-    &self.preds
+    &self.preds.0
   }
 
-  /// Adds the specific basic block to the predecessor list.
-  pub(crate) fn add_pred(&mut self, bb: BasicBlockRef) {
-    // update predecessor list
-    self.preds.push(bb);
-  }
-
-  /// Removes the specific basic block from the predecessor list.
-  pub(crate) fn remove_pred(&mut self, bb: &BasicBlockRef) {
-    if let Some(i) = self
-      .preds
-      .iter()
-      .enumerate()
-      .find_map(|(i, b)| b.ptr_eq(bb).then(|| i))
-    {
-      self.preds.swap_remove(i);
-    }
+  /// Gets the mutable predecessor list.
+  pub(crate) fn preds_mut(&mut self) -> &mut PredList {
+    &mut self.preds
   }
 
   /// Gets the successors list.
@@ -310,6 +298,47 @@ impl BasicBlockInner {
     &self.insts
   }
 
+  /// Creates a [`ValueCursorMut`] from a instruction (value).
+  ///
+  /// # Panics
+  ///
+  /// Panics when `inst` is not in the current basic block.
+  pub fn cursor_mut_from_inst(&mut self, inst: &Value) -> ValueCursorMut<'_> {
+    assert!(
+      inst
+        .inner()
+        .bb()
+        .as_ref()
+        .map_or(false, |bb| self.bb.ptr_eq(bb)),
+      "`inst` is not in the current basic block"
+    );
+    ValueCursorMut {
+      cursor: unsafe { self.insts.cursor_mut_from_ptr(inst) },
+      bb: self.bb.clone(),
+      preds: &mut self.preds,
+    }
+  }
+
+  /// Returns a [`ValueCursorMut`] pointing to the first instruction of the
+  /// list. If the the list is empty then a null cursor is returned.
+  pub fn front_mut(&mut self) -> ValueCursorMut<'_> {
+    ValueCursorMut {
+      cursor: self.insts.front_mut(),
+      bb: self.bb.clone(),
+      preds: &mut self.preds,
+    }
+  }
+
+  /// Returns a [`ValueCursorMut`] pointing to the last instruction of the
+  /// list. If the the list is empty then a null cursor is returned.
+  pub fn back_mut(&mut self) -> ValueCursorMut<'_> {
+    ValueCursorMut {
+      cursor: self.insts.back_mut(),
+      bb: self.bb.clone(),
+      preds: &mut self.preds,
+    }
+  }
+
   /// Adds the specific instruction to the end of the current basic block.
   ///
   /// # Panics
@@ -317,141 +346,7 @@ impl BasicBlockInner {
   /// Panics when `inst` is not an instruction, or the instruction
   /// is already in another basic block.
   pub fn add_inst(&mut self, inst: ValueRc) {
-    assert!(inst.is_inst(), "`inst` is not an instruction");
-    let mut inst_inner = inst.inner_mut();
-    assert!(
-      inst_inner.bb().is_none(),
-      "instruction is already in another basic block"
-    );
-    inst_inner.set_bb(Some(self.bb.clone()));
-    inst.add_pred(self.bb.clone(), self);
-    drop(inst_inner);
-    self.insts.push_back(inst);
-  }
-
-  /// Removes the specific instruction from the current basic block.
-  ///
-  /// # Panics
-  ///
-  /// Panics when the instruction is not in the current basic block.
-  pub fn remove_inst(&mut self, inst: &Value) {
-    let mut inst_inner = inst.inner_mut();
-    assert!(
-      inst_inner
-        .bb()
-        .as_ref()
-        .map_or(false, |bb| self.bb.ptr_eq(bb)),
-      "instruction is not in the current basic block"
-    );
-    // break circular references if the instruction is a phi function
-    if matches!(inst.kind(), ValueKind::Phi(_)) {
-      inst_inner.replace_all_uses_with(None);
-    }
-    // remove from the current basic block
-    inst_inner.set_bb(None);
-    inst.remove_pred(&self.bb.clone(), self);
-    unsafe {
-      self.insts.cursor_mut_from_ptr(inst).remove();
-    }
-  }
-
-  /// Replaces the specific instruction with a new instruction.
-  ///
-  /// # Panics
-  ///
-  /// Panics when the instruction is not in the current basic block, or the new
-  /// value is not an instruction, or the new value is in another basic block.
-  pub fn replace_inst(&mut self, inst: &Value, new: ValueRc) {
-    // update `inst`
-    let mut inst_inner = inst.inner_mut();
-    assert!(
-      inst_inner
-        .bb()
-        .as_ref()
-        .map_or(false, |bb| self.bb.ptr_eq(bb)),
-      "`inst` is not in the current basic block"
-    );
-    inst_inner.set_bb(None);
-    inst.remove_pred(&self.bb.clone(), self);
-    // update `new`
-    let mut new_inner = new.inner_mut();
-    assert!(new.is_inst(), "`new` is not an instruction");
-    assert!(
-      new_inner.bb().is_none(),
-      "`new` is already in another basic block"
-    );
-    new_inner.set_bb(Some(self.bb.clone()));
-    new.add_pred(self.bb.clone(), self);
-    drop(new_inner);
-    // update instruction list
-    unsafe {
-      let result = self.insts.cursor_mut_from_ptr(inst).replace_with(new);
-      assert!(result.is_ok());
-    }
-  }
-
-  /// Inserts a new instruction before the specific instruction.
-  ///
-  /// # Panics
-  ///
-  /// Panics when the instruction is not in the current basic block, or the new
-  /// value is not an instruction, or the new value is in another basic block.
-  pub fn insert_before(&mut self, inst: &Value, new: ValueRc) {
-    // check `inst`
-    assert!(
-      inst
-        .inner()
-        .bb()
-        .as_ref()
-        .map_or(false, |bb| self.bb.ptr_eq(bb)),
-      "`inst` is not in the current basic block"
-    );
-    // update `new`
-    let mut new_inner = new.inner_mut();
-    assert!(new.is_inst(), "`new` is not an instruction");
-    assert!(
-      new_inner.bb().is_none(),
-      "`new` is already in another basic block"
-    );
-    new_inner.set_bb(Some(self.bb.clone()));
-    new.add_pred(self.bb.clone(), self);
-    drop(new_inner);
-    // update instruction list
-    unsafe {
-      self.insts.cursor_mut_from_ptr(inst).insert_before(new);
-    }
-  }
-
-  /// Inserts a new instruction after the specific instruction.
-  ///
-  /// # Panics
-  ///
-  /// Panics when the instruction is not in the current basic block, or the new
-  /// value is not an instruction, or the new value is in another basic block.
-  pub fn insert_after(&mut self, inst: &Value, new: ValueRc) {
-    // check `inst`
-    assert!(
-      inst
-        .inner()
-        .bb()
-        .as_ref()
-        .map_or(false, |bb| self.bb.ptr_eq(bb)),
-      "`inst` is not in the current basic block"
-    );
-    // update `new`
-    let mut new_inner = new.inner_mut();
-    assert!(new.is_inst(), "`new` is not an instruction");
-    assert!(
-      new_inner.bb().is_none(),
-      "`new` is already in another basic block"
-    );
-    new_inner.set_bb(Some(self.bb.clone()));
-    new.add_pred(self.bb.clone(), self);
-    drop(new_inner);
-    // update instruction list
-    unsafe {
-      self.insts.cursor_mut_from_ptr(inst).insert_after(new);
-    }
+    self.back_mut().insert_after(inst);
   }
 }
 
@@ -463,5 +358,156 @@ impl Drop for BasicBlockInner {
         inst.inner_mut().replace_all_uses_with(None);
       }
     }
+  }
+}
+
+/// Predecessor list.
+pub(crate) struct PredList(Vec<BasicBlockRef>);
+
+impl PredList {
+  /// Adds the specific basic block to the predecessor list.
+  pub(crate) fn add_pred(&mut self, bb: BasicBlockRef) {
+    // update predecessor list
+    self.0.push(bb);
+  }
+
+  /// Removes the specific basic block from the predecessor list.
+  pub(crate) fn remove_pred(&mut self, bb: &BasicBlockRef) {
+    if let Some(i) = self.0.iter().position(|b| b.ptr_eq(bb)) {
+      self.0.swap_remove(i);
+    }
+  }
+}
+
+/// Mutable cursor of an instruction (value) list.
+pub struct ValueCursorMut<'a> {
+  cursor: CursorMut<'a, ValueAdapter>,
+  bb: BasicBlockRef,
+  preds: &'a mut PredList,
+}
+
+macro_rules! impl_methods {
+  () => {};
+  (pub fn $name:ident($($t:tt)*) $(-> $ret:ty)?; $($rest:tt)*) => {
+    impl_methods! { @impl pub fn $name($($t)*) $(-> $ret)?; }
+    impl_methods! { $($rest)* }
+  };
+  (@impl pub fn $name:ident(&self $(,$arg:ident: $ty:ty)*) $(-> $ret:ty)?;) => {
+    #[doc = concat!(
+      "See [`intrusive_collections::linked_list::CursorMut::", stringify!($name), "`]."
+    )]
+    #[inline(always)]
+    pub fn $name(&self $(,$arg: $ty)*) $(-> $ret)? {
+      self.cursor.$name($($arg,)*)
+    }
+  };
+  (@impl pub fn $name:ident(&mut self $(,$arg:ident: $ty:ty)*) $(-> $ret:ty)?;) => {
+    #[doc = concat!(
+      "See [`intrusive_collections::linked_list::CursorMut::", stringify!($name), "`]."
+    )]
+    #[inline(always)]
+    pub fn $name(&mut self $(,$arg: $ty)*) $(-> $ret)? {
+      self.cursor.$name($($arg,)*)
+    }
+  };
+}
+
+impl<'a> ValueCursorMut<'a> {
+  impl_methods! {
+    pub fn is_null(&self) -> bool;
+    pub fn get(&self) -> Option<&Value>;
+    pub fn as_cursor(&self) -> Cursor<'_, ValueAdapter>;
+    pub fn move_next(&mut self);
+    pub fn move_prev(&mut self);
+    pub fn peek_next(&self) -> Cursor<'_, ValueAdapter>;
+    pub fn peek_prev(&self) -> Cursor<'_, ValueAdapter>;
+  }
+
+  /// Removes the current instruction from the instruction list.
+  ///
+  /// The removed [`ValueRc`] is returned, and the cursor is moved to point to
+  /// the next instruction.
+  ///
+  /// If the cursor is currently pointing to the null object, no instruction
+  /// is removed and [`None`] is returned.
+  pub fn remove(&mut self) -> Option<ValueRc> {
+    self.cursor.remove().map(|inst| {
+      let mut inst_inner = inst.inner_mut();
+      // break circular references if the instruction is a phi function
+      if matches!(inst.kind(), ValueKind::Phi(_)) {
+        inst_inner.replace_all_uses_with(None);
+      }
+      // remove from the current basic block
+      inst_inner.set_bb(None);
+      inst.remove_pred(&self.bb, self.preds);
+      drop(inst_inner);
+      inst
+    })
+  }
+
+  /// Removes the current instruction from the instruction list and inserts
+  /// another instruction in its place.
+  ///
+  /// The removed [`ValueRc`] is returned, and the cursor is modified to point
+  /// to the newly added instruction.
+  ///
+  /// If the cursor is currently pointing to the null object, an error is
+  /// returned containing the given `inst` parameter.
+  ///
+  /// # Panics
+  ///
+  /// Panics if `inst` is not an instruction, or it's already linked to a
+  /// different instruction list.
+  pub fn replace_with(&mut self, inst: ValueRc) -> Result<ValueRc, ValueRc> {
+    assert!(inst.is_inst(), "`inst` is not an instruction");
+    self.cursor.replace_with(inst.clone()).map(|old| {
+      // update `old`
+      let mut old_inner = old.inner_mut();
+      old_inner.set_bb(None);
+      old.remove_pred(&self.bb, self.preds);
+      drop(old_inner);
+      // update `inst`
+      let mut inst_inner = inst.inner_mut();
+      inst_inner.set_bb(Some(self.bb.clone()));
+      inst.add_pred(self.bb.clone(), self.preds);
+      old
+    })
+  }
+
+  /// Inserts a new instruction into the instruction list after the current
+  /// one.
+  ///
+  /// If the cursor is pointing at the null object, the new instruction is
+  /// inserted at the front of the instruction list.
+  ///
+  /// # Panics
+  ///
+  /// Panics if `inst` is not an instruction, or it's already linked to a
+  /// different instruction list.
+  pub fn insert_after(&mut self, inst: ValueRc) {
+    self.insert_update_inst(&inst);
+    self.cursor.insert_after(inst);
+  }
+
+  /// Inserts a new instruction into the instruction list before the current
+  /// one.
+  ///
+  /// If the cursor is pointing at the null object, the new instruction is
+  /// inserted at the end of the instruction list.
+  ///
+  /// # Panics
+  ///
+  /// Panics if `inst` is not an instruction, or it's already linked to a
+  /// different instruction list.
+  pub fn insert_before(&mut self, inst: ValueRc) {
+    self.insert_update_inst(&inst);
+    self.cursor.insert_before(inst);
+  }
+
+  /// Checks and updates the specific instruction before insertion.
+  fn insert_update_inst(&mut self, inst: &Value) {
+    assert!(inst.is_inst(), "`inst` is not an instruction");
+    inst.inner_mut().set_bb(Some(self.bb.clone()));
+    inst.add_pred(self.bb.clone(), self.preds);
   }
 }
