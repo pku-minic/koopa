@@ -1,4 +1,4 @@
-use crate::ir::structs::{BasicBlockInner, BasicBlockRef};
+use crate::ir::structs::{BasicBlockRef, PredList};
 use crate::ir::{instructions::*, values::*, Type};
 use crate::utils::NewWithRef;
 use intrusive_collections::{intrusive_adapter, LinkedList, LinkedListLink, UnsafeRef};
@@ -117,19 +117,19 @@ impl Value {
   }
 
   /// Checks and performs 'add_pred' operation on branches and jumps.
-  pub(crate) fn add_pred(&self, bb: BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+  pub(crate) fn add_pred(&self, bb: BasicBlockRef, preds: &mut PredList) {
     match &self.kind {
-      ValueKind::Branch(br) => br.add_pred(bb, bb_inner),
-      ValueKind::Jump(jump) => jump.add_pred(bb, bb_inner),
+      ValueKind::Branch(br) => br.add_pred(bb, preds),
+      ValueKind::Jump(jump) => jump.add_pred(bb, preds),
       _ => (),
     }
   }
 
   /// Checks and performs 'remove_pred' operation on branches and jumps.
-  pub(crate) fn remove_pred(&self, bb: &BasicBlockRef, bb_inner: &mut BasicBlockInner) {
+  pub(crate) fn remove_pred(&self, bb: &BasicBlockRef, preds: &mut PredList) {
     match &self.kind {
-      ValueKind::Branch(br) => br.remove_pred(bb, bb_inner),
-      ValueKind::Jump(jump) => jump.remove_pred(bb, bb_inner),
+      ValueKind::Branch(br) => br.remove_pred(bb, preds),
+      ValueKind::Jump(jump) => jump.remove_pred(bb, preds),
       _ => (),
     }
   }
