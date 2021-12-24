@@ -52,7 +52,5 @@ fn try_main() -> Result<(), Error> {
   passman.run_passes(&mut program);
   // dump the output
   let mut generator = KoopaGenerator::from_path(output).map_err(Error::InvalidFile)?;
-  generator
-    .generate_on(&program)
-    .map_err(Error::Io)
+  generator.generate_on(&program).map_err(Error::Io)
 }
