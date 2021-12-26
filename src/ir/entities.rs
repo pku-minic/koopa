@@ -4,7 +4,7 @@ use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
 use crate::ir::types::{Type, TypeKind};
 use crate::ir::values;
 use std::cell::{Ref, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
 /// A Koopa IR program.
@@ -186,7 +186,7 @@ pub struct BasicBlockData {
   ty: Type,
   name: Option<String>,
   params: Vec<Value>,
-  pub(crate) used_by: Vec<Value>,
+  pub(crate) used_by: HashSet<Value>,
 }
 
 impl BasicBlockData {
@@ -205,7 +205,7 @@ impl BasicBlockData {
       ty: Type::get_basic_block(Vec::new()),
       name,
       params: Vec::new(),
-      used_by: Vec::new(),
+      used_by: HashSet::new(),
     }
   }
 
@@ -223,7 +223,7 @@ impl BasicBlockData {
       ty,
       name,
       params,
-      used_by: Vec::new(),
+      used_by: HashSet::new(),
     }
   }
 
@@ -244,7 +244,7 @@ impl BasicBlockData {
 
   /// Returns a reference to the values that the current basic block
   /// is used by.
-  pub fn used_by(&self) -> &[Value] {
+  pub fn used_by(&self) -> &HashSet<Value> {
     &self.used_by
   }
 }
@@ -256,7 +256,7 @@ impl Default for BasicBlockData {
       ty: Type::get_basic_block(Vec::default()),
       name: None,
       params: Vec::default(),
-      used_by: Vec::default(),
+      used_by: HashSet::default(),
     }
   }
 }
@@ -276,7 +276,7 @@ pub struct ValueData {
   ty: Type,
   name: Option<String>,
   kind: ValueKind,
-  pub(crate) used_by: Vec<Value>,
+  pub(crate) used_by: HashSet<Value>,
 }
 
 impl ValueData {
@@ -286,7 +286,7 @@ impl ValueData {
       ty,
       name: None,
       kind,
-      used_by: Vec::new(),
+      used_by: HashSet::new(),
     }
   }
 
@@ -311,12 +311,23 @@ impl ValueData {
   }
 
   /// Returns a reference to the values that the current value is used by.
-  pub fn used_by(&self) -> &[Value] {
+  pub fn used_by(&self) -> &HashSet<Value> {
     &self.used_by
   }
 }
 
+impl PartialEq<ValueData> for ValueData {
+  /// Tests if `self` equals to `other`, they are equal if the type and the
+  /// kind are equal.
+  fn eq(&self, other: &ValueData) -> bool {
+    self.ty == other.ty && self.kind == other.kind
+  }
+}
+
+impl Eq for ValueData {}
+
 /// Kind of Koopa IR value.
+#[derive(PartialEq, Eq)]
 pub enum ValueKind {
   Integer(values::Integer),
   ZeroInit(values::ZeroInit),
