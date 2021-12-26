@@ -27,7 +27,6 @@ macro_rules! data_mut {
   };
 }
 
-// TODO: handle value uses blocks
 impl DataFlowGraph {
   /// Creates a new data flow graph.
   pub(crate) fn new() -> Self {
