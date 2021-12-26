@@ -1,6 +1,7 @@
 use crate::ir::idman::{next_bb_id, next_func_id, next_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
 use crate::ir::types::{Type, TypeKind};
+use crate::ir::values;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
@@ -157,7 +158,7 @@ impl BasicBlockData {
   pub fn with_params(name: Option<String>, params: Vec<Value>, ty: Type) -> Self {
     assert!(
       matches!(ty.kind(), TypeKind::BasicBlock(p) if p.len() == params.len()),
-      "invalid basic block type"
+      "`ty` is not a valid basic block type"
     );
     Self {
       ty,
@@ -258,5 +259,21 @@ impl ValueData {
 
 /// Kind of Koopa IR value.
 pub enum ValueKind {
-  //
+  Integer(values::Integer),
+  ZeroInit(values::ZeroInit),
+  Undef(values::Undef),
+  Aggregate(values::Aggregate),
+  FuncArgRef(values::FuncArgRef),
+  BlockArgRef(values::BlockArgRef),
+  Alloc(values::Alloc),
+  GlobalAlloc(values::GlobalAlloc),
+  Load(values::Load),
+  Store(values::Store),
+  GetPtr(values::GetPtr),
+  GetElemPtr(values::GetElemPtr),
+  Binary(values::Binary),
+  Branch(values::Branch),
+  Jump(values::Jump),
+  Call(values::Call),
+  Return(values::Return),
 }
