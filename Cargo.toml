@@ -17,5 +17,6 @@ no-front-logger = []
 
 [dependencies]
 intrusive-collections = "0.9"
+key-node-list = "0.0.2"
 phf = { version = "0.9", features = ["macros"] }
 colored = "2"
