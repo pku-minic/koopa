@@ -350,8 +350,16 @@ pub enum ValueKind {
 
 impl ValueKind {
   /// Returns an iterator of all values that used by the `ValueKind`.
-  pub fn uses(&self) -> Uses {
-    Uses {
+  pub fn value_uses(&self) -> ValueUses {
+    ValueUses {
+      kind: self,
+      index: 0,
+    }
+  }
+
+  /// Returns an iterator of all basic blocks that used by the `ValueKind`.
+  pub fn bb_uses(&self) -> BasicBlockUses {
+    BasicBlockUses {
       kind: self,
       index: 0,
     }
@@ -359,12 +367,12 @@ impl ValueKind {
 }
 
 /// An iterator over all values that used by a [`ValueKind`].
-pub struct Uses<'a> {
+pub struct ValueUses<'a> {
   kind: &'a ValueKind,
   index: usize,
 }
 
-impl<'a> Iterator for Uses<'a> {
+impl<'a> Iterator for ValueUses<'a> {
   type Item = Value;
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -418,6 +426,33 @@ impl<'a> Iterator for Uses<'a> {
       ValueKind::Call(v) => vec_use!(v.args()),
       ValueKind::Return(v) => match cur {
         0 => v.value(),
+        _ => None,
+      },
+      _ => None,
+    }
+  }
+}
+
+/// An iterator over all basic blocks that used by a [`ValueKind`].
+pub struct BasicBlockUses<'a> {
+  kind: &'a ValueKind,
+  index: usize,
+}
+
+impl<'a> Iterator for BasicBlockUses<'a> {
+  type Item = BasicBlock;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    let cur = self.index;
+    self.index += 1;
+    match self.kind {
+      ValueKind::Branch(br) => match cur {
+        0 => Some(br.true_bb()),
+        1 => Some(br.false_bb()),
+        _ => None,
+      },
+      ValueKind::Jump(jump) => match cur {
+        0 => Some(jump.target()),
         _ => None,
       },
       _ => None,
