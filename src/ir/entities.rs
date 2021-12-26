@@ -31,7 +31,7 @@ impl Program {
   /// Removes the specific global value by its handle.
   ///
   /// Returns the value data if the value was previously in the program.
-  pub fn remove_value(&mut self, value: &Value) -> Option<ValueData> {
+  pub fn remove_value(&mut self, value: Value) -> Option<ValueData> {
     todo!()
   }
 
@@ -51,8 +51,8 @@ impl Program {
   /// Removes the specific function by its handle.
   ///
   /// Returns the function data if the function was previously in the program.
-  pub fn remove_func(&mut self, func: &Function) -> Option<FunctionData> {
-    self.funcs.remove(func)
+  pub fn remove_func(&mut self, func: Function) -> Option<FunctionData> {
+    self.funcs.remove(&func)
   }
 
   /// Returns a reference to the function map.
@@ -148,12 +148,12 @@ impl FunctionData {
   }
 
   /// Returns a reference to the function's name.
-  pub fn name(&self) -> &String {
+  pub fn name(&self) -> &str {
     &self.name
   }
 
   /// Returns a reference to the function parameters.
-  pub fn params(&self) -> &Vec<Value> {
+  pub fn params(&self) -> &[Value] {
     &self.params
   }
 
@@ -238,13 +238,13 @@ impl BasicBlockData {
   }
 
   /// Returns a reference to the basic block parameters.
-  pub fn params(&self) -> &Vec<Value> {
+  pub fn params(&self) -> &[Value] {
     &self.params
   }
 
   /// Returns a reference to the values that the current basic block
   /// is used by.
-  pub fn used_by(&self) -> &Vec<Value> {
+  pub fn used_by(&self) -> &[Value] {
     &self.used_by
   }
 }
@@ -311,7 +311,7 @@ impl ValueData {
   }
 
   /// Returns a reference to the values that the current value is used by.
-  pub fn used_by(&self) -> &Vec<Value> {
+  pub fn used_by(&self) -> &[Value] {
     &self.used_by
   }
 }
@@ -406,7 +406,7 @@ impl<'a> Iterator for Uses<'a> {
       ValueKind::Jump(v) => vec_use!(v.args()),
       ValueKind::Call(v) => vec_use!(v.args()),
       ValueKind::Return(v) => match cur {
-        0 => *v.value(),
+        0 => v.value(),
         _ => None,
       },
       _ => None,
