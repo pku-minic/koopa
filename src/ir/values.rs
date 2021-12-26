@@ -71,7 +71,7 @@ impl Aggregate {
   }
 
   /// Returns a reference to the aggregate elements.
-  pub fn elems(&self) -> &Vec<Value> {
+  pub fn elems(&self) -> &[Value] {
     &self.elems
   }
 }
@@ -155,8 +155,8 @@ impl GlobalAlloc {
   }
 
   /// Returns a reference to the initializer.
-  pub fn init(&self) -> &Value {
-    &self.init
+  pub fn init(&self) -> Value {
+    self.init
   }
 }
 
@@ -177,8 +177,8 @@ impl Load {
   }
 
   /// Returns a reference to the source memory location.
-  pub fn src(&self) -> &Value {
-    &self.src
+  pub fn src(&self) -> Value {
+    self.src
   }
 }
 
@@ -195,13 +195,13 @@ impl Store {
   }
 
   /// Returns a reference to the value of the memory store.
-  pub fn value(&self) -> &Value {
-    &self.value
+  pub fn value(&self) -> Value {
+    self.value
   }
 
   /// Returns a reference to the destination of the memory store.
-  pub fn dest(&self) -> &Value {
-    &self.dest
+  pub fn dest(&self) -> Value {
+    self.dest
   }
 }
 
@@ -226,13 +226,13 @@ impl GetPtr {
   }
 
   /// Returns a reference to the source memory location.
-  pub fn src(&self) -> &Value {
-    &self.src
+  pub fn src(&self) -> Value {
+    self.src
   }
 
   /// Returns a reference to the index of pointer calculation.
-  pub fn index(&self) -> &Value {
-    &self.index
+  pub fn index(&self) -> Value {
+    self.index
   }
 }
 
@@ -258,13 +258,13 @@ impl GetElemPtr {
   }
 
   /// Returns a reference to the source memory location.
-  pub fn src(&self) -> &Value {
-    &self.src
+  pub fn src(&self) -> Value {
+    self.src
   }
 
   /// Returns a reference to the index of element pointer calculation.
-  pub fn index(&self) -> &Value {
-    &self.index
+  pub fn index(&self) -> Value {
+    self.index
   }
 }
 
@@ -284,18 +284,18 @@ impl Binary {
   }
 
   /// Returns a reference to the binary operator.
-  pub fn op(&self) -> &BinaryOp {
-    &self.op
+  pub fn op(&self) -> BinaryOp {
+    self.op
   }
 
   /// Returns a reference to the left-hand side use.
-  pub fn lhs(&self) -> &Value {
-    &self.lhs
+  pub fn lhs(&self) -> Value {
+    self.lhs
   }
 
   /// Returns a reference to the right-hand side use.
-  pub fn rhs(&self) -> &Value {
-    &self.rhs
+  pub fn rhs(&self) -> Value {
+    self.rhs
   }
 }
 
@@ -383,29 +383,29 @@ impl Branch {
   }
 
   /// Returns a reference to the branch condition.
-  pub fn cond(&self) -> &Value {
-    &self.cond
+  pub fn cond(&self) -> Value {
+    self.cond
   }
 
   /// Returns a reference to the true target basic block.
-  pub fn true_bb(&self) -> &BasicBlock {
-    &self.true_bb
+  pub fn true_bb(&self) -> BasicBlock {
+    self.true_bb
   }
 
   /// Returns a reference to the false target basic block.
-  pub fn false_bb(&self) -> &BasicBlock {
-    &self.false_bb
+  pub fn false_bb(&self) -> BasicBlock {
+    self.false_bb
   }
 
   /// Returns a reference to the arguments passed to
   /// the true target basic block.
-  pub fn true_args(&self) -> &Vec<Value> {
+  pub fn true_args(&self) -> &[Value] {
     &self.true_args
   }
 
   /// Returns a reference to the arguments passed to
   /// the false target basic block.
-  pub fn false_args(&self) -> &Vec<Value> {
+  pub fn false_args(&self) -> &[Value] {
     &self.false_args
   }
 }
@@ -434,12 +434,12 @@ impl Jump {
   }
 
   /// Returns a reference to the target basic block.
-  pub fn target(&self) -> &BasicBlock {
-    &self.target
+  pub fn target(&self) -> BasicBlock {
+    self.target
   }
 
   /// Returns a reference to the arguments passed to the target basic block.
-  pub fn args(&self) -> &Vec<Value> {
+  pub fn args(&self) -> &[Value] {
     &self.args
   }
 }
@@ -457,12 +457,12 @@ impl Call {
   }
 
   /// Returns a reference to the callee.
-  pub fn callee(&self) -> &Function {
-    &self.callee
+  pub fn callee(&self) -> Function {
+    self.callee
   }
 
   /// Returns a reference to the argument list.
-  pub fn args(&self) -> &Vec<Value> {
+  pub fn args(&self) -> &[Value] {
     &self.args
   }
 }
@@ -479,7 +479,7 @@ impl Return {
   }
 
   /// Returns a reference to the return value.
-  pub fn value(&self) -> &Option<Value> {
-    &self.value
+  pub fn value(&self) -> Option<Value> {
+    self.value
   }
 }
