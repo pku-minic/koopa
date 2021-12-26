@@ -1,3 +1,4 @@
+use crate::ir::dfg::DataFlowGraph;
 use crate::ir::idman::{next_bb_id, next_func_id, next_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
 use crate::ir::types::{Type, TypeKind};
@@ -40,8 +41,9 @@ impl Program {
   }
 
   /// Creates a new function in the current program.
-  pub fn new_func(&mut self, data: FunctionData) -> Function {
+  pub fn new_func(&mut self, mut data: FunctionData) -> Function {
     let func = Function(next_func_id());
+    data.dfg.globals = Rc::downgrade(&self.values);
     self.funcs.insert(func, data);
     func
   }
@@ -66,12 +68,12 @@ impl Program {
 
 /// Weak pointer for the `RefCell` of global value map.
 ///
-/// For `DataFlowGraph`s in function.
+/// For [`DataFlowGraph`]s in function.
 pub(crate) type GlobalValueMapCell = Weak<RefCell<HashMap<Value, ValueData>>>;
 
 /// A handle of Koopa IR function.
 ///
-/// You can fetch `FunctionData` from `Program` by using this handle.
+/// You can fetch `FunctionData` from [`Program`] by using this handle.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Function(FunctionId);
 
@@ -82,24 +84,62 @@ pub struct FunctionData {
   ty: Type,
   name: String,
   params: Vec<Value>,
-  // TODO: dfg and layout
+  dfg: DataFlowGraph,
+  // TODO: layout
 }
 
 impl FunctionData {
   /// Creates a new function definition.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name not starts with `%` or `@`, or the given
+  /// type is not a valid function type.
   pub fn new(name: String, params: Vec<Value>, ty: Type) -> Self {
-    // TODO: assertions
-    Self { ty, name, params }
+    Self::check_sanity(&name, &ty);
+    Self {
+      ty,
+      name,
+      params,
+      dfg: DataFlowGraph::new(),
+    }
   }
 
   /// Creates a new function declaration.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name not starts with `%` or `@`, or the given
+  /// type is not a valid function type.
   pub fn new_decl(name: String, ty: Type) -> Self {
-    // TODO: assertions
+    Self::check_sanity(&name, &ty);
     Self {
       ty,
       name,
       params: Vec::new(),
+      dfg: DataFlowGraph::new(),
     }
+  }
+
+  /// Checks if the given name and type is valid.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name and type is invalid.
+  fn check_sanity(name: &str, ty: &Type) {
+    assert!(
+      name.len() > 1 && (name.starts_with('%') || name.starts_with('@')),
+      "invalid function name"
+    );
+    match ty.kind() {
+      TypeKind::Function(params, _) => {
+        assert!(
+          params.iter().all(|p| !p.is_unit()),
+          "parameter type must not be `unit`!"
+        )
+      }
+      _ => panic!("expected a function type!"),
+    };
   }
 
   /// Returns a reference to the function's type.
@@ -116,21 +156,31 @@ impl FunctionData {
   pub fn params(&self) -> &Vec<Value> {
     &self.params
   }
+
+  /// Returns a reference to the data flow graph.
+  pub fn dfg(&self) -> &DataFlowGraph {
+    &self.dfg
+  }
+
+  /// Returns a mutable reference to the data flow graph.
+  pub fn dfg_mut(&mut self) -> &mut DataFlowGraph {
+    &mut self.dfg
+  }
 }
 
 /// A handle of Koopa IR basic block.
 ///
-/// You can fetch `BasicBlockData` from `DataFlowGraph` in `FunctionData`
+/// You can fetch `BasicBlockData` from [`DataFlowGraph`] in [`FunctionData`]
 /// by using this handle.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BasicBlock(BasicBlockId);
+pub struct BasicBlock(pub(crate) BasicBlockId);
 
 /// Data of Koopa IR basic block.
 ///
 /// `BasicBlockData` only holds parameters about this basic block, and
 /// which values (branch/jump instructions) the current basic block is
 /// used by. Other information, such as the data and order of instructions
-/// in this basic block, can be found in `FunctionData` (in the data flow
+/// in this basic block, can be found in [`FunctionData`] (in the data flow
 /// graph or the layout).
 pub struct BasicBlockData {
   ty: Type,
@@ -141,7 +191,16 @@ pub struct BasicBlockData {
 
 impl BasicBlockData {
   /// Creates a new `BasicBlockData` with the given name.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name (if exists) not starts with `%` or `@`.
   pub fn new(name: Option<String>) -> Self {
+    assert!(
+      name.as_ref().map_or(true, |n| n.len() > 1
+        && (n.starts_with('%') || n.starts_with('@'))),
+      "invalid basic block name"
+    );
     Self {
       ty: Type::get_basic_block(Vec::new()),
       name,
@@ -204,10 +263,10 @@ impl Default for BasicBlockData {
 
 /// A handle of Koopa IR value.
 ///
-/// You can fetch `ValueData` from `DataFlowGraph` in `FunctionData`
+/// You can fetch `ValueData` from [`DataFlowGraph`] in [`FunctionData`]
 /// by using this handle.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Value(ValueId);
+pub struct Value(pub(crate) ValueId);
 
 /// Data of Koopa IR value.
 ///
@@ -276,4 +335,81 @@ pub enum ValueKind {
   Jump(values::Jump),
   Call(values::Call),
   Return(values::Return),
+}
+
+impl ValueKind {
+  /// Returns an iterator of all values that used by the `ValueKind`.
+  pub fn uses(&self) -> Uses {
+    Uses {
+      kind: self,
+      index: 0,
+    }
+  }
+}
+
+/// An iterator over all values that used by a [`ValueKind`].
+pub struct Uses<'a> {
+  kind: &'a ValueKind,
+  index: usize,
+}
+
+impl<'a> Iterator for Uses<'a> {
+  type Item = Value;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    let cur = self.index;
+    self.index += 1;
+    macro_rules! vec_use {
+      ($vec:expr) => {
+        if cur < $vec.len() {
+          Some($vec[cur])
+        } else {
+          None
+        }
+      };
+    }
+    macro_rules! field_use {
+      ($($field:expr),+) => {
+        field_use!(@expand 0 $(,$field)+)
+      };
+      (@expand $index:expr) => {
+        None
+      };
+      (@expand $index:expr, $head:expr $(,$tail:expr)*) => {
+        if cur == $index {
+          Some($head)
+        } else {
+          field_use!(@expand $index + 1 $(,$tail)*)
+        }
+      };
+    }
+    match self.kind {
+      ValueKind::Aggregate(v) => vec_use!(v.elems()),
+      ValueKind::GlobalAlloc(v) => field_use!(v.init()),
+      ValueKind::Load(v) => field_use!(v.src()),
+      ValueKind::Store(v) => field_use!(v.value(), v.dest()),
+      ValueKind::GetPtr(v) => field_use!(v.src(), v.index()),
+      ValueKind::GetElemPtr(v) => field_use!(v.src(), v.index()),
+      ValueKind::Binary(v) => field_use!(v.lhs(), v.rhs()),
+      ValueKind::Branch(v) => {
+        let tlen = v.true_args().len();
+        if cur == 0 {
+          Some(v.cond())
+        } else if cur >= 1 && cur <= tlen {
+          Some(v.true_args()[cur - 1])
+        } else if cur > tlen && cur <= tlen + v.false_args().len() {
+          Some(v.false_args()[cur - tlen - 1])
+        } else {
+          None
+        }
+      }
+      ValueKind::Jump(v) => vec_use!(v.args()),
+      ValueKind::Call(v) => vec_use!(v.args()),
+      ValueKind::Return(v) => match cur {
+        0 => *v.value(),
+        _ => None,
+      },
+      _ => None,
+    }
+  }
 }
