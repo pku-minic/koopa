@@ -3,6 +3,7 @@ use crate::ir::types::{Type, TypeKind};
 use std::fmt;
 
 /// Integer constant.
+#[derive(PartialEq, Eq)]
 pub struct Integer {
   value: i32,
 }
@@ -22,6 +23,7 @@ impl Integer {
 }
 
 /// Zero initializer.
+#[derive(PartialEq, Eq)]
 pub struct ZeroInit;
 
 impl ZeroInit {
@@ -37,6 +39,7 @@ impl ZeroInit {
 }
 
 /// Undefined value.
+#[derive(PartialEq, Eq)]
 pub struct Undef;
 
 impl Undef {
@@ -52,6 +55,7 @@ impl Undef {
 }
 
 /// Aggregate constant.
+#[derive(PartialEq, Eq)]
 pub struct Aggregate {
   elems: Vec<Value>,
 }
@@ -77,6 +81,7 @@ impl Aggregate {
 }
 
 /// Function argument reference.
+#[derive(PartialEq, Eq)]
 pub struct FuncArgRef {
   index: usize,
 }
@@ -99,6 +104,7 @@ impl FuncArgRef {
 }
 
 /// Basic block argument reference.
+#[derive(PartialEq, Eq)]
 pub struct BlockArgRef {
   index: usize,
 }
@@ -121,6 +127,7 @@ impl BlockArgRef {
 }
 
 /// Local memory allocation.
+#[derive(PartialEq, Eq)]
 pub struct Alloc;
 
 impl Alloc {
@@ -136,6 +143,7 @@ impl Alloc {
 }
 
 /// Global memory allocation.
+#[derive(PartialEq, Eq)]
 pub struct GlobalAlloc {
   init: Value,
 }
@@ -161,6 +169,7 @@ impl GlobalAlloc {
 }
 
 /// Memory load.
+#[derive(PartialEq, Eq)]
 pub struct Load {
   src: Value,
 }
@@ -183,6 +192,7 @@ impl Load {
 }
 
 /// Memory store.
+#[derive(PartialEq, Eq)]
 pub struct Store {
   value: Value,
   dest: Value,
@@ -206,6 +216,7 @@ impl Store {
 }
 
 /// Pointer calculation.
+#[derive(PartialEq, Eq)]
 pub struct GetPtr {
   src: Value,
   index: Value,
@@ -237,6 +248,7 @@ impl GetPtr {
 }
 
 /// Element pointer calculation.
+#[derive(PartialEq, Eq)]
 pub struct GetElemPtr {
   src: Value,
   index: Value,
@@ -269,6 +281,7 @@ impl GetElemPtr {
 }
 
 /// Binary operation.
+#[derive(PartialEq, Eq)]
 pub struct Binary {
   op: BinaryOp,
   lhs: Value,
@@ -338,6 +351,7 @@ impl fmt::Display for BinaryOp {
 }
 
 /// Conditional branch.
+#[derive(PartialEq, Eq)]
 pub struct Branch {
   cond: Value,
   true_bb: BasicBlock,
@@ -411,6 +425,7 @@ impl Branch {
 }
 
 /// Unconditional jump.
+#[derive(PartialEq, Eq)]
 pub struct Jump {
   target: BasicBlock,
   args: Vec<Value>,
@@ -445,6 +460,7 @@ impl Jump {
 }
 
 /// Function call.
+#[derive(PartialEq, Eq)]
 pub struct Call {
   callee: Function,
   args: Vec<Value>,
@@ -468,6 +484,7 @@ impl Call {
 }
 
 /// Function return.
+#[derive(PartialEq, Eq)]
 pub struct Return {
   value: Option<Value>,
 }
