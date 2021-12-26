@@ -1,7 +1,7 @@
 use crate::ir::idman::{next_bb_id, next_func_id, next_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
-use crate::ir::types::Type;
-use std::cell::RefCell;
+use crate::ir::types::{Type, TypeKind};
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
@@ -19,6 +19,48 @@ impl Program {
   pub fn new() -> Self {
     Self::default()
   }
+
+  /// Creates a new global value in the current program.
+  pub fn new_value(&mut self) -> Value {
+    // TODO: add parameter `GlobalAlloc`
+    todo!()
+  }
+
+  /// Removes the specific global value by its handle.
+  ///
+  /// Returns the value data if the value was previously in the program.
+  pub fn remove_value(&mut self, value: &Value) -> Option<ValueData> {
+    todo!()
+  }
+
+  /// Immutably borrows the global value map.
+  pub fn borrow_values(&self) -> Ref<HashMap<Value, ValueData>> {
+    self.values.as_ref().borrow()
+  }
+
+  /// Creates a new function in the current program.
+  pub fn new_func(&mut self, data: FunctionData) -> Function {
+    let func = Function(next_func_id());
+    self.funcs.insert(func, data);
+    func
+  }
+
+  /// Removes the specific function by its handle.
+  ///
+  /// Returns the function data if the function was previously in the program.
+  pub fn remove_func(&mut self, func: &Function) -> Option<FunctionData> {
+    self.funcs.remove(func)
+  }
+
+  /// Returns a reference to the function map.
+  pub fn funcs(&self) -> &HashMap<Function, FunctionData> {
+    &self.funcs
+  }
+
+  /// Returns a mutable reference to the function map.
+  pub fn funcs_mut(&mut self) -> &mut HashMap<Function, FunctionData> {
+    &mut self.funcs
+  }
 }
 
 /// Weak pointer for the `RefCell` of global value map.
@@ -29,6 +71,7 @@ pub(crate) type GlobalValueMapCell = Weak<RefCell<HashMap<Value, ValueData>>>;
 /// A handle of Koopa IR function.
 ///
 /// You can fetch `FunctionData` from `Program` by using this handle.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Function(FunctionId);
 
 /// Data of Koopa IR function.
@@ -78,6 +121,7 @@ impl FunctionData {
 ///
 /// You can fetch `BasicBlockData` from `DataFlowGraph` in `FunctionData`
 /// by using this handle.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BasicBlock(BasicBlockId);
 
 /// Data of Koopa IR basic block.
@@ -106,7 +150,15 @@ impl BasicBlockData {
   }
 
   /// Creates a new `BasicBlockData` with the given name, parameters and type.
+  ///
+  /// # Panics
+  ///
+  /// Panics if `ty` is not a valid basic block type.
   pub fn with_params(name: Option<String>, params: Vec<Value>, ty: Type) -> Self {
+    assert!(
+      matches!(ty.kind(), TypeKind::BasicBlock(p) if p.len() == params.len()),
+      "invalid basic block type"
+    );
     Self {
       ty,
       name,
@@ -153,6 +205,7 @@ impl Default for BasicBlockData {
 ///
 /// You can fetch `ValueData` from `DataFlowGraph` in `FunctionData`
 /// by using this handle.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Value(ValueId);
 
 /// Data of Koopa IR value.
