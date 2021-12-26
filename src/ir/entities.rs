@@ -1,6 +1,7 @@
 use crate::ir::dfg::DataFlowGraph;
-use crate::ir::idman::{next_bb_id, next_func_id, next_value_id};
+use crate::ir::idman::{next_func_id, next_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
+use crate::ir::layout::Layout;
 use crate::ir::types::{Type, TypeKind};
 use crate::ir::values;
 use std::cell::{Ref, RefCell};
@@ -16,6 +17,18 @@ pub struct Program {
   funcs: HashMap<Function, FunctionData>,
 }
 
+/// Returns a mutable reference of the global value data by the given
+/// value handle.
+macro_rules! data_mut {
+  ($self:ident, $value:expr) => {
+    $self
+      .values
+      .borrow_mut()
+      .get_mut(&$value)
+      .expect("value does not exist")
+  };
+}
+
 impl Program {
   /// Creates a new program.
   pub fn new() -> Self {
@@ -23,16 +36,37 @@ impl Program {
   }
 
   /// Creates a new global value in the current program.
-  pub fn new_value(&mut self) -> Value {
-    // TODO: add parameter `GlobalAlloc`
-    todo!()
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value data uses unexisted values.
+  pub fn new_value(&mut self, data: ValueData) -> Value {
+    let value = Value(next_value_id());
+    for v in data.kind().value_uses() {
+      data_mut!(self, v).used_by.insert(value);
+    }
+    self.values.borrow_mut().insert(value, data);
+    value
   }
 
-  /// Removes the specific global value by its handle.
+  /// Removes the specific global value by its handle. Returns the
+  /// corresponding value data.
   ///
-  /// Returns the value data if the value was previously in the program.
-  pub fn remove_value(&mut self, value: Value) -> Option<ValueData> {
-    todo!()
+  /// # Panics
+  ///
+  /// Panics if the given value does not exist, or the removed value is
+  /// currently used by other values.
+  pub fn remove_value(&mut self, value: Value) -> ValueData {
+    let data = self
+      .values
+      .borrow_mut()
+      .remove(&value)
+      .expect("`value` does not exist");
+    assert!(data.used_by.is_empty(), "`value` is used by other values");
+    for v in data.kind().value_uses() {
+      data_mut!(self, v).used_by.remove(&value);
+    }
+    data
   }
 
   /// Immutably borrows the global value map.
@@ -85,7 +119,7 @@ pub struct FunctionData {
   name: String,
   params: Vec<Value>,
   dfg: DataFlowGraph,
-  // TODO: layout
+  layout: Layout,
 }
 
 impl FunctionData {
@@ -102,6 +136,7 @@ impl FunctionData {
       name,
       params,
       dfg: DataFlowGraph::new(),
+      layout: Layout::new(),
     }
   }
 
@@ -118,6 +153,7 @@ impl FunctionData {
       name,
       params: Vec::new(),
       dfg: DataFlowGraph::new(),
+      layout: Layout::new(),
     }
   }
 
@@ -165,6 +201,16 @@ impl FunctionData {
   /// Returns a mutable reference to the data flow graph.
   pub fn dfg_mut(&mut self) -> &mut DataFlowGraph {
     &mut self.dfg
+  }
+
+  /// Returns a reference to the layout.
+  pub fn layout(&self) -> &Layout {
+    &self.layout
+  }
+
+  /// Returns a mutable reference to the layout.
+  pub fn layout_mut(&mut self) -> &mut Layout {
+    &mut self.layout
   }
 }
 
