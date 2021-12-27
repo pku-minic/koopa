@@ -128,14 +128,22 @@ impl FunctionData {
   /// # Panics
   ///
   /// Panics if the given name not starts with `%` or `@`, or the given
-  /// type is not a valid function type.
-  pub fn new(name: String, params: Vec<Value>, ty: Type) -> Self {
-    Self::check_sanity(&name, &ty);
+  /// type can not construct a valid function type.
+  pub fn new(name: String, params_ty: Vec<Type>, ret_ty: Type) -> Self {
+    use crate::ir::values::FuncArgRef;
+    Self::check_sanity(&name, &params_ty);
+    // create function argument references
+    let mut dfg = DataFlowGraph::new();
+    let params = params_ty
+      .iter()
+      .enumerate()
+      .map(|(i, ty)| dfg.new_value(FuncArgRef::new_data(i, ty.clone())))
+      .collect();
     Self {
-      ty,
+      ty: Type::get_function(params_ty, ret_ty),
       name,
       params,
-      dfg: DataFlowGraph::new(),
+      dfg,
       layout: Layout::new(),
     }
   }
@@ -145,11 +153,11 @@ impl FunctionData {
   /// # Panics
   ///
   /// Panics if the given name not starts with `%` or `@`, or the given
-  /// type is not a valid function type.
-  pub fn new_decl(name: String, ty: Type) -> Self {
-    Self::check_sanity(&name, &ty);
+  /// type can not construct a valid function type.
+  pub fn new_decl(name: String, params_ty: Vec<Type>, ret_ty: Type) -> Self {
+    Self::check_sanity(&name, &params_ty);
     Self {
-      ty,
+      ty: Type::get_function(params_ty, ret_ty),
       name,
       params: Vec::new(),
       dfg: DataFlowGraph::new(),
@@ -162,20 +170,15 @@ impl FunctionData {
   /// # Panics
   ///
   /// Panics if the given name and type is invalid.
-  fn check_sanity(name: &str, ty: &Type) {
+  fn check_sanity(name: &str, params: &[Type]) {
     assert!(
       name.len() > 1 && (name.starts_with('%') || name.starts_with('@')),
       "invalid function name"
     );
-    match ty.kind() {
-      TypeKind::Function(params, _) => {
-        assert!(
-          params.iter().all(|p| !p.is_unit()),
-          "parameter type must not be `unit`!"
-        )
-      }
-      _ => panic!("expected a function type!"),
-    };
+    assert!(
+      params.iter().all(|p| !p.is_unit()),
+      "parameter type must not be `unit`!"
+    );
   }
 
   /// Returns a reference to the function's type.
