@@ -23,6 +23,10 @@ cargo build --release
 
 > WIP.
 
+## References
+
+Koopa IR library is heavily influenced by [LLVM](https://llvm.org/) and [Cranelift](https://wasmtime.dev/).
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
