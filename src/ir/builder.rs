@@ -403,7 +403,7 @@ impl<'a> EntityBuilder for ReplaceBuilder<'a> {
   }
 
   fn insert(self, data: ValueData) -> Value {
-    self.dfg.replace_value_with(self.value, data);
+    self.dfg.replace_value_with_data(self.value, data);
     self.value
   }
 }
