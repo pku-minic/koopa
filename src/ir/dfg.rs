@@ -1,4 +1,5 @@
-use crate::ir::entities::{BasicBlock, BasicBlockData, GlobalValueMapCell, Value, ValueData};
+use crate::ir::entities::{BasicBlock, BasicBlockData, Value, ValueData};
+use crate::ir::entities::{FuncTypeMapCell, GlobalValueMapCell};
 use crate::ir::idman::{next_bb_id, next_value_id};
 use std::collections::HashMap;
 
@@ -9,6 +10,7 @@ use std::collections::HashMap;
 /// define-use chain.
 pub struct DataFlowGraph {
   pub(crate) globals: GlobalValueMapCell,
+  pub(crate) func_tys: FuncTypeMapCell,
   values: HashMap<Value, ValueData>,
   bbs: HashMap<BasicBlock, BasicBlockData>,
 }
@@ -46,6 +48,7 @@ impl DataFlowGraph {
   pub(crate) fn new() -> Self {
     Self {
       globals: GlobalValueMapCell::new(),
+      func_tys: FuncTypeMapCell::new(),
       values: HashMap::new(),
       bbs: HashMap::new(),
     }
