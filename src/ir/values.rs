@@ -1,5 +1,5 @@
 use crate::ir::entities::{BasicBlock, Function, Value, ValueData, ValueKind};
-use crate::ir::types::{Type, TypeKind};
+use crate::ir::types::Type;
 use std::fmt;
 
 /// Integer constant.
@@ -8,10 +8,7 @@ pub struct Integer {
 }
 
 impl Integer {
-  /// Create a new integer constant.
-  ///
-  /// The type of the created `Integer` will be integer type.
-  pub fn new_data(value: i32) -> ValueData {
+  pub(crate) fn new_data(value: i32) -> ValueData {
     ValueData::new(Type::get_i32(), ValueKind::Integer(Self { value }))
   }
 
@@ -25,13 +22,7 @@ impl Integer {
 pub struct ZeroInit;
 
 impl ZeroInit {
-  /// Create a new zero initializer.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  pub fn new_data(ty: Type) -> ValueData {
-    assert!(!ty.is_unit(), "`ty` can not be unit");
+  pub(crate) fn new_data(ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::ZeroInit(Self))
   }
 }
@@ -40,13 +31,7 @@ impl ZeroInit {
 pub struct Undef;
 
 impl Undef {
-  /// Create a new undefined value.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  pub fn new_data(ty: Type) -> ValueData {
-    assert!(!ty.is_unit(), "`ty` can not be unit");
+  pub(crate) fn new_data(ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Undef(Self))
   }
 }
@@ -57,16 +42,7 @@ pub struct Aggregate {
 }
 
 impl Aggregate {
-  /// Creates an aggregate constant with elements `elems`.
-  ///
-  /// # Panics
-  ///
-  /// Panics if type is not a valid array type.
-  pub fn new_data(elems: Vec<Value>, ty: Type) -> ValueData {
-    assert!(
-      matches!(ty.kind(), TypeKind::Array(_, len) if *len == elems.len()),
-      "`ty` is not a valid array type"
-    );
+  pub(crate) fn new_data(elems: Vec<Value>, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Aggregate(Self { elems }))
   }
 
@@ -82,13 +58,7 @@ pub struct FuncArgRef {
 }
 
 impl FuncArgRef {
-  /// Creates a function argument reference with the given index.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  pub fn new_data(index: usize, ty: Type) -> ValueData {
-    assert!(!ty.is_unit(), "`ty` can not be unit");
+  pub(crate) fn new_data(index: usize, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::FuncArgRef(Self { index }))
   }
 
@@ -104,13 +74,7 @@ pub struct BlockArgRef {
 }
 
 impl BlockArgRef {
-  /// Creates a basic block argument reference with the given index.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  pub fn new_data(index: usize, ty: Type) -> ValueData {
-    assert!(!ty.is_unit(), "`ty` can not be unit");
+  pub(crate) fn new_data(index: usize, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::BlockArgRef(Self { index }))
   }
 
@@ -124,12 +88,7 @@ impl BlockArgRef {
 pub struct Alloc;
 
 impl Alloc {
-  /// Creates a local memory allocation.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  pub fn new_data(ty: Type) -> ValueData {
+  pub(crate) fn new_data(ty: Type) -> ValueData {
     assert!(!ty.is_unit(), "`ty` can not be unit");
     ValueData::new(ty, ValueKind::Alloc(Self))
   }
@@ -141,16 +100,7 @@ pub struct GlobalAlloc {
 }
 
 impl GlobalAlloc {
-  /// Creates a global memory allocation.
-  ///
-  /// # Panics
-  ///
-  /// Panics if type is not a valid pointer type.
-  pub fn new_data(init: Value, ty: Type) -> ValueData {
-    assert!(
-      matches!(ty.kind(), TypeKind::Pointer(_)),
-      "`ty` is not a valid pointer type"
-    );
+  pub(crate) fn new_data(init: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::GlobalAlloc(Self { init }))
   }
 
@@ -166,13 +116,7 @@ pub struct Load {
 }
 
 impl Load {
-  /// Creates a memory load with the given source.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  pub fn new_data(src: Value, ty: Type) -> ValueData {
-    assert!(!ty.is_unit(), "`ty` can not be unit");
+  pub(crate) fn new_data(src: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Load(Self { src }))
   }
 
@@ -189,8 +133,7 @@ pub struct Store {
 }
 
 impl Store {
-  /// Creates a memory store with the given value and destination.
-  pub fn new_data(value: Value, dest: Value) -> ValueData {
+  pub(crate) fn new_data(value: Value, dest: Value) -> ValueData {
     ValueData::new(Type::get_unit(), ValueKind::Store(Self { value, dest }))
   }
 
@@ -212,16 +155,7 @@ pub struct GetPtr {
 }
 
 impl GetPtr {
-  /// Creates a pointer calculation with the given source pointer and index.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the type is not a valid pointer type.
-  pub fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
-    assert!(
-      matches!(ty.kind(), TypeKind::Pointer(..)),
-      "`ty` is not a valid pointer type"
-    );
+  pub(crate) fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::GetPtr(Self { src, index }))
   }
 
@@ -243,17 +177,7 @@ pub struct GetElemPtr {
 }
 
 impl GetElemPtr {
-  /// Creates a element pointer calculation with the given source pointer
-  /// and index.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the type is not a valid pointer.
-  pub fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
-    assert!(
-      matches!(ty.kind(), TypeKind::Pointer(_)),
-      "`ty` is not a valid pointer"
-    );
+  pub(crate) fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::GetElemPtr(Self { src, index }))
   }
 
@@ -276,11 +200,8 @@ pub struct Binary {
 }
 
 impl Binary {
-  /// Creates a binary operation.
-  ///
-  /// The type of the created `Binary` will be integer type.
-  pub fn new_data(op: BinaryOp, lhs: Value, rhs: Value) -> ValueData {
-    ValueData::new(Type::get_i32(), ValueKind::Binary(Self { op, lhs, rhs }))
+  pub(crate) fn new_data(op: BinaryOp, lhs: Value, rhs: Value, ty: Type) -> ValueData {
+    ValueData::new(ty, ValueKind::Binary(Self { op, lhs, rhs }))
   }
 
   /// Returns a reference to the binary operator.
@@ -347,8 +268,7 @@ pub struct Branch {
 }
 
 impl Branch {
-  /// Creates a conditional branch with the given condition and targets.
-  pub fn new_data(cond: Value, true_bb: BasicBlock, false_bb: BasicBlock) -> ValueData {
+  pub(crate) fn new_data(cond: Value, true_bb: BasicBlock, false_bb: BasicBlock) -> ValueData {
     ValueData::new(
       Type::get_unit(),
       ValueKind::Branch(Self {
@@ -361,9 +281,7 @@ impl Branch {
     )
   }
 
-  /// Creates a conditional branch with the given condition, targets
-  /// and arguments.
-  pub fn with_args(
+  pub(crate) fn with_args(
     cond: Value,
     true_bb: BasicBlock,
     false_bb: BasicBlock,
@@ -417,8 +335,7 @@ pub struct Jump {
 }
 
 impl Jump {
-  /// Creates a unconditional jump with the given target.
-  pub fn new_data(target: BasicBlock) -> ValueData {
+  pub(crate) fn new_data(target: BasicBlock) -> ValueData {
     ValueData::new(
       Type::get_unit(),
       ValueKind::Jump(Self {
@@ -428,8 +345,7 @@ impl Jump {
     )
   }
 
-  /// Creates a unconditional jump with the given target and arguments.
-  pub fn with_args(target: BasicBlock, args: Vec<Value>) -> ValueData {
+  pub(crate) fn with_args(target: BasicBlock, args: Vec<Value>) -> ValueData {
     ValueData::new(Type::get_unit(), ValueKind::Jump(Self { target, args }))
   }
 
@@ -451,8 +367,7 @@ pub struct Call {
 }
 
 impl Call {
-  /// Creates a function call.
-  pub fn new_data(callee: Function, args: Vec<Value>, ty: Type) -> ValueData {
+  pub(crate) fn new_data(callee: Function, args: Vec<Value>, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Call(Self { callee, args }))
   }
 
@@ -473,8 +388,7 @@ pub struct Return {
 }
 
 impl Return {
-  /// Creates a new return instruction.
-  pub fn new_data(value: Option<Value>) -> ValueData {
+  pub(crate) fn new_data(value: Option<Value>) -> ValueData {
     ValueData::new(Type::get_unit(), ValueKind::Return(Self { value }))
   }
 
