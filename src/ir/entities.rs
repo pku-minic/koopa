@@ -362,18 +362,7 @@ impl ValueData {
   }
 }
 
-impl PartialEq<ValueData> for ValueData {
-  /// Tests if `self` equals to `other`, they are equal if the type and the
-  /// kind are equal.
-  fn eq(&self, other: &ValueData) -> bool {
-    self.ty == other.ty && self.kind == other.kind
-  }
-}
-
-impl Eq for ValueData {}
-
 /// Kind of Koopa IR value.
-#[derive(PartialEq, Eq)]
 pub enum ValueKind {
   Integer(values::Integer),
   ZeroInit(values::ZeroInit),
