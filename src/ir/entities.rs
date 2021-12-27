@@ -15,6 +15,7 @@ use std::rc::{Rc, Weak};
 pub struct Program {
   values: Rc<RefCell<HashMap<Value, ValueData>>>,
   funcs: HashMap<Function, FunctionData>,
+  func_tys: Rc<RefCell<HashMap<Function, Type>>>,
 }
 
 /// Returns a mutable reference of the global value data by the given
@@ -71,13 +72,15 @@ impl Program {
 
   /// Immutably borrows the global value map.
   pub fn borrow_values(&self) -> Ref<HashMap<Value, ValueData>> {
-    self.values.as_ref().borrow()
+    self.values.borrow()
   }
 
   /// Creates a new function in the current program.
   pub fn new_func(&mut self, mut data: FunctionData) -> Function {
     let func = Function(next_func_id());
     data.dfg.globals = Rc::downgrade(&self.values);
+    data.dfg.func_tys = Rc::downgrade(&self.func_tys);
+    self.func_tys.borrow_mut().insert(func, data.ty.clone());
     self.funcs.insert(func, data);
     func
   }
@@ -86,6 +89,7 @@ impl Program {
   ///
   /// Returns the function data if the function was previously in the program.
   pub fn remove_func(&mut self, func: Function) -> Option<FunctionData> {
+    self.func_tys.borrow_mut().remove(&func);
     self.funcs.remove(&func)
   }
 
@@ -104,6 +108,11 @@ impl Program {
 ///
 /// For [`DataFlowGraph`]s in function.
 pub(crate) type GlobalValueMapCell = Weak<RefCell<HashMap<Value, ValueData>>>;
+
+/// Weak pointer for the `RefCell` of function type map.
+///
+/// For [`DataFlowGraph`]s in function.
+pub(crate) type FuncTypeMapCell = Weak<RefCell<HashMap<Function, Type>>>;
 
 /// A handle of Koopa IR function.
 ///
@@ -401,6 +410,17 @@ impl ValueKind {
       kind: self,
       index: 0,
     }
+  }
+
+  /// Returns `true` if the `ValueKind` represents a constant value.
+  pub fn is_const(&self) -> bool {
+    matches!(
+      self,
+      ValueKind::Integer(..)
+        | ValueKind::ZeroInit(..)
+        | ValueKind::Undef(..)
+        | ValueKind::Aggregate(..)
+    )
   }
 }
 
