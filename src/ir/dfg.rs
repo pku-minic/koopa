@@ -1,3 +1,4 @@
+use crate::ir::builder::ReplaceBuilder;
 use crate::ir::entities::{BasicBlock, BasicBlockData, Value, ValueData};
 use crate::ir::entities::{FuncTypeMapCell, GlobalValueMapCell};
 use crate::ir::idman::{next_bb_id, next_value_id};
@@ -72,14 +73,21 @@ impl DataFlowGraph {
     value
   }
 
-  /// Replaces the given value with a new value data. Returns the old
-  /// value data.
+  /// Replaces the given value with a new value.
+  /// Returns a [`ReplaceBuilder`] for building the new value.
   ///
   /// # Panics
   ///
   /// Panics if the given value does not exist.
-  pub fn replace_value_with(&mut self, value: Value, data: ValueData) -> ValueData {
-    let old = self.values.remove(&value).expect("`value` does not exist");
+  pub fn replace_value_with(&mut self, value: Value) -> ReplaceBuilder {
+    ReplaceBuilder { dfg: self, value }
+  }
+
+  /// Replaces the given value with a new value data.
+  ///
+  /// This method will be called by [`ReplaceBuilder`].
+  pub(crate) fn replace_value_with_data(&mut self, value: Value, data: ValueData) {
+    let old = self.values.remove(&value).unwrap();
     for v in old.kind().value_uses() {
       data_mut!(self, v).used_by.remove(&value);
     }
@@ -93,7 +101,6 @@ impl DataFlowGraph {
       self.bb_mut(bb).used_by.insert(value);
     }
     self.values.insert(value, data);
-    old
   }
 
   /// Removes the given value. Returns the corresponding value data.
