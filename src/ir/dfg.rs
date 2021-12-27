@@ -13,6 +13,20 @@ pub struct DataFlowGraph {
   bbs: HashMap<BasicBlock, BasicBlockData>,
 }
 
+/// Returns a reference of the value data by the given value handle.
+macro_rules! data {
+  ($self:ident, $value:expr) => {
+    $self
+      .globals
+      .upgrade()
+      .unwrap()
+      .borrow_mut()
+      .get(&$value)
+      .or_else(|| $self.values.get(&$value))
+      .expect("value does not exist")
+  };
+}
+
 /// Returns a mutable reference of the value data by the given value handle.
 macro_rules! data_mut {
   ($self:ident, $value:expr) => {
@@ -100,6 +114,50 @@ impl DataFlowGraph {
   /// Returns a reference to the value map.
   pub fn values(&self) -> &HashMap<Value, ValueData> {
     &self.values
+  }
+
+  /// Checks if the two given values are equal.
+  pub fn value_eq(&self, lhs: Value, rhs: Value) -> bool {
+    self.data_eq(data!(self, lhs), data!(self, rhs))
+  }
+
+  /// Checks if the two given value data are equal.
+  fn data_eq(&self, lhs: &ValueData, rhs: &ValueData) -> bool {
+    use crate::ir::entities::ValueKind::*;
+    macro_rules! return_if {
+      ($e:expr) => {
+        if $e {
+          return false;
+        }
+      };
+    }
+    return_if!(lhs.ty() != rhs.ty());
+    match (lhs.kind(), rhs.kind()) {
+      (Integer(l), Integer(r)) => return_if!(l.value() != r.value()),
+      (ZeroInit(_), ZeroInit(_)) => return true,
+      (Undef(_), Undef(_)) => return true,
+      (Aggregate(_), Aggregate(_)) => (),
+      (FuncArgRef(l), FuncArgRef(r)) => return_if!(l.index() != r.index()),
+      (BlockArgRef(l), BlockArgRef(r)) => return_if!(l.index() != r.index()),
+      (Alloc(_), Alloc(_)) => return true,
+      (GlobalAlloc(_), GlobalAlloc(_)) => (),
+      (Load(_), Load(_)) => (),
+      (Store(_), Store(_)) => (),
+      (GetPtr(_), GetPtr(_)) => (),
+      (GetElemPtr(_), GetElemPtr(_)) => (),
+      (Binary(l), Binary(r)) => return_if!(l.op() != r.op()),
+      (Branch(l), Branch(r)) => {
+        return_if!(l.true_bb() != r.true_bb() || l.false_bb() != r.false_bb())
+      }
+      (Jump(l), Jump(r)) => return_if!(l.target() != r.target()),
+      (Call(l), Call(r)) => return_if!(l.callee() != r.callee()),
+      (Return(l), Return(r)) => return_if!(l.value().xor(r.value()).is_some()),
+      _ => return false,
+    }
+    for (lu, ru) in lhs.kind().value_uses().zip(rhs.kind().value_uses()) {
+      return_if!(!self.value_eq(lu, ru));
+    }
+    true
   }
 
   /// Creates a new basic block in the current data flow graph.
