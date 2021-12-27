@@ -136,7 +136,7 @@ impl DataFlowGraph {
       (Integer(l), Integer(r)) => return_if!(l.value() != r.value()),
       (ZeroInit(_), ZeroInit(_)) => return true,
       (Undef(_), Undef(_)) => return true,
-      (Aggregate(_), Aggregate(_)) => (),
+      (Aggregate(l), Aggregate(r)) => return_if!(l.elems().len() != r.elems().len()),
       (FuncArgRef(l), FuncArgRef(r)) => return_if!(l.index() != r.index()),
       (BlockArgRef(l), BlockArgRef(r)) => return_if!(l.index() != r.index()),
       (Alloc(_), Alloc(_)) => return true,
@@ -147,10 +147,19 @@ impl DataFlowGraph {
       (GetElemPtr(_), GetElemPtr(_)) => (),
       (Binary(l), Binary(r)) => return_if!(l.op() != r.op()),
       (Branch(l), Branch(r)) => {
-        return_if!(l.true_bb() != r.true_bb() || l.false_bb() != r.false_bb())
+        return_if!(
+          l.true_bb() != r.true_bb()
+            || l.false_bb() != r.false_bb()
+            || l.true_args().len() != r.true_args().len()
+            || l.false_args().len() != r.false_args().len()
+        )
       }
-      (Jump(l), Jump(r)) => return_if!(l.target() != r.target()),
-      (Call(l), Call(r)) => return_if!(l.callee() != r.callee()),
+      (Jump(l), Jump(r)) => {
+        return_if!(l.target() != r.target() || l.args().len() != r.args().len())
+      }
+      (Call(l), Call(r)) => {
+        return_if!(l.callee() != r.callee() || l.args().len() != r.args().len())
+      }
       (Return(l), Return(r)) => return_if!(l.value().xor(r.value()).is_some()),
       _ => return false,
     }
