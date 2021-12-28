@@ -106,8 +106,8 @@ pub trait ValueBuilder: Sized + EntityInfoQuerier + ValueInserter {
   }
 }
 
-/// A builder for building and inserting global values.
-pub trait GlobalValueBuilder: ValueBuilder {
+/// A builder for building and inserting global instructions.
+pub trait GlobalInstBuilder: ValueBuilder {
   /// Creates a global memory allocation.
   ///
   /// # Panics
@@ -121,28 +121,8 @@ pub trait GlobalValueBuilder: ValueBuilder {
   }
 }
 
-/// A builder for building and inserting local values.
-pub trait LocalValueBuilder: ValueBuilder {
-  /// Creates a function argument reference with the given index.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  fn func_arg_ref(mut self, index: usize, ty: Type) -> Value {
-    assert!(!ty.is_unit(), "`ty` can not be unit");
-    self.insert_value(FuncArgRef::new_data(index, ty))
-  }
-
-  /// Creates a basic block argument reference with the given index.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given type is an unit type.
-  fn block_arg_ref(mut self, index: usize, ty: Type) -> Value {
-    assert!(!ty.is_unit(), "`ty` can not be unit");
-    self.insert_value(BlockArgRef::new_data(index, ty))
-  }
-
+/// A builder for building and inserting local instructions.
+pub trait LocalInstBuilder: ValueBuilder {
   /// Creates a local memory allocation.
   ///
   /// # Panics
@@ -412,24 +392,21 @@ fn check_bb_name(name: &Option<String>) {
   );
 }
 
-/// An entity builder that replaces an existing value.
-///
-/// The inserted new value will have the same value handle as the old one.
-pub struct ReplaceBuilder<'a> {
-  pub(crate) dfg: &'a mut DataFlowGraph,
-  pub(crate) value: Value,
+/// An entity information querier based on data flow graph.
+pub trait DfgBasedInfoQuerier {
+  fn dfg(&self) -> &DataFlowGraph;
 }
 
-impl<'a> EntityInfoQuerier for ReplaceBuilder<'a> {
+impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
   fn value_type(&self, value: Value) -> Type {
     self
-      .dfg
+      .dfg()
       .globals
       .upgrade()
       .unwrap()
       .borrow()
       .get(&value)
-      .or_else(|| self.dfg.values().get(&value))
+      .or_else(|| self.dfg().values().get(&value))
       .expect("value does not exist")
       .ty()
       .clone()
@@ -437,7 +414,7 @@ impl<'a> EntityInfoQuerier for ReplaceBuilder<'a> {
 
   fn bb_type(&self, bb: BasicBlock) -> Type {
     self
-      .dfg
+      .dfg()
       .bbs()
       .get(&bb)
       .expect("basic block does not exist")
@@ -447,7 +424,7 @@ impl<'a> EntityInfoQuerier for ReplaceBuilder<'a> {
 
   fn func_type(&self, func: Function) -> Type {
     self
-      .dfg
+      .dfg()
       .func_tys
       .upgrade()
       .unwrap()
@@ -459,16 +436,30 @@ impl<'a> EntityInfoQuerier for ReplaceBuilder<'a> {
 
   fn is_const(&self, value: Value) -> bool {
     self
-      .dfg
+      .dfg()
       .globals
       .upgrade()
       .unwrap()
       .borrow()
       .get(&value)
-      .or_else(|| self.dfg.values().get(&value))
+      .or_else(|| self.dfg().values().get(&value))
       .expect("value does not exist")
       .kind()
       .is_const()
+  }
+}
+
+/// An entity builder that replaces an existing local value.
+///
+/// The inserted new value will have the same value handle as the old one.
+pub struct ReplaceBuilder<'a> {
+  pub(crate) dfg: &'a mut DataFlowGraph,
+  pub(crate) value: Value,
+}
+
+impl<'a> DfgBasedInfoQuerier for ReplaceBuilder<'a> {
+  fn dfg(&self) -> &DataFlowGraph {
+    self.dfg
   }
 }
 
@@ -478,3 +469,6 @@ impl<'a> ValueInserter for ReplaceBuilder<'a> {
     self.value
   }
 }
+
+impl<'a> ValueBuilder for ReplaceBuilder<'a> {}
+impl<'a> LocalInstBuilder for ReplaceBuilder<'a> {}
