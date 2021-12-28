@@ -5,7 +5,7 @@ use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
 use crate::ir::layout::Layout;
 use crate::ir::types::Type;
 use crate::ir::values;
-use std::cell::{Ref, RefCell};
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::rc::{Rc, Weak};
 
@@ -81,6 +81,17 @@ impl Program {
   /// Immutably borrows the global value map.
   pub fn borrow_values(&self) -> Ref<HashMap<Value, ValueData>> {
     self.values.borrow()
+  }
+
+  /// Mutably borrows the global value data by the given value handle.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value does not exist.
+  pub fn borrow_value_mut(&self, value: Value) -> RefMut<ValueData> {
+    RefMut::map(self.values.borrow_mut(), |m| {
+      m.get_mut(&value).expect("`value` does not exist")
+    })
   }
 
   /// Creates a new function in the current program.
