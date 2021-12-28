@@ -1,26 +1,25 @@
-use crate::ir::{BasicBlock, Function, Program};
+use crate::ir::{Function, FunctionData, Program};
 
 /// A Koopa IR pass.
+///
+/// Pass can be a [`ModulePass`] or a [`FunctionPass`].
 pub enum Pass {
   Module(Box<dyn ModulePass>),
   Function(Box<dyn FunctionPass>),
-  BasicBlock(Box<dyn BasicBlockPass>),
 }
 
-/// Module pass, runs on IR programs.
+/// Trait of a module pass.
+///
+/// Module passes can run on IR programs.
 pub trait ModulePass {
   /// Runs on the specific IR program.
   fn run_on(&mut self, program: &mut Program);
 }
 
-/// Function pass, runs on functions.
+/// Trait of a function pass.
+///
+/// Function passes can run on functions.
 pub trait FunctionPass {
-  /// Runs on the specific Function.
-  fn run_on(&mut self, func: &Function);
-}
-
-/// Basic block pass, runs on basic blocks.
-pub trait BasicBlockPass {
-  /// Runs on the specific basic block.
-  fn run_on(&mut self, bb: &BasicBlock);
+  /// Runs on the specific function data.
+  fn run_on(&mut self, func: Function, data: &mut FunctionData);
 }
