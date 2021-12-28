@@ -1,4 +1,4 @@
-use crate::ir::builder::ReplaceBuilder;
+use crate::ir::builder::{LocalBuilder, ReplaceBuilder};
 use crate::ir::entities::{BasicBlock, BasicBlockData, Value, ValueData};
 use crate::ir::entities::{FuncTypeMapCell, GlobalValueMapCell};
 use crate::ir::idman::{next_bb_id, next_value_id};
@@ -56,12 +56,18 @@ impl DataFlowGraph {
   }
 
   /// Creates a new value in the current data flow graph.
-  /// Returns the handle of the created value.
+  /// Returns a [`LocalBuilder`] for building the new local value.
+  pub fn new_value(&mut self) -> LocalBuilder {
+    LocalBuilder { dfg: self }
+  }
+
+  /// Creates a new local value by its value data. Returns the handle of
+  /// the created value. This method will be called by [`LocalBuilder`].
   ///
   /// # Panics
   ///
   /// Panics if the given value data uses unexisted values or basic blocks.
-  pub fn new_value(&mut self, data: ValueData) -> Value {
+  pub(crate) fn new_value_data(&mut self, data: ValueData) -> Value {
     let value = Value(next_value_id());
     for v in data.kind().value_uses() {
       data_mut!(self, v).used_by.insert(value);
