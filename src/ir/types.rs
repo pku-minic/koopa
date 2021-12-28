@@ -120,7 +120,7 @@ impl Type {
     Self::PTR_SIZE.with(|ptr_size| ptr_size.set(size));
   }
 
-  /// Gets the kind of the current `Type`.
+  /// Gets the kind of the current type.
   pub fn kind(&self) -> &TypeKind {
     &self.0
   }
