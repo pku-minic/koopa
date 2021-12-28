@@ -1,22 +1,20 @@
-#![allow(clippy::new_ret_no_self)]
-
 use crate::front::span::Span;
-use crate::ir::instructions::BinaryOp;
+use crate::ir::values::BinaryOp;
 use std::cmp::PartialEq;
 
-/// AST of Koopa IR.
+/// An AST of Koopa IR.
 #[derive(Debug)]
 pub struct Ast {
   pub span: Span,
   pub kind: AstKind,
 }
 
-/// Box of AST.
+/// A [`Box`] of Koopa IR AST.
 pub type AstBox = Box<Ast>;
 
 impl Ast {
   /// Creates a new AST box.
-  pub(crate) fn new(span: Span, kind: AstKind) -> AstBox {
+  pub(crate) fn new_box(span: Span, kind: AstKind) -> AstBox {
     Box::new(Self { span, kind })
   }
 }
@@ -56,7 +54,6 @@ pub enum AstKind {
   FunDef(FunDef),
   Block(Block),
   FunDecl(FunDecl),
-  Phi(Phi),
   End(End),
   Error(Error),
 }
@@ -67,8 +64,8 @@ pub struct IntType;
 
 impl IntType {
   /// Creates a new box of `IntType` AST.
-  pub fn new(span: Span) -> AstBox {
-    Ast::new(span, AstKind::IntType(Self))
+  pub fn new_box(span: Span) -> AstBox {
+    Ast::new_box(span, AstKind::IntType(Self))
   }
 }
 
@@ -81,8 +78,8 @@ pub struct ArrayType {
 
 impl ArrayType {
   /// Creates a new box of `ArrayType` AST.
-  pub fn new(span: Span, base: AstBox, len: usize) -> AstBox {
-    Ast::new(span, AstKind::ArrayType(Self { base, len }))
+  pub fn new_box(span: Span, base: AstBox, len: usize) -> AstBox {
+    Ast::new_box(span, AstKind::ArrayType(Self { base, len }))
   }
 }
 
@@ -94,8 +91,8 @@ pub struct PointerType {
 
 impl PointerType {
   /// Creates a new box of `PointerType` AST.
-  pub fn new(span: Span, base: AstBox) -> AstBox {
-    Ast::new(span, AstKind::PointerType(Self { base }))
+  pub fn new_box(span: Span, base: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::PointerType(Self { base }))
   }
 }
 
@@ -108,8 +105,8 @@ pub struct FunType {
 
 impl FunType {
   /// Creates a new box of `FunType` AST.
-  pub fn new(span: Span, params: Vec<AstBox>, ret: Option<AstBox>) -> AstBox {
-    Ast::new(span, AstKind::FunType(Self { params, ret }))
+  pub fn new_box(span: Span, params: Vec<AstBox>, ret: Option<AstBox>) -> AstBox {
+    Ast::new_box(span, AstKind::FunType(Self { params, ret }))
   }
 }
 
@@ -121,8 +118,8 @@ pub struct SymbolRef {
 
 impl SymbolRef {
   /// Creates a new box of `SymbolRef` AST.
-  pub fn new(span: Span, symbol: String) -> AstBox {
-    Ast::new(span, AstKind::SymbolRef(Self { symbol }))
+  pub fn new_box(span: Span, symbol: String) -> AstBox {
+    Ast::new_box(span, AstKind::SymbolRef(Self { symbol }))
   }
 }
 
@@ -134,8 +131,8 @@ pub struct IntVal {
 
 impl IntVal {
   /// Creates a new box of `IntVal` AST.
-  pub fn new(span: Span, value: i32) -> AstBox {
-    Ast::new(span, AstKind::IntVal(Self { value }))
+  pub fn new_box(span: Span, value: i32) -> AstBox {
+    Ast::new_box(span, AstKind::IntVal(Self { value }))
   }
 }
 
@@ -145,8 +142,8 @@ pub struct UndefVal;
 
 impl UndefVal {
   /// Creates a new box of `UndefVal` AST.
-  pub fn new(span: Span) -> AstBox {
-    Ast::new(span, AstKind::UndefVal(Self))
+  pub fn new_box(span: Span) -> AstBox {
+    Ast::new_box(span, AstKind::UndefVal(Self))
   }
 }
 
@@ -158,8 +155,8 @@ pub struct Aggregate {
 
 impl Aggregate {
   /// Creates a new box of `Aggregate` AST.
-  pub fn new(span: Span, elems: Vec<AstBox>) -> AstBox {
-    Ast::new(span, AstKind::Aggregate(Self { elems }))
+  pub fn new_box(span: Span, elems: Vec<AstBox>) -> AstBox {
+    Ast::new_box(span, AstKind::Aggregate(Self { elems }))
   }
 }
 
@@ -169,8 +166,8 @@ pub struct ZeroInit;
 
 impl ZeroInit {
   /// Creates a new box of `ZeroInit` AST.
-  pub fn new(span: Span) -> AstBox {
-    Ast::new(span, AstKind::ZeroInit(Self))
+  pub fn new_box(span: Span) -> AstBox {
+    Ast::new_box(span, AstKind::ZeroInit(Self))
   }
 }
 
@@ -183,8 +180,8 @@ pub struct SymbolDef {
 
 impl SymbolDef {
   /// Creates a new box of `SymbolDef` AST.
-  pub fn new(span: Span, name: String, value: AstBox) -> AstBox {
-    Ast::new(span, AstKind::SymbolDef(Self { name, value }))
+  pub fn new_box(span: Span, name: String, value: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::SymbolDef(Self { name, value }))
   }
 }
 
@@ -197,8 +194,8 @@ pub struct GlobalDef {
 
 impl GlobalDef {
   /// Creates a new box of `GlobalDef` AST.
-  pub fn new(span: Span, name: String, value: AstBox) -> AstBox {
-    Ast::new(span, AstKind::GlobalDef(Self { name, value }))
+  pub fn new_box(span: Span, name: String, value: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::GlobalDef(Self { name, value }))
   }
 }
 
@@ -210,8 +207,8 @@ pub struct MemDecl {
 
 impl MemDecl {
   /// Creates a new box of `MemDecl` AST.
-  pub fn new(span: Span, ty: AstBox) -> AstBox {
-    Ast::new(span, AstKind::MemDecl(Self { ty }))
+  pub fn new_box(span: Span, ty: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::MemDecl(Self { ty }))
   }
 }
 
@@ -224,8 +221,8 @@ pub struct GlobalDecl {
 
 impl GlobalDecl {
   /// Creates a new box of `GlobalDecl` AST.
-  pub fn new(span: Span, ty: AstBox, init: AstBox) -> AstBox {
-    Ast::new(span, AstKind::GlobalDecl(Self { ty, init }))
+  pub fn new_box(span: Span, ty: AstBox, init: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::GlobalDecl(Self { ty, init }))
   }
 }
 
@@ -237,8 +234,8 @@ pub struct Load {
 
 impl Load {
   /// Creates a new box of `Load` AST.
-  pub fn new(span: Span, symbol: String) -> AstBox {
-    Ast::new(span, AstKind::Load(Self { symbol }))
+  pub fn new_box(span: Span, symbol: String) -> AstBox {
+    Ast::new_box(span, AstKind::Load(Self { symbol }))
   }
 }
 
@@ -251,8 +248,8 @@ pub struct Store {
 
 impl Store {
   /// Creates a new box of `Store` AST.
-  pub fn new(span: Span, value: AstBox, symbol: String) -> AstBox {
-    Ast::new(span, AstKind::Store(Self { value, symbol }))
+  pub fn new_box(span: Span, value: AstBox, symbol: String) -> AstBox {
+    Ast::new_box(span, AstKind::Store(Self { value, symbol }))
   }
 }
 
@@ -265,8 +262,8 @@ pub struct GetPointer {
 
 impl GetPointer {
   /// Creates a new box of `GetPointer` AST.
-  pub fn new(span: Span, symbol: String, value: AstBox) -> AstBox {
-    Ast::new(span, AstKind::GetPointer(Self { symbol, value }))
+  pub fn new_box(span: Span, symbol: String, value: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::GetPointer(Self { symbol, value }))
   }
 }
 
@@ -279,8 +276,8 @@ pub struct GetElementPointer {
 
 impl GetElementPointer {
   /// Creates a new box of `GetElementPointer` AST.
-  pub fn new(span: Span, symbol: String, value: AstBox) -> AstBox {
-    Ast::new(span, AstKind::GetElementPointer(Self { symbol, value }))
+  pub fn new_box(span: Span, symbol: String, value: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::GetElementPointer(Self { symbol, value }))
   }
 }
 
@@ -294,8 +291,8 @@ pub struct BinaryExpr {
 
 impl BinaryExpr {
   /// Creates a new box of `BinaryExpr` AST.
-  pub fn new(span: Span, op: BinaryOp, lhs: AstBox, rhs: AstBox) -> AstBox {
-    Ast::new(span, AstKind::BinaryExpr(Self { op, lhs, rhs }))
+  pub fn new_box(span: Span, op: BinaryOp, lhs: AstBox, rhs: AstBox) -> AstBox {
+    Ast::new_box(span, AstKind::BinaryExpr(Self { op, lhs, rhs }))
   }
 }
 
@@ -304,13 +301,31 @@ impl BinaryExpr {
 pub struct Branch {
   pub cond: AstBox,
   pub tbb: String,
+  pub targs: Vec<AstBox>,
   pub fbb: String,
+  pub fargs: Vec<AstBox>,
 }
 
 impl Branch {
   /// Creates a new box of `Branch` AST.
-  pub fn new(span: Span, cond: AstBox, tbb: String, fbb: String) -> AstBox {
-    Ast::new(span, AstKind::Branch(Self { cond, tbb, fbb }))
+  pub fn new_box(
+    span: Span,
+    cond: AstBox,
+    tbb: String,
+    targs: Vec<AstBox>,
+    fbb: String,
+    fargs: Vec<AstBox>,
+  ) -> AstBox {
+    Ast::new_box(
+      span,
+      AstKind::Branch(Self {
+        cond,
+        tbb,
+        targs,
+        fbb,
+        fargs,
+      }),
+    )
   }
 }
 
@@ -318,12 +333,13 @@ impl Branch {
 #[derive(Debug, PartialEq)]
 pub struct Jump {
   pub target: String,
+  pub args: Vec<AstBox>,
 }
 
 impl Jump {
   /// Creates a new box of `Jump` AST.
-  pub fn new(span: Span, target: String) -> AstBox {
-    Ast::new(span, AstKind::Jump(Self { target }))
+  pub fn new_box(span: Span, target: String, args: Vec<AstBox>) -> AstBox {
+    Ast::new_box(span, AstKind::Jump(Self { target, args }))
   }
 }
 
@@ -336,8 +352,8 @@ pub struct FunCall {
 
 impl FunCall {
   /// Creates a new box of `FunCall` AST.
-  pub fn new(span: Span, fun: String, args: Vec<AstBox>) -> AstBox {
-    Ast::new(span, AstKind::FunCall(Self { fun, args }))
+  pub fn new_box(span: Span, fun: String, args: Vec<AstBox>) -> AstBox {
+    Ast::new_box(span, AstKind::FunCall(Self { fun, args }))
   }
 }
 
@@ -349,8 +365,8 @@ pub struct Return {
 
 impl Return {
   /// Creates a new box of `Return` AST.
-  pub fn new(span: Span, value: Option<AstBox>) -> AstBox {
-    Ast::new(span, AstKind::Return(Self { value }))
+  pub fn new_box(span: Span, value: Option<AstBox>) -> AstBox {
+    Ast::new_box(span, AstKind::Return(Self { value }))
   }
 }
 
@@ -365,14 +381,14 @@ pub struct FunDef {
 
 impl FunDef {
   /// Creates a new box of `FunDef` AST.
-  pub fn new(
+  pub fn new_box(
     span: Span,
     name: String,
     params: Vec<(String, AstBox)>,
     ret: Option<AstBox>,
     bbs: Vec<AstBox>,
   ) -> AstBox {
-    Ast::new(
+    Ast::new_box(
       span,
       AstKind::FunDef(Self {
         name,
@@ -388,13 +404,26 @@ impl FunDef {
 #[derive(Debug, PartialEq)]
 pub struct Block {
   pub name: String,
+  pub params: Vec<(String, AstBox)>,
   pub stmts: Vec<AstBox>,
 }
 
 impl Block {
   /// Creates a new box of `Block` AST.
-  pub fn new(span: Span, name: String, stmts: Vec<AstBox>) -> AstBox {
-    Ast::new(span, AstKind::Block(Self { name, stmts }))
+  pub fn new_box(
+    span: Span,
+    name: String,
+    params: Vec<(String, AstBox)>,
+    stmts: Vec<AstBox>,
+  ) -> AstBox {
+    Ast::new_box(
+      span,
+      AstKind::Block(Self {
+        name,
+        params,
+        stmts,
+      }),
+    )
   }
 }
 
@@ -408,22 +437,8 @@ pub struct FunDecl {
 
 impl FunDecl {
   /// Creates a new box of `FunDecl` AST.
-  pub fn new(span: Span, name: String, params: Vec<AstBox>, ret: Option<AstBox>) -> AstBox {
-    Ast::new(span, AstKind::FunDecl(Self { name, params, ret }))
-  }
-}
-
-/// Phi function.
-#[derive(Debug, PartialEq)]
-pub struct Phi {
-  pub ty: AstBox,
-  pub oprs: Vec<(AstBox, String)>,
-}
-
-impl Phi {
-  /// Creates a new box of `Phi` AST.
-  pub fn new(span: Span, ty: AstBox, oprs: Vec<(AstBox, String)>) -> AstBox {
-    Ast::new(span, AstKind::Phi(Self { ty, oprs }))
+  pub fn new_box(span: Span, name: String, params: Vec<AstBox>, ret: Option<AstBox>) -> AstBox {
+    Ast::new_box(span, AstKind::FunDecl(Self { name, params, ret }))
   }
 }
 
@@ -433,8 +448,8 @@ pub struct End;
 
 impl End {
   /// Creates a new box of `End` AST.
-  pub fn new(span: Span) -> AstBox {
-    Ast::new(span, AstKind::End(Self))
+  pub fn new_box(span: Span) -> AstBox {
+    Ast::new_box(span, AstKind::End(Self))
   }
 }
 
@@ -444,7 +459,7 @@ pub struct Error;
 
 impl Error {
   /// Creates a new box of `Error` AST.
-  pub fn new(span: Span) -> AstBox {
-    Ast::new(span, AstKind::Error(Self))
+  pub fn new_box(span: Span) -> AstBox {
+    Ast::new_box(span, AstKind::Error(Self))
   }
 }
