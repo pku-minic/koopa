@@ -7,7 +7,7 @@ use colored::*;
 #[cfg(not(feature = "no-front-logger"))]
 use std::{fs::File, io::BufRead, io::BufReader, io::Result as IoResult};
 
-/// The type of error returned by logger methods of `Span`.
+/// The type of error returned by logger methods of [`Span`].
 #[cfg(feature = "no-front-logger")]
 #[derive(Debug)]
 pub enum Error {
@@ -15,7 +15,7 @@ pub enum Error {
   Fatal(String),
 }
 
-/// The type of error returned by logger methods of `Span`.
+/// The type of error returned by logger methods of [`Span`].
 #[cfg(not(feature = "no-front-logger"))]
 #[derive(Debug)]
 pub enum Error {
@@ -24,13 +24,13 @@ pub enum Error {
 }
 
 impl Error {
-  /// Checks if the current error is fatal.
+  /// Returns `true` if the current error is fatal.
   #[cfg(feature = "no-front-logger")]
   pub fn is_fatal(&self) -> bool {
     matches!(self, Error::Fatal(..))
   }
 
-  /// Checks if the current error is fatal.
+  /// Returns `true` if the current error is fatal.
   #[cfg(not(feature = "no-front-logger"))]
   pub fn is_fatal(&self) -> bool {
     matches!(self, Error::Fatal)
@@ -38,11 +38,13 @@ impl Error {
 }
 
 impl Default for Error {
+  /// Creates a normal error.
   #[cfg(feature = "no-front-logger")]
   fn default() -> Self {
     Error::Normal(String::default())
   }
 
+  /// Creates a normal error.
   #[cfg(not(feature = "no-front-logger"))]
   fn default() -> Self {
     Error::Normal
@@ -50,12 +52,14 @@ impl Default for Error {
 }
 
 impl<T> From<Error> for Result<T, Error> {
+  /// Creates a result from the given error,
+  /// which the value is always [`Err`].
   fn from(error: Error) -> Self {
     Err(error)
   }
 }
 
-/// A span.
+/// A span that records source code locations.
 ///
 /// Used to print error messages.
 #[derive(Clone, Copy)]
@@ -108,12 +112,12 @@ impl Span {
     });
   }
 
-  /// Creates a new span from `Pos`.
+  /// Creates a new span from [`Pos`].
   pub fn new(start: Pos) -> Self {
     Self { start, end: start }
   }
 
-  /// Resets the global state.
+  /// Resets the global state in all spans.
   pub fn reset(file: FileType) {
     Self::STATE.with(|gs| {
       *gs.borrow_mut() = GlobalState {
@@ -230,7 +234,7 @@ impl Span {
   #[cfg(feature = "no-front-logger")]
   pub fn log_error(&self, args: Arguments) -> Error {
     Self::log_raw_error(args);
-    Error::Normal(self.get_error_message(args))
+    Error::Normal(self.error_message(args))
   }
 
   /// Logs normal error message.
@@ -245,7 +249,7 @@ impl Span {
   #[cfg(feature = "no-front-logger")]
   pub fn log_fatal_error(&self, args: Arguments) -> Error {
     Self::log_raw_error(args);
-    Error::Fatal(self.get_error_message(args))
+    Error::Fatal(self.error_message(args))
   }
 
   /// Logs fatal error message.
@@ -302,13 +306,13 @@ impl Span {
     self.end.line == span.start.line
   }
 
-  /// Gets error message.
+  /// Returns the error message.
   #[cfg(feature = "no-front-logger")]
-  fn get_error_message(&self, args: Arguments) -> String {
+  fn error_message(&self, args: Arguments) -> String {
     Self::STATE.with(|gs| format!("{}:{}: {}", gs.borrow().file, self.start, args))
   }
 
-  /// Prints file information.
+  /// Prints the file information.
   #[cfg(not(feature = "no-front-logger"))]
   fn print_file_info(&self, file: &FileType, color: Color) {
     eprintln!("  {} {}:{}", "at".blue(), file, self.start);
@@ -326,7 +330,7 @@ impl Span {
     eprintln!();
   }
 
-  /// Prints single line information.
+  /// Prints the single line information.
   ///
   /// Used by method `print_file_info`.
   #[cfg(not(feature = "no-front-logger"))]
@@ -348,7 +352,7 @@ impl Span {
     eprintln!("{}", format!("{:^>w$}", "", w = len).color(color));
   }
 
-  /// Prints multi-line information.
+  /// Prints the multi-line information.
   ///
   /// Used by method `print_file_info`.
   #[cfg(not(feature = "no-front-logger"))]
@@ -397,6 +401,7 @@ impl Span {
 }
 
 impl Default for Span {
+  /// Creates a span with the default source code locations.
   fn default() -> Self {
     Self::new(Pos::default())
   }
@@ -408,7 +413,7 @@ impl fmt::Debug for Span {
   }
 }
 
-/// Line-column mark.
+/// A line-column mark.
 #[derive(Clone, Copy)]
 pub struct Pos {
   line: u32,
@@ -421,7 +426,7 @@ impl Pos {
     Self { line: 1, col: 0 }
   }
 
-  /// Updates the line number ans column number based on the specific character.
+  /// Updates the line number ans column number based on the given character.
   pub fn update(&mut self, c: char) {
     match c {
       '\n' => {
@@ -454,8 +459,11 @@ struct GlobalState {
 
 /// Type of input file.
 pub enum FileType {
+  /// File with a path.
   File(PathBuf),
+  /// Standard input file.
   Stdin,
+  /// A buffer in the memory.
   Buffer,
 }
 
