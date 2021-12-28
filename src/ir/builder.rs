@@ -449,7 +449,28 @@ impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
   }
 }
 
-/// An entity builder that replaces an existing local value.
+/// An value builder that builds a new local value and inserts it
+/// to the data flow graph.
+pub struct LocalBuilder<'a> {
+  pub(crate) dfg: &'a mut DataFlowGraph,
+}
+
+impl<'a> DfgBasedInfoQuerier for LocalBuilder<'a> {
+  fn dfg(&self) -> &DataFlowGraph {
+    self.dfg
+  }
+}
+
+impl<'a> ValueInserter for LocalBuilder<'a> {
+  fn insert_value(&mut self, data: ValueData) -> Value {
+    self.dfg.new_value_data(data)
+  }
+}
+
+impl<'a> ValueBuilder for LocalBuilder<'a> {}
+impl<'a> LocalInstBuilder for LocalBuilder<'a> {}
+
+/// An value builder that replaces an existing local value.
 ///
 /// The inserted new value will have the same value handle as the old one.
 pub struct ReplaceBuilder<'a> {
@@ -473,7 +494,7 @@ impl<'a> ValueInserter for ReplaceBuilder<'a> {
 impl<'a> ValueBuilder for ReplaceBuilder<'a> {}
 impl<'a> LocalInstBuilder for ReplaceBuilder<'a> {}
 
-/// An entity builder that builds a new global value and inserts it
+/// An value builder that builds a new global value and inserts it
 /// to the program.
 pub struct GlobalBuilder<'a> {
   pub(crate) program: &'a mut Program,
