@@ -2,7 +2,7 @@ use crate::ir::dfg::DataFlowGraph;
 use crate::ir::idman::{next_func_id, next_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
 use crate::ir::layout::Layout;
-use crate::ir::types::{Type, TypeKind};
+use crate::ir::types::Type;
 use crate::ir::values;
 use std::cell::{Ref, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -248,17 +248,7 @@ pub struct BasicBlockData {
 }
 
 impl BasicBlockData {
-  /// Creates a new `BasicBlockData` with the given name.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given name (if exists) not starts with `%` or `@`.
-  pub fn new(name: Option<String>) -> Self {
-    assert!(
-      name.as_ref().map_or(true, |n| n.len() > 1
-        && (n.starts_with('%') || n.starts_with('@'))),
-      "invalid basic block name"
-    );
+  pub(crate) fn new(name: Option<String>) -> Self {
     Self {
       ty: Type::get_basic_block(Vec::new()),
       name,
@@ -267,16 +257,7 @@ impl BasicBlockData {
     }
   }
 
-  /// Creates a new `BasicBlockData` with the given name, parameters and type.
-  ///
-  /// # Panics
-  ///
-  /// Panics if `ty` is not a valid basic block type.
-  pub fn with_params(name: Option<String>, params: Vec<Value>, ty: Type) -> Self {
-    assert!(
-      matches!(ty.kind(), TypeKind::BasicBlock(p) if p.len() == params.len()),
-      "`ty` is not a valid basic block type"
-    );
+  pub(crate) fn with_params(name: Option<String>, params: Vec<Value>, ty: Type) -> Self {
     Self {
       ty,
       name,
@@ -304,18 +285,6 @@ impl BasicBlockData {
   /// is used by.
   pub fn used_by(&self) -> &HashSet<Value> {
     &self.used_by
-  }
-}
-
-impl Default for BasicBlockData {
-  /// Creates a `BasicBlockData` without name and parameters.
-  fn default() -> Self {
-    Self {
-      ty: Type::get_basic_block(Vec::default()),
-      name: None,
-      params: Vec::default(),
-      used_by: HashSet::default(),
-    }
   }
 }
 
@@ -359,7 +328,16 @@ impl ValueData {
   }
 
   /// Sets the name of this value.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name (if exists) not starts with `%` or `@`.
   pub fn set_name(&mut self, name: Option<String>) {
+    assert!(
+      name.as_ref().map_or(true, |n| n.len() > 1
+        && (n.starts_with('%') || n.starts_with('@'))),
+      "invalid value name"
+    );
     self.name = name;
   }
 
