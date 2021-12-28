@@ -1,3 +1,4 @@
+use crate::ir::builder::GlobalBuilder;
 use crate::ir::dfg::DataFlowGraph;
 use crate::ir::idman::{next_func_id, next_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
@@ -13,7 +14,7 @@ use std::rc::{Rc, Weak};
 /// Programs can hold global values and functions.
 #[derive(Default)]
 pub struct Program {
-  values: Rc<RefCell<HashMap<Value, ValueData>>>,
+  pub(crate) values: Rc<RefCell<HashMap<Value, ValueData>>>,
   funcs: HashMap<Function, FunctionData>,
   func_tys: Rc<RefCell<HashMap<Function, Type>>>,
 }
@@ -37,11 +38,18 @@ impl Program {
   }
 
   /// Creates a new global value in the current program.
+  /// Returns a [`GlobalBuilder`] for building the new global value.
+  pub fn new_value(&mut self) -> GlobalBuilder {
+    GlobalBuilder { program: self }
+  }
+
+  /// Creates a new global value by its value data.
+  /// This method will be called by [`GlobalBuilder`].
   ///
   /// # Panics
   ///
   /// Panics if the given value data uses unexisted values.
-  pub fn new_value(&mut self, data: ValueData) -> Value {
+  pub(crate) fn new_value_data(&mut self, data: ValueData) -> Value {
     let value = Value(next_value_id());
     for v in data.kind().value_uses() {
       data_mut!(self, v).used_by.insert(value);
