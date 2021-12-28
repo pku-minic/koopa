@@ -84,8 +84,11 @@ impl DataFlowGraph {
   }
 
   /// Replaces the given value with a new value data.
-  ///
   /// This method will be called by [`ReplaceBuilder`].
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value does not exist.
   pub(crate) fn replace_value_with_data(&mut self, value: Value, data: ValueData) {
     let old = self.values.remove(&value).unwrap();
     for v in old.kind().value_uses() {
