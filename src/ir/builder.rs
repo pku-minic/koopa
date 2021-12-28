@@ -1,5 +1,3 @@
-// TODO: cursor on function (layout)
-
 use crate::ir::dfg::DataFlowGraph;
 use crate::ir::entities::{BasicBlock, BasicBlockData, Function, Program, Value, ValueData};
 use crate::ir::types::{Type, TypeKind};
