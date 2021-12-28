@@ -1,7 +1,7 @@
 // TODO: cursor on function (layout)
 
 use crate::ir::dfg::DataFlowGraph;
-use crate::ir::entities::{BasicBlock, BasicBlockData, Function, Value, ValueData};
+use crate::ir::entities::{BasicBlock, BasicBlockData, Function, Program, Value, ValueData};
 use crate::ir::types::{Type, TypeKind};
 use crate::ir::values::*;
 
@@ -472,3 +472,50 @@ impl<'a> ValueInserter for ReplaceBuilder<'a> {
 
 impl<'a> ValueBuilder for ReplaceBuilder<'a> {}
 impl<'a> LocalInstBuilder for ReplaceBuilder<'a> {}
+
+/// An entity builder that builds a new global value and inserts it
+/// to the program.
+pub struct GlobalBuilder<'a> {
+  pub(crate) program: &'a mut Program,
+}
+
+impl<'a> EntityInfoQuerier for GlobalBuilder<'a> {
+  fn value_type(&self, value: Value) -> Type {
+    self
+      .program
+      .values
+      .borrow()
+      .get(&value)
+      .expect("value does not exist")
+      .ty()
+      .clone()
+  }
+
+  fn bb_type(&self, _: BasicBlock) -> Type {
+    unimplemented!()
+  }
+
+  fn func_type(&self, _: Function) -> Type {
+    unimplemented!()
+  }
+
+  fn is_const(&self, value: Value) -> bool {
+    self
+      .program
+      .values
+      .borrow()
+      .get(&value)
+      .expect("value does not exist")
+      .kind()
+      .is_const()
+  }
+}
+
+impl<'a> ValueInserter for GlobalBuilder<'a> {
+  fn insert_value(&mut self, data: ValueData) -> Value {
+    self.program.new_value_data(data)
+  }
+}
+
+impl<'a> ValueBuilder for GlobalBuilder<'a> {}
+impl<'a> GlobalInstBuilder for GlobalBuilder<'a> {}
