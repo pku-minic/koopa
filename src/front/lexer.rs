@@ -1,11 +1,11 @@
 use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
-use crate::ir::instructions::BinaryOp;
+use crate::ir::values::BinaryOp;
 use crate::{log_raw_fatal_error, return_error};
 use phf::phf_map;
 use std::io::Read;
 
-/// Lexer of Koopa IR.
+/// A lexer of Koopa IR.
 pub struct Lexer<T: Read> {
   reader: T,
   pos: Pos,
@@ -13,11 +13,11 @@ pub struct Lexer<T: Read> {
   last_char: Option<char>,
 }
 
-/// Result returned by `Lexer`.
+/// Result that returned by [`Lexer`].
 pub type Result = std::result::Result<Token, Error>;
 
 impl<T: Read> Lexer<T> {
-  /// Creates a new `Lexer` from the specific reader.
+  /// Creates a new lexer from the specific reader.
   pub fn new(reader: T) -> Self {
     Self {
       reader,
@@ -26,7 +26,7 @@ impl<T: Read> Lexer<T> {
     }
   }
 
-  /// Gets the next token from file.
+  /// Returns the next token from file, or a lexer error.
   pub fn next_token(&mut self) -> Result {
     // skip spaces
     while self.last_char.map_or(false, |c| c.is_whitespace()) {
@@ -230,7 +230,6 @@ static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
   "ret" => Keyword::Ret,
   "fun" => Keyword::Fun,
   "decl" => Keyword::Decl,
-  "phi" => Keyword::Phi,
 };
 
 /// All supported binary operators.
