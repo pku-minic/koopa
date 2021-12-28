@@ -1,14 +1,17 @@
 use crate::ir::Program;
 use crate::opt::pass::Pass;
 
-/// Manages all registed passes.
+/// A pass manager.
+///
+/// Pass manager manages all registed passes, and processes the input
+/// IR program by using registered passes.
 #[derive(Default)]
 pub struct PassManager {
   passes: Vec<Pass>,
 }
 
 impl PassManager {
-  /// Creates a new `PassManager`.
+  /// Creates a new pass manager.
   pub fn new() -> Self {
     Self::default()
   }
@@ -18,21 +21,14 @@ impl PassManager {
     self.passes.push(pass);
   }
 
-  /// Runs on the specific IR program.
+  /// Runs all registered passes on the specific IR program.
   pub fn run_passes(&mut self, program: &mut Program) {
     for pass in &mut self.passes {
       match pass {
         Pass::Module(p) => p.run_on(program),
         Pass::Function(p) => {
-          for func in program.funcs() {
-            p.run_on(func);
-          }
-        }
-        Pass::BasicBlock(p) => {
-          for func in program.funcs() {
-            for bb in func.inner().bbs() {
-              p.run_on(bb);
-            }
+          for (func, data) in program.funcs_mut() {
+            p.run_on(*func, data);
           }
         }
       }
@@ -40,7 +36,7 @@ impl PassManager {
   }
 }
 
-/// Creates a new `PassManager` from a `Vec` of passes.
+/// Creates a new pass manager from a [`Vec`] of passes.
 impl From<Vec<Pass>> for PassManager {
   fn from(passes: Vec<Pass>) -> Self {
     Self { passes }
