@@ -5,7 +5,7 @@ use crate::{log_raw_fatal_error, return_error};
 use phf::phf_map;
 use std::io::Read;
 
-/// A lexer of Koopa IR.
+/// A lexer for lexing text form Koopa IR.
 pub struct Lexer<T: Read> {
   reader: T,
   pos: Pos,
