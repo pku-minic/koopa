@@ -45,8 +45,6 @@ pub trait ValueInserter {
 /// A builder trait that provides method for building value data.
 pub trait ValueBuilder: Sized + EntityInfoQuerier + ValueInserter {
   /// Create a new integer constant.
-  ///
-  /// The type of the created `Integer` will be integer type.
   fn integer(mut self, value: i32) -> Value {
     self.insert_value(Integer::new_data(value))
   }
