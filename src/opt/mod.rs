@@ -1,5 +1,5 @@
-pub mod pass;
-pub mod passman;
+mod pass;
+mod passman;
 
-pub use pass::{BasicBlockPass, FunctionPass, ModulePass, Pass};
+pub use pass::*;
 pub use passman::PassManager;
