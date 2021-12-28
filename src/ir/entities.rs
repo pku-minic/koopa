@@ -43,8 +43,8 @@ impl Program {
     GlobalBuilder { program: self }
   }
 
-  /// Creates a new global value by its value data.
-  /// This method will be called by [`GlobalBuilder`].
+  /// Creates a new global value by its value data. Returns the handle of
+  /// the created value. This method will be called by [`GlobalBuilder`].
   ///
   /// # Panics
   ///
@@ -154,7 +154,7 @@ impl FunctionData {
     let params = params_ty
       .iter()
       .enumerate()
-      .map(|(i, ty)| dfg.new_value(FuncArgRef::new_data(i, ty.clone())))
+      .map(|(i, ty)| dfg.new_value_data(FuncArgRef::new_data(i, ty.clone())))
       .collect();
     Self {
       ty: Type::get_function(params_ty, ret_ty),
