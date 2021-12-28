@@ -121,6 +121,15 @@ impl DataFlowGraph {
     data
   }
 
+  /// Returns a mutable reference to the given local value.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given local value does not exist.
+  pub fn value_mut(&mut self, value: Value) -> &mut ValueData {
+    self.values.get_mut(&value).expect("`value` does not exist")
+  }
+
   /// Returns a reference to the value map.
   pub fn values(&self) -> &HashMap<Value, ValueData> {
     &self.values
@@ -187,15 +196,6 @@ impl DataFlowGraph {
     bb
   }
 
-  /// Returns a mutable reference of the given basic block.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given basic block does not exist.
-  pub fn bb_mut(&mut self, bb: BasicBlock) -> &mut BasicBlockData {
-    self.bbs.get_mut(&bb).expect("`bb` does not exist")
-  }
-
   /// Removes the given basic block. Returns the corresponding
   /// basic block data.
   ///
@@ -204,6 +204,15 @@ impl DataFlowGraph {
   /// Panics if the given basic block does not exist.
   pub fn remove_bb(&mut self, bb: BasicBlock) -> BasicBlockData {
     self.bbs.remove(&bb).expect("`bb` does not exist")
+  }
+
+  /// Returns a mutable reference of the given basic block.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given basic block does not exist.
+  pub fn bb_mut(&mut self, bb: BasicBlock) -> &mut BasicBlockData {
+    self.bbs.get_mut(&bb).expect("`bb` does not exist")
   }
 
   /// Returns a reference to the basic block map.
