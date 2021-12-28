@@ -5,13 +5,13 @@ use crate::front::token::{Keyword, Token, TokenKind};
 use crate::return_error;
 use std::io::Read;
 
-/// Parser of Koopa IR.
+/// A Parser for parsing the text form Koopa IR.
 pub struct Parser<T: Read> {
   lexer: Lexer<T>,
   cur_token: Token,
 }
 
-/// Result returned by `Parser`
+/// Result that returned by [`Parser`].
 pub type Result = std::result::Result<AstBox, Error>;
 
 /// Reads the value of the specific kind of token from lexer.
@@ -34,7 +34,7 @@ macro_rules! match_token {
     use $self:ident, $span:ident, $kind:ident;
     $($p:pat => $e:expr,)*
     ? => $default:expr,
-    $(break if $($br_pat:pat)|+ $(=> $br_block:block)?,)?
+    $(break if $br_pat:pat $(=> $br_block:block)?,)?
   } => {{
     let ($span, $kind) = ($self.cur_token.span, &$self.cur_token.kind);
     let result = match $self.cur_token.kind {
@@ -45,7 +45,7 @@ macro_rules! match_token {
       Err(e) if !e.is_fatal() => {
         let mut span = $span;
         while !matches!($self.cur_token.kind, $($p)|+) {
-          $(if matches!($self.cur_token.kind, $($br_pat)|+) {
+          $(if matches!($self.cur_token.kind, $br_pat) {
             $($br_block)?
             break;
           })?
@@ -55,7 +55,7 @@ macro_rules! match_token {
           }
           span.update_span($self.cur_token.span);
         }
-        Ok(ast::Error::new(span))
+        Ok(ast::Error::new_boxed(span))
       }
       _ => result,
     }
@@ -63,7 +63,7 @@ macro_rules! match_token {
 }
 
 impl<T: Read> Parser<T> {
-  /// Creates a new `Parser` from the specific `Lexer`.
+  /// Creates a new parser from the specific [`Lexer`].
   pub fn new(lexer: Lexer<T>) -> Self {
     let mut parser = Self {
       lexer,
@@ -73,11 +73,11 @@ impl<T: Read> Parser<T> {
     parser
   }
 
-  /// Parses the next AST.
+  /// Parses the next AST and returns the box of paarsed AST.
   pub fn parse_next(&mut self) -> Result {
     match_token! {
       use self, span, kind;
-      TokenKind::End => Ok(ast::End::new(span)),
+      TokenKind::End => Ok(ast::End::new_boxed(span)),
       TokenKind::Keyword(Keyword::Global) => self.parse_global_def(),
       TokenKind::Keyword(Keyword::Fun) => self.parse_fun_def(),
       TokenKind::Keyword(Keyword::Decl) => self.parse_fun_decl(),
@@ -114,9 +114,9 @@ impl<T: Read> Parser<T> {
     self.parse_init().map(|init| {
       let span_last = init.span;
       // create global memory declaration
-      let value = ast::GlobalDecl::new(span_alloc.into_updated_span(span_last), ty, init);
+      let value = ast::GlobalDecl::new_boxed(span_alloc.into_updated_span(span_last), ty, init);
       // create global symbol definition
-      ast::GlobalDef::new(span.into_updated_span(span_last), name, value)
+      ast::GlobalDef::new_boxed(span.into_updated_span(span_last), name, value)
     })
   }
 
@@ -159,7 +159,7 @@ impl<T: Read> Parser<T> {
         "expected at least one basic block in function definition"
       )
     } else {
-      Ok(ast::FunDef::new(span, name, params, ret, bbs))
+      Ok(ast::FunDef::new_boxed(span, name, params, ret, bbs))
     }
   }
 
@@ -182,7 +182,7 @@ impl<T: Read> Parser<T> {
       ret = Some(ty);
     }
     // create function declaration
-    Ok(ast::FunDecl::new(span, name, params, ret))
+    Ok(ast::FunDecl::new_boxed(span, name, params, ret))
   }
 
   /// Parses types.
@@ -201,7 +201,7 @@ impl<T: Read> Parser<T> {
   fn parse_int_type(&mut self) -> Result {
     let span = self.span();
     self.next_token()?;
-    Ok(ast::IntType::new(span))
+    Ok(ast::IntType::new_boxed(span))
   }
 
   /// Parses array types.
@@ -217,7 +217,7 @@ impl<T: Read> Parser<T> {
     let len = read!(self, TokenKind::Int, "length")? as usize;
     // check & eat ']'
     span.update_span(self.expect(TokenKind::Other(']'))?);
-    Ok(ast::ArrayType::new(span, base, len))
+    Ok(ast::ArrayType::new_boxed(span, base, len))
   }
 
   /// Parses pointer types.
@@ -228,7 +228,7 @@ impl<T: Read> Parser<T> {
     // get base type
     self
       .parse_type()
-      .map(|base| ast::PointerType::new(span.into_updated_span(base.span), base))
+      .map(|base| ast::PointerType::new_boxed(span.into_updated_span(base.span), base))
   }
 
   /// Parses function types.
@@ -246,7 +246,7 @@ impl<T: Read> Parser<T> {
       ret = Some(ty);
     }
     // create function type
-    Ok(ast::FunType::new(span, params, ret))
+    Ok(ast::FunType::new_boxed(span, params, ret))
   }
 
   /// Parses basic blocks.
@@ -254,6 +254,15 @@ impl<T: Read> Parser<T> {
     let span = self.span();
     // get block name
     let name = read!(self, TokenKind::Symbol, "basic block name")?;
+    // get parameters
+    let (params, _) = self.parse_opt_list(|s| {
+      // get parameter name
+      let name = read!(s, TokenKind::Symbol, "parameter name")?;
+      // check & eat ':'
+      s.expect(TokenKind::Other(':'))?;
+      // get parameter type
+      Ok((name, s.parse_type()?))
+    })?;
     // check & eat ':'
     self.expect(TokenKind::Other(':'))?;
     // get statements
@@ -273,9 +282,10 @@ impl<T: Read> Parser<T> {
       }?);
     }
     // create basic block
-    Ok(ast::Block::new(
+    Ok(ast::Block::new_boxed(
       span.into_updated_span(stmts.last().unwrap().span),
       name,
+      params,
       stmts,
     ))
   }
@@ -296,10 +306,9 @@ impl<T: Read> Parser<T> {
       TokenKind::Keyword(Keyword::GetElemPtr) => self.parse_get_element_pointer(),
       TokenKind::BinaryOp(_) => self.parse_binary_expr(),
       TokenKind::Keyword(Keyword::Call) => self.parse_fun_call(),
-      TokenKind::Keyword(Keyword::Phi) => self.parse_phi(),
       _ => return_error!(sp, "expected expression, found {}", kind),
     }
-    .map(|value| ast::SymbolDef::new(span.into_updated_span(value.span), name, value))
+    .map(|value| ast::SymbolDef::new_boxed(span.into_updated_span(value.span), name, value))
   }
 
   /// Parses memory declarations.
@@ -310,7 +319,7 @@ impl<T: Read> Parser<T> {
     // get type
     self
       .parse_type()
-      .map(|ty| ast::MemDecl::new(span.into_updated_span(ty.span), ty))
+      .map(|ty| ast::MemDecl::new_boxed(span.into_updated_span(ty.span), ty))
   }
 
   /// Parses loads.
@@ -320,7 +329,7 @@ impl<T: Read> Parser<T> {
     self.next_token()?;
     // get symbol name
     span.update_span(self.span());
-    read!(self, TokenKind::Symbol, "symbol").map(|symbol| ast::Load::new(span, symbol))
+    read!(self, TokenKind::Symbol, "symbol").map(|symbol| ast::Load::new_boxed(span, symbol))
   }
 
   /// Parses stores.
@@ -334,7 +343,7 @@ impl<T: Read> Parser<T> {
       kind: TokenKind::Symbol(symbol),
     } = &self.cur_token
     {
-      let sym = ast::SymbolRef::new(*span, symbol.clone());
+      let sym = ast::SymbolRef::new_boxed(*span, symbol.clone());
       self.next_token()?;
       sym
     } else {
@@ -344,7 +353,8 @@ impl<T: Read> Parser<T> {
     self.expect(TokenKind::Other(','))?;
     // get symbol name
     span.update_span(self.span());
-    read!(self, TokenKind::Symbol, "symbol").map(|symbol| ast::Store::new(span, value, symbol))
+    read!(self, TokenKind::Symbol, "symbol")
+      .map(|symbol| ast::Store::new_boxed(span, value, symbol))
   }
 
   /// Parses pointer calculations.
@@ -360,7 +370,7 @@ impl<T: Read> Parser<T> {
     let value = self.parse_value()?;
     span.update_span(value.span);
     // create get pointer
-    Ok(ast::GetPointer::new(span, symbol, value))
+    Ok(ast::GetPointer::new_boxed(span, symbol, value))
   }
 
   /// Parses element pointer calculations.
@@ -376,7 +386,7 @@ impl<T: Read> Parser<T> {
     let value = self.parse_value()?;
     span.update_span(value.span);
     // create get pointer
-    Ok(ast::GetElementPointer::new(span, symbol, value))
+    Ok(ast::GetElementPointer::new_boxed(span, symbol, value))
   }
 
   /// Parses binary expressions.
@@ -389,12 +399,12 @@ impl<T: Read> Parser<T> {
     self.expect(TokenKind::Other(','))?;
     self
       .parse_value()
-      .map(|rhs| ast::BinaryExpr::new(span.into_updated_span(rhs.span), op, lhs, rhs))
+      .map(|rhs| ast::BinaryExpr::new_boxed(span.into_updated_span(rhs.span), op, lhs, rhs))
   }
 
   /// Parses branches.
   fn parse_branch(&mut self) -> Result {
-    let mut span = self.span();
+    let span = self.span();
     // eat 'branch'
     self.next_token()?;
     // get condition
@@ -403,22 +413,38 @@ impl<T: Read> Parser<T> {
     self.expect(TokenKind::Other(','))?;
     // get true target basic block
     let tbb = read!(self, TokenKind::Symbol, "basic block name")?;
+    // get true target basic block arguments
+    let (targs, _) = self.parse_opt_list(|s| s.parse_value())?;
     // check & eat ','
     self.expect(TokenKind::Other(','))?;
     // get false target basic block
-    span.update_span(self.span());
-    read!(self, TokenKind::Symbol, "basic block name")
-      .map(|fbb| ast::Branch::new(span, cond, tbb, fbb))
+    let fbb = read!(self, TokenKind::Symbol, "basic block name")?;
+    // get false target basic block arguments
+    let (fargs, sp) = self.parse_opt_list(|s| s.parse_value())?;
+    Ok(ast::Branch::new_boxed(
+      span.into_updated_span(sp),
+      cond,
+      tbb,
+      targs,
+      fbb,
+      fargs,
+    ))
   }
 
   /// Parses jumps.
   fn parse_jump(&mut self) -> Result {
-    let mut span = self.span();
+    let span = self.span();
     // eat 'jump'
     self.next_token()?;
-    // get symbol
-    span.update_span(self.span());
-    read!(self, TokenKind::Symbol, "basic block name").map(|target| ast::Jump::new(span, target))
+    // get target basic block
+    let target = read!(self, TokenKind::Symbol, "basic block name")?;
+    // get target basic block arguments
+    let (args, sp) = self.parse_opt_list(|s| s.parse_value())?;
+    Ok(ast::Jump::new_boxed(
+      span.into_updated_span(sp),
+      target,
+      args,
+    ))
   }
 
   /// Parses function calls.
@@ -431,7 +457,11 @@ impl<T: Read> Parser<T> {
     // get arguments
     let (args, sp) = self.parse_list(|s| s.parse_value())?;
     // create function call
-    Ok(ast::FunCall::new(span.into_updated_span(sp), fun, args))
+    Ok(ast::FunCall::new_boxed(
+      span.into_updated_span(sp),
+      fun,
+      args,
+    ))
   }
 
   /// Parses returns.
@@ -447,46 +477,7 @@ impl<T: Read> Parser<T> {
       value = Some(val);
     }
     // create function call
-    Ok(ast::Return::new(span, value))
-  }
-
-  /// Parses phi functions.
-  fn parse_phi(&mut self) -> Result {
-    let mut span = self.span();
-    // eat 'phi'
-    self.next_token()?;
-    // get type
-    let ty = self.parse_type()?;
-    // get the first operand
-    let (first, sp) = self.parse_phi_opr()?;
-    span.update_span(sp);
-    let mut oprs = vec![first];
-    // get the rest operands
-    while self.is_token(TokenKind::Other(',')) {
-      self.next_token()?;
-      let (opr, sp) = self.parse_phi_opr()?;
-      oprs.push(opr);
-      span.update_span(sp);
-    }
-    // create phi function
-    Ok(ast::Phi::new(span, ty, oprs))
-  }
-
-  /// Parses phi operands.
-  fn parse_phi_opr(&mut self) -> std::result::Result<((AstBox, String), Span), Error> {
-    let span = self.span();
-    // check & eat '('
-    self.expect(TokenKind::Other('('))?;
-    // get value
-    let value = self.parse_value()?;
-    // check & eat ','
-    self.expect(TokenKind::Other(','))?;
-    // get symbol name
-    let symbol = read!(self, TokenKind::Symbol, "symbol")?;
-    Ok((
-      (value, symbol),
-      span.into_updated_span(self.expect(TokenKind::Other(')'))?),
-    ))
+    Ok(ast::Return::new_boxed(span, value))
   }
 
   /// Parses values.
@@ -494,11 +485,11 @@ impl<T: Read> Parser<T> {
     let Token { span, kind } = &self.cur_token;
     let ret = match kind {
       // symbol reference
-      TokenKind::Symbol(s) => ast::SymbolRef::new(*span, s.clone()),
+      TokenKind::Symbol(s) => ast::SymbolRef::new_boxed(*span, s.clone()),
       // integer literal
-      TokenKind::Int(i) => ast::IntVal::new(*span, *i as i32),
+      TokenKind::Int(i) => ast::IntVal::new_boxed(*span, *i as i32),
       // undefined value
-      TokenKind::Keyword(Keyword::Undef) => ast::UndefVal::new(*span),
+      TokenKind::Keyword(Keyword::Undef) => ast::UndefVal::new_boxed(*span),
       // unknown
       _ => return_error!(span, "expected value, found {}", kind),
     };
@@ -512,19 +503,19 @@ impl<T: Read> Parser<T> {
     match kind {
       // integer literal
       TokenKind::Int(i) => {
-        let ast = ast::IntVal::new(*span, *i as i32);
+        let ast = ast::IntVal::new_boxed(*span, *i as i32);
         self.next_token()?;
         Ok(ast)
       }
       // undefined value
       TokenKind::Keyword(Keyword::Undef) => {
-        let ast = ast::UndefVal::new(*span);
+        let ast = ast::UndefVal::new_boxed(*span);
         self.next_token()?;
         Ok(ast)
       }
       // zero initializer
       TokenKind::Keyword(Keyword::ZeroInit) => {
-        let ast = ast::ZeroInit::new(*span);
+        let ast = ast::ZeroInit::new_boxed(*span);
         self.next_token()?;
         Ok(ast)
       }
@@ -547,13 +538,13 @@ impl<T: Read> Parser<T> {
       elems.push(self.parse_init()?);
     }
     // check & eat '}'
-    Ok(ast::Aggregate::new(
+    Ok(ast::Aggregate::new_boxed(
       span.into_updated_span(self.expect(TokenKind::Other('}'))?),
       elems,
     ))
   }
 
-  /// Parses comma-seperated lists.
+  /// Parses comma-separated lists.
   fn parse_list<F, U>(&mut self, parser: F) -> std::result::Result<(Vec<U>, Span), Error>
   where
     F: Fn(&mut Self) -> std::result::Result<U, Error>,
@@ -577,6 +568,19 @@ impl<T: Read> Parser<T> {
     Ok((items, self.expect(TokenKind::Other(')'))?))
   }
 
+  /// Parses optional comma-separated lists.
+  fn parse_opt_list<F, U>(&mut self, parser: F) -> std::result::Result<(Vec<U>, Span), Error>
+  where
+    F: Fn(&mut Self) -> std::result::Result<U, Error>,
+  {
+    // check left bracket
+    if self.is_token(TokenKind::Other('(')) {
+      self.parse_list(parser)
+    } else {
+      Ok((Vec::new(), self.span()))
+    }
+  }
+
   /// Checks if the current token is the specific token.
   fn is_token(&self, tk: TokenKind) -> bool {
     self.cur_token.kind == tk
@@ -598,15 +602,15 @@ impl<T: Read> Parser<T> {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::ir::instructions::BinaryOp;
+  use crate::ir::values::BinaryOp;
   use std::io::Cursor;
 
   macro_rules! new_ast {
     ($name:ident { $($field:ident: $value:expr),+ $(,)? }) => {
-      ast::$name::new(Span::default(), $($value),+)
+      ast::$name::new_boxed(Span::default(), $($value),+)
     };
     ($name:ident) => {
-      ast::$name::new(Span::default())
+      ast::$name::new_boxed(Span::default())
     };
   }
 
@@ -646,6 +650,7 @@ mod test {
       ret: Some(new_ast!(IntType)),
       bbs: vec![new_ast!(Block {
         name: "%entry".into(),
+        params: vec![],
         stmts: vec![
           new_ast!(SymbolDef {
             name: "%0".into(),
@@ -730,6 +735,7 @@ mod test {
       ret: Some(new_ast!(IntType)),
       bbs: vec![new_ast!(Block {
         name: "%entry".into(),
+        params: vec![],
         stmts: vec![
           new_ast!(SymbolDef {
             name: "%0".into(),
