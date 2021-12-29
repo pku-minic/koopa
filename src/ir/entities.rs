@@ -159,7 +159,7 @@ impl FunctionData {
   /// type can not construct a valid function type.
   pub fn new(name: String, params_ty: Vec<Type>, ret_ty: Type) -> Self {
     use crate::ir::values::FuncArgRef;
-    Self::check_sanity(&name, &params_ty);
+    Self::check_sanity(&name, params_ty.iter());
     // create function argument references
     let mut dfg = DataFlowGraph::new();
     let params = params_ty
@@ -176,6 +176,35 @@ impl FunctionData {
     }
   }
 
+  /// Creates a new function definition with parameter names.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name not starts with `%` or `@`, or the given
+  /// type can not construct a valid function type.
+  pub fn with_param_names(name: String, params: Vec<(Option<String>, Type)>, ret_ty: Type) -> Self {
+    use crate::ir::values::FuncArgRef;
+    Self::check_sanity(&name, params.iter().map(|(_, ty)| ty));
+    // create function argument references
+    let mut dfg = DataFlowGraph::new();
+    let (params, params_ty) = params
+      .into_iter()
+      .enumerate()
+      .map(|(i, (n, ty))| {
+        let v = dfg.new_value_data(FuncArgRef::new_data(i, ty.clone()));
+        dfg.value_mut(v).set_name(n);
+        (v, ty)
+      })
+      .unzip();
+    Self {
+      ty: Type::get_function(params_ty, ret_ty),
+      name,
+      params,
+      dfg,
+      layout: Layout::new(),
+    }
+  }
+
   /// Creates a new function declaration.
   ///
   /// # Panics
@@ -183,7 +212,7 @@ impl FunctionData {
   /// Panics if the given name not starts with `%` or `@`, or the given
   /// type can not construct a valid function type.
   pub fn new_decl(name: String, params_ty: Vec<Type>, ret_ty: Type) -> Self {
-    Self::check_sanity(&name, &params_ty);
+    Self::check_sanity(&name, params_ty.iter());
     Self {
       ty: Type::get_function(params_ty, ret_ty),
       name,
@@ -198,13 +227,16 @@ impl FunctionData {
   /// # Panics
   ///
   /// Panics if the given name and type is invalid.
-  fn check_sanity(name: &str, params: &[Type]) {
+  fn check_sanity<'a, T>(name: &str, mut params: T)
+  where
+    T: Iterator<Item = &'a Type>,
+  {
     assert!(
       name.len() > 1 && (name.starts_with('%') || name.starts_with('@')),
       "invalid function name"
     );
     assert!(
-      params.iter().all(|p| !p.is_unit()),
+      params.all(|p| !p.is_unit()),
       "parameter type must not be `unit`!"
     );
   }
