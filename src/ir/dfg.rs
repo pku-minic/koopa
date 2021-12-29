@@ -130,6 +130,15 @@ impl DataFlowGraph {
     data
   }
 
+  /// Returns a reference to the given local value.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given local value does not exist.
+  pub fn value(&self, value: Value) -> &ValueData {
+    self.values.get(&value).expect("`value` does not exist")
+  }
+
   /// Returns a mutable reference to the given local value.
   ///
   /// # Panics
