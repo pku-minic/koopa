@@ -83,6 +83,17 @@ impl Program {
     self.values.borrow()
   }
 
+  /// Immutably borrows the global value data by the given value handle.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value does not exist.
+  pub fn borrow_value(&self, value: Value) -> Ref<ValueData> {
+    Ref::map(self.values.borrow(), |m| {
+      m.get(&value).expect("`value` does not exist")
+    })
+  }
+
   /// Mutably borrows the global value data by the given value handle.
   ///
   /// # Panics
@@ -120,6 +131,16 @@ impl Program {
   /// Returns a mutable reference to the function map.
   pub fn funcs_mut(&mut self) -> &mut HashMap<Function, FunctionData> {
     &mut self.funcs
+  }
+
+  /// Returns a reference to the function data by
+  /// the given function handle.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given function does not exist.
+  pub fn func(&self, func: Function) -> &FunctionData {
+    self.funcs.get(&func).expect("`func` does not exist")
   }
 
   /// Returns a mutable reference to the function data by
