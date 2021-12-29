@@ -230,6 +230,15 @@ impl DataFlowGraph {
     self.bbs.remove(&bb).expect("`bb` does not exist")
   }
 
+  /// Returns a reference to the given basic block.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given basic block does not exist.
+  pub fn bb(&self, bb: BasicBlock) -> &BasicBlockData {
+    self.bbs.get(&bb).expect("`bb` does not exist")
+  }
+
   /// Returns a mutable reference to the given basic block.
   ///
   /// # Panics
