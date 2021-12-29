@@ -1,4 +1,4 @@
-use crate::ir::{BasicBlock, Function, Program, Value};
+use crate::ir::entities::{BasicBlockData, FunctionData, Program, ValueData};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -15,10 +15,11 @@ pub struct NameManager {
   prefix: Prefix,
   global_names: HashSet<StringRc>,
   bb_names: HashSet<StringRc>,
-  global_vars: HashMap<Value, Rc<String>>,
-  funcs: HashMap<Function, Rc<String>>,
-  bbs: HashMap<BasicBlock, Rc<String>>,
-  values: Option<HashMap<Value, Rc<String>>>,
+  global_vars: HashMap<*const ValueData, Rc<String>>,
+  funcs: HashMap<*const FunctionData, Rc<String>>,
+  bbs: HashMap<*const BasicBlockData, Rc<String>>,
+  // TODO: what's this?
+  values: Option<HashMap<*const ValueData, Rc<String>>>,
 }
 
 impl NameManager {
@@ -68,54 +69,49 @@ impl NameManager {
   }
 
   /// Returns the name of the given function.
-  pub fn func_name(&mut self, program: &Program, func: Function) -> Rc<String> {
-    if let Some(name) = self.funcs.get(&func) {
+  pub fn func_name(&mut self, func: &FunctionData) -> Rc<String> {
+    let ptr: *const FunctionData = func;
+    if let Some(name) = self.funcs.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_name_str(program.func(func).name(), |s| &mut s.global_names);
-      self.funcs.insert(func, name);
-      self.funcs[&func].clone()
+      let name = self.next_name_str(func.name(), |s| &mut s.global_names);
+      self.funcs.insert(ptr, name);
+      self.funcs[&ptr].clone()
     }
   }
 
   /// Returns the name of the given basic block.
-  pub fn bb_name(&mut self, program: &Program, func: Function, bb: BasicBlock) -> Rc<String> {
-    if let Some(name) = self.bbs.get(&bb) {
+  pub fn bb_name(&mut self, bb: &BasicBlockData) -> Rc<String> {
+    let ptr: *const BasicBlockData = bb;
+    if let Some(name) = self.bbs.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_name(program.func(func).dfg().bb(bb).name(), |s| &mut s.bb_names);
-      self.bbs.insert(bb, name);
-      self.bbs[&bb].clone()
+      let name = self.next_name(bb.name(), |s| &mut s.bb_names);
+      self.bbs.insert(ptr, name);
+      self.bbs[&ptr].clone()
     }
   }
 
   /// Returns the name of the given value.
-  pub fn value_name(&mut self, program: &Program, func: Function, value: Value) -> Rc<String> {
+  pub fn value_name(&mut self, value: &ValueData) -> Rc<String> {
     match self.cur_scope {
-      ScopeKind::Global => self.value_name_impl(program, func, value, |s| &mut s.global_vars),
-      _ => self.value_name_impl(program, func, value, |s| s.values.as_mut().unwrap()),
+      ScopeKind::Global => self.value_name_impl(value, |s| &mut s.global_vars),
+      _ => self.value_name_impl(value, |s| s.values.as_mut().unwrap()),
     }
   }
 
-  fn value_name_impl<F>(
-    &mut self,
-    program: &Program,
-    func: Function,
-    value: Value,
-    value_set: F,
-  ) -> Rc<String>
+  fn value_name_impl<F>(&mut self, value: &ValueData, value_set: F) -> Rc<String>
   where
-    F: for<'a> Fn(&'a mut Self) -> &'a mut HashMap<Value, Rc<String>>,
+    F: for<'a> Fn(&'a mut Self) -> &'a mut HashMap<*const ValueData, Rc<String>>,
   {
-    if let Some(name) = value_set(self).get(&value) {
+    let ptr: *const ValueData = value;
+    if let Some(name) = value_set(self).get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_name(program.func(func).dfg().value(value).name(), |s| {
-        &mut s.global_names
-      });
+      let name = self.next_name(value.name(), |s| &mut s.global_names);
       let values = value_set(self);
-      values.insert(value, name);
-      values[&value].clone()
+      values.insert(ptr, name);
+      values[&ptr].clone()
     }
   }
 
