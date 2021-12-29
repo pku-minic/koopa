@@ -16,7 +16,7 @@ pub struct DataFlowGraph {
   bbs: HashMap<BasicBlock, BasicBlockData>,
 }
 
-/// Returns a reference of the value data by the given value handle.
+/// Returns a reference to the value data by the given value handle.
 macro_rules! data {
   ($self:ident, $value:expr) => {
     $self
@@ -30,7 +30,7 @@ macro_rules! data {
   };
 }
 
-/// Returns a mutable reference of the value data by the given value handle.
+/// Returns a mutable reference to the value data by the given value handle.
 macro_rules! data_mut {
   ($self:ident, $value:expr) => {
     $self
@@ -230,7 +230,7 @@ impl DataFlowGraph {
     self.bbs.remove(&bb).expect("`bb` does not exist")
   }
 
-  /// Returns a mutable reference of the given basic block.
+  /// Returns a mutable reference to the given basic block.
   ///
   /// # Panics
   ///

@@ -19,7 +19,7 @@ pub struct Program {
   func_tys: Rc<RefCell<HashMap<Function, Type>>>,
 }
 
-/// Returns a mutable reference of the global value data by the given
+/// Returns a mutable reference to the global value data by the given
 /// value handle.
 macro_rules! data_mut {
   ($self:ident, $value:expr) => {
