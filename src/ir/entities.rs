@@ -121,6 +121,16 @@ impl Program {
   pub fn funcs_mut(&mut self) -> &mut HashMap<Function, FunctionData> {
     &mut self.funcs
   }
+
+  /// Returns a mutable reference to the function data by
+  /// the given function handle.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given function does not exist.
+  pub fn func_mut(&mut self, func: Function) -> &mut FunctionData {
+    self.funcs.get_mut(&func).expect("`func` does not exist")
+  }
 }
 
 /// Weak pointer for the `RefCell` of global value map.
