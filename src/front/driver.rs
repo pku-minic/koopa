@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 
-/// Driver can convert IR in string form to structures.
+/// A driver for converting text form Koopa IR to IR structures.
 pub struct Driver<T: Read> {
   parser: Parser<T>,
   builder: Builder,
@@ -18,7 +18,8 @@ pub struct Driver<T: Read> {
 impl<T: Read> Driver<T> {
   /// Maximum number of errors allowed.
   const MAX_ERR_NUM: usize = 20;
-  /// Creates a new `Driver`.
+
+  /// Creates a new driver.
   pub fn new(ft: FileType, reader: T) -> Self {
     Span::reset(ft);
     Self {
@@ -27,7 +28,7 @@ impl<T: Read> Driver<T> {
     }
   }
 
-  /// Generates IR program.
+  /// Generates Koopa IR program from the reader.
   pub fn generate_program(mut self) -> Result<Program, Error> {
     loop {
       // parse & get the next AST
@@ -57,7 +58,7 @@ impl<T: Read> Driver<T> {
 }
 
 impl Driver<File> {
-  /// Creates a new `Driver` from the specific path.
+  /// Creates a new driver from the specific path.
   pub fn from_path<P>(path: P) -> io::Result<Self>
   where
     P: AsRef<Path> + Clone,
@@ -66,22 +67,22 @@ impl Driver<File> {
   }
 }
 
-/// Creates `Driver` from standard input.
 impl From<io::Stdin> for Driver<io::Stdin> {
+  /// Creates a new driver from the standard input.
   fn from(stdin: io::Stdin) -> Self {
     Driver::new(FileType::Stdin, stdin)
   }
 }
 
-/// Creates `Driver` from `String`s.
 impl From<String> for Driver<io::Cursor<String>> {
+  /// Creates a new driver from the given [`String`].
   fn from(buf: String) -> Self {
     Driver::new(FileType::Buffer, io::Cursor::new(buf))
   }
 }
 
-/// Creates `Driver` from strings.
 impl<'a> From<&'a str> for Driver<io::Cursor<&'a str>> {
+  /// Creates a new driver from the given [`&str`].
   fn from(buf: &'a str) -> Self {
     Driver::new(FileType::Buffer, io::Cursor::new(buf))
   }
@@ -110,8 +111,8 @@ mod test {
     .into();
     let program = driver.generate_program().unwrap();
     assert_eq!(Span::error_num() + Span::warning_num(), 0);
-    for var in program.vars() {
-      assert_eq!(var.inner().name(), &Some("@x".into()));
+    for var in program.borrow_values().values() {
+      assert_eq!(var.name(), &Some("@x".into()));
       assert_eq!(
         var.ty(),
         &Type::get_pointer(Type::get_array(Type::get_i32(), 10))
@@ -119,14 +120,14 @@ mod test {
       match var.kind() {
         ValueKind::GlobalAlloc(alloc) => {
           assert!(matches!(
-            alloc.init().value().unwrap().kind(),
+            program.borrow_values()[&alloc.init()].kind(),
             ValueKind::ZeroInit(..)
           ));
         }
         _ => panic!(),
       }
     }
-    for func in program.funcs() {
+    for func in program.funcs().values() {
       assert_eq!(func.name(), "@test");
       assert_eq!(
         func.ty(),
