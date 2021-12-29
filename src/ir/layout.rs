@@ -31,6 +31,16 @@ impl Layout {
     &mut self.bbs
   }
 
+  /// Returns a mutable reference to the basic block node
+  /// by the given basic block handle.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given basic block does not exist.
+  pub fn bb_mut(&mut self, bb: BasicBlock) -> &mut BasicBlockNode {
+    self.bbs.node_mut(&bb).expect("`bb` does not exist")
+  }
+
   /// Returns the entry basic block of the function, returns `None` if
   /// the function is a declaration.
   pub fn entry_bb(&self) -> Option<BasicBlock> {
