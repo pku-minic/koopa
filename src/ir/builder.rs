@@ -495,6 +495,24 @@ impl<'a> ValueInserter for LocalBuilder<'a> {
 impl<'a> ValueBuilder for LocalBuilder<'a> {}
 impl<'a> LocalInstBuilder for LocalBuilder<'a> {}
 
+/// An basic block builder that builds a new basic block and inserts it
+/// to the data flow graph.
+pub struct BlockBuilder<'a> {
+  pub(crate) dfg: &'a mut DataFlowGraph,
+}
+
+impl<'a> ValueInserter for BlockBuilder<'a> {
+  fn insert_value(&mut self, data: ValueData) -> Value {
+    self.dfg.new_value_data(data)
+  }
+}
+
+impl<'a> BasicBlockBuilder for BlockBuilder<'a> {
+  fn insert_bb(&mut self, data: BasicBlockData) -> BasicBlock {
+    self.dfg.new_bb_data(data)
+  }
+}
+
 /// An value builder that replaces an existing local value.
 ///
 /// The inserted new value will have the same value handle as the old one.
