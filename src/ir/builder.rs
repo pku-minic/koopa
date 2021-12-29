@@ -340,6 +340,35 @@ pub trait BasicBlockBuilder: Sized + ValueInserter {
     let ty = Type::get_basic_block(params_ty);
     self.insert_bb(BasicBlockData::with_params(name, params, ty))
   }
+
+  /// Creates a new basic block with the given name, parameter names
+  /// and parameter types.
+  ///
+  /// # Panics
+  ///
+  /// Panics if there are unit types in the given parameter types.
+  fn basic_block_with_param_names(
+    mut self,
+    name: Option<String>,
+    params: Vec<(Option<String>, Type)>,
+  ) -> BasicBlock {
+    check_bb_name(&name);
+    assert!(
+      params.iter().all(|(_, p)| !p.is_unit()),
+      "parameter type must not be `unit`!"
+    );
+    let (params, params_ty) = params
+      .into_iter()
+      .enumerate()
+      .map(|(i, (n, ty))| {
+        let mut arg = BlockArgRef::new_data(i, ty.clone());
+        arg.set_name(n);
+        (self.insert_value(arg), ty)
+      })
+      .unzip();
+    let ty = Type::get_basic_block(params_ty);
+    self.insert_bb(BasicBlockData::with_params(name, params, ty))
+  }
 }
 
 /// Checks if the given basic block type has no parameters.
