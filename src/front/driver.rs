@@ -120,7 +120,7 @@ mod test {
       match var.kind() {
         ValueKind::GlobalAlloc(alloc) => {
           assert!(matches!(
-            program.borrow_values()[&alloc.init()].kind(),
+            program.borrow_value(alloc.init()).kind(),
             ValueKind::ZeroInit(..)
           ));
         }
