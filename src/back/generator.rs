@@ -7,7 +7,7 @@ use std::path::Path;
 use std::rc::Rc;
 
 /// A manager for storing names and allocating unique temporary
-/// names of global variables, functions, basic blocks and values.
+/// names of global values, functions, basic blocks and local values.
 #[derive(Default)]
 pub struct NameManager {
   next_id: usize,
@@ -15,21 +15,24 @@ pub struct NameManager {
   prefix: Prefix,
   global_names: HashSet<StringRc>,
   bb_names: HashSet<StringRc>,
-  global_vars: HashMap<*const Value, Rc<String>>,
-  funcs: HashMap<*const Function, Rc<String>>,
-  bbs: HashMap<*const BasicBlock, Rc<String>>,
-  values: Option<HashMap<*const Value, Rc<String>>>,
+  global_vars: HashMap<Value, Rc<String>>,
+  funcs: HashMap<Function, Rc<String>>,
+  bbs: HashMap<BasicBlock, Rc<String>>,
+  values: Option<HashMap<Value, Rc<String>>>,
 }
 
 impl NameManager {
-  /// Creates a new `NameManager`.
+  /// Creates a new name manager.
   pub fn new() -> Self {
     Self::default()
   }
 
   /// Enters the function scope.
-  ///
   /// Call this method when generating basic blocks and local values.
+  ///
+  /// # Panics
+  ///
+  /// Panics when the current scope is already function scope.
   pub fn enter_func_scope(&mut self) {
     assert!(
       matches!(self.cur_scope, ScopeKind::Global),
@@ -40,6 +43,11 @@ impl NameManager {
   }
 
   /// Exits the function scope.
+  /// Call this method when quitting from function generation.
+  ///
+  /// # Panics
+  ///
+  /// Panics when the current scope is not function scope.
   pub fn exit_func_scope(&mut self) {
     assert!(
       matches!(self.cur_scope, ScopeKind::Function),
@@ -59,55 +67,60 @@ impl NameManager {
     self.prefix = prefix;
   }
 
-  /// Gets the name of the specific function.
-  pub fn get_func_name(&mut self, func: &Function) -> Rc<String> {
-    let ptr: *const Function = func;
-    if let Some(name) = self.funcs.get(&ptr) {
+  /// Returns the name of the given function.
+  pub fn func_name(&mut self, program: &Program, func: Function) -> Rc<String> {
+    if let Some(name) = self.funcs.get(&func) {
       name.clone()
     } else {
-      let name = self.next_name_str(func.name(), |s| &mut s.global_names);
-      self.funcs.insert(ptr, name);
-      self.funcs[&ptr].clone()
+      let name = self.next_name_str(program.func(func).name(), |s| &mut s.global_names);
+      self.funcs.insert(func, name);
+      self.funcs[&func].clone()
     }
   }
 
-  /// Gets the name of the specific basic block.
-  pub fn get_bb_name(&mut self, bb: &BasicBlock) -> Rc<String> {
-    let ptr: *const BasicBlock = bb;
-    if let Some(name) = self.bbs.get(&ptr) {
+  /// Returns the name of the given basic block.
+  pub fn bb_name(&mut self, program: &Program, func: Function, bb: BasicBlock) -> Rc<String> {
+    if let Some(name) = self.bbs.get(&bb) {
       name.clone()
     } else {
-      let name = self.next_name(bb.name(), |s| &mut s.bb_names);
-      self.bbs.insert(ptr, name);
-      self.bbs[&ptr].clone()
+      let name = self.next_name(program.func(func).dfg().bb(bb).name(), |s| &mut s.bb_names);
+      self.bbs.insert(bb, name);
+      self.bbs[&bb].clone()
     }
   }
 
-  /// Gets the name of the specific value.
-  pub fn get_value_name(&mut self, value: &Value) -> Rc<String> {
+  /// Returns the name of the given value.
+  pub fn value_name(&mut self, program: &Program, func: Function, value: Value) -> Rc<String> {
     match self.cur_scope {
-      ScopeKind::Global => self.get_value_name_impl(value, |s| &mut s.global_vars),
-      _ => self.get_value_name_impl(value, |s| s.values.as_mut().unwrap()),
+      ScopeKind::Global => self.value_name_impl(program, func, value, |s| &mut s.global_vars),
+      _ => self.value_name_impl(program, func, value, |s| s.values.as_mut().unwrap()),
     }
   }
 
-  fn get_value_name_impl<F>(&mut self, value: &Value, value_set: F) -> Rc<String>
+  fn value_name_impl<F>(
+    &mut self,
+    program: &Program,
+    func: Function,
+    value: Value,
+    value_set: F,
+  ) -> Rc<String>
   where
-    F: for<'a> Fn(&'a mut Self) -> &'a mut HashMap<*const Value, Rc<String>>,
+    F: for<'a> Fn(&'a mut Self) -> &'a mut HashMap<Value, Rc<String>>,
   {
-    let ptr: *const Value = value;
-    if let Some(name) = value_set(self).get(&ptr) {
+    if let Some(name) = value_set(self).get(&value) {
       name.clone()
     } else {
-      let name = self.next_name(value.inner().name(), |s| &mut s.global_names);
+      let name = self.next_name(program.func(func).dfg().value(value).name(), |s| {
+        &mut s.global_names
+      });
       let values = value_set(self);
-      values.insert(ptr, name);
-      values[&ptr].clone()
+      values.insert(value, name);
+      values[&value].clone()
     }
   }
 
-  /// Gets a temporary value name.
-  pub fn get_temp_value_name(&mut self) -> Rc<String> {
+  /// Returns a temporary value name.
+  pub fn temp_value_name(&mut self) -> Rc<String> {
     self.next_name(&None, |s| &mut s.global_names)
   }
 
@@ -122,7 +135,7 @@ impl NameManager {
       self.next_name_str(name, name_set)
     } else {
       // generate a temporary name
-      let name = self.prefix.get_temp_name(self.next_id);
+      let name = self.prefix.temp_name(self.next_id);
       self.next_id += 1;
       let names = name_set(self);
       names.insert(name.clone().into());
@@ -136,7 +149,7 @@ impl NameManager {
   where
     F: for<'a> FnOnce(&'a mut Self) -> &'a mut HashSet<StringRc>,
   {
-    let name = self.prefix.get_name(name);
+    let name = self.prefix.name(name);
     let names = name_set(self);
     // check for duplicate names
     if !names.contains(&name) {
@@ -172,15 +185,18 @@ impl Default for ScopeKind {
 /// Prefix of name.
 pub enum Prefix {
   /// Default prefix,
-  /// named variables start with '@' and temporary variables start with '%'.
+  /// named variables start with '@' and
+  /// temporary variables start with '%'.
   Default,
-  /// Custom prefix.
+  /// Custom prefix,
+  /// named variables start with `named` and
+  /// temporary variables start with `temp`.
   Custom { named: String, temp: String },
 }
 
 impl Prefix {
-  /// Gets the name according to the prefix setting.
-  fn get_name(&self, name: &str) -> String {
+  /// Returns the name according to the prefix setting.
+  fn name(&self, name: &str) -> String {
     match self {
       Prefix::Default => name.into(),
       Prefix::Custom { named, temp } => {
@@ -193,8 +209,8 @@ impl Prefix {
     }
   }
 
-  /// Gets a temp name by the specific id.
-  fn get_temp_name(&self, id: usize) -> String {
+  /// Returns a temp name by the specific id.
+  fn temp_name(&self, id: usize) -> String {
     match self {
       Prefix::Default => format!("%{}", id),
       Prefix::Custom { temp, .. } => format!("{}{}", temp, id),
@@ -248,7 +264,7 @@ impl Borrow<str> for StringRc {
   }
 }
 
-/// Koopa IR generator
+/// A generator for traversing and generating Koopa IR into other forms.
 pub struct Generator<W: Write, V: Visitor<W>> {
   writer: W,
   visitor: V,
@@ -256,7 +272,7 @@ pub struct Generator<W: Write, V: Visitor<W>> {
 }
 
 impl<W: Write, V: Visitor<W>> Generator<W, V> {
-  /// Creates a new generator
+  /// Creates a new generator.
   pub fn new(writer: W) -> Self
   where
     V: Default,
@@ -269,7 +285,7 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
   }
 
   /// Creates a new generator with the specific visitor.
-  pub fn new_with_visitor(writer: W, visitor: V) -> Self {
+  pub fn with_visitor(writer: W, visitor: V) -> Self {
     Self {
       writer,
       visitor,
@@ -277,12 +293,12 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
     }
   }
 
-  /// Consumes and gets the writer inside of the current generator.
+  /// Consumes and returns the writer inside of the current generator.
   pub fn writer(self) -> W {
     self.writer
   }
 
-  /// Generates on the specific IR program.
+  /// Generates on the given Koopa IR program.
   pub fn generate_on(&mut self, program: &Program) -> Result<V::Output> {
     self
       .visitor
@@ -291,7 +307,7 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
 }
 
 impl<V: Visitor<File>> Generator<File, V> {
-  /// Creates a new `Generator` from the specific path.
+  /// Creates a new generator from the given path.
   pub fn from_path<P>(path: P) -> Result<Self>
   where
     V: Default,
@@ -301,19 +317,11 @@ impl<V: Visitor<File>> Generator<File, V> {
   }
 }
 
-/// Koopa IR visitor.
+/// A visitor trait for all Koopa IR visitors.
 pub trait Visitor<W: Write> {
   /// The output type of all visitor methods.
   type Output;
 
-  /// Visits the specific program.
+  /// Visits the given Koopa IR program.
   fn visit(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<Self::Output>;
-}
-
-/// Gets the value reference of the specific use.
-#[macro_export]
-macro_rules! value {
-  ($use:expr) => {
-    $use.value().unwrap().as_ref()
-  };
 }
