@@ -146,7 +146,7 @@ pub(crate) type FuncTypeMapCell = Weak<RefCell<HashMap<Function, Type>>>;
 /// A handle of Koopa IR function.
 ///
 /// You can fetch [`FunctionData`] from [`Program`] by using this handle.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Function(FunctionId);
 
 /// Data of Koopa IR function.
@@ -291,7 +291,7 @@ impl FunctionData {
 ///
 /// You can fetch [`BasicBlockData`] from [`DataFlowGraph`] in
 /// [`FunctionData`] by using this handle.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct BasicBlock(pub(crate) BasicBlockId);
 
 /// Data of Koopa IR basic block.
@@ -353,7 +353,7 @@ impl BasicBlockData {
 ///
 /// You can fetch [`ValueData`] from [`DataFlowGraph`] in [`FunctionData`]
 /// by using this handle.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Value(pub(crate) ValueId);
 
 /// Data of Koopa IR value.
