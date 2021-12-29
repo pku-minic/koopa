@@ -1,4 +1,4 @@
-use crate::ir::builder::{LocalBuilder, ReplaceBuilder};
+use crate::ir::builder::{BlockBuilder, LocalBuilder, ReplaceBuilder};
 use crate::ir::entities::{BasicBlock, BasicBlockData, Value, ValueData};
 use crate::ir::entities::{FuncTypeMapCell, GlobalValueMapCell};
 use crate::ir::idman::{next_bb_id, next_value_id};
@@ -198,8 +198,14 @@ impl DataFlowGraph {
   }
 
   /// Creates a new basic block in the current data flow graph.
+  /// Returns a [`BlockBuilder`] for building the new basic block.
+  pub fn new_bb(&mut self) -> BlockBuilder {
+    BlockBuilder { dfg: self }
+  }
+
+  /// Creates a new basic block in the current data flow graph.
   /// Returns the handle of the created basic block.
-  pub fn new_bb(&mut self, data: BasicBlockData) -> BasicBlock {
+  pub(crate) fn new_bb_data(&mut self, data: BasicBlockData) -> BasicBlock {
     let bb = BasicBlock(next_bb_id());
     self.bbs.insert(bb, data);
     bb
