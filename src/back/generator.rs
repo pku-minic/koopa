@@ -320,11 +320,3 @@ pub trait Visitor<W: Write> {
   /// Visits the given Koopa IR program.
   fn visit(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<Self::Output>;
 }
-
-/// Returns a reference to the given value by its parent function.
-#[macro_export]
-macro_rules! value {
-  ($func:expr, $value:expr) => {
-    $func.dfg().value($value)
-  };
-}
