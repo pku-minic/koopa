@@ -18,7 +18,6 @@ pub struct NameManager {
   global_vars: HashMap<*const ValueData, Rc<String>>,
   funcs: HashMap<*const FunctionData, Rc<String>>,
   bbs: HashMap<*const BasicBlockData, Rc<String>>,
-  // TODO: what's this?
   values: Option<HashMap<*const ValueData, Rc<String>>>,
 }
 
@@ -320,4 +319,12 @@ pub trait Visitor<W: Write> {
 
   /// Visits the given Koopa IR program.
   fn visit(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<Self::Output>;
+}
+
+/// Returns a reference to the given value by its parent function.
+#[macro_export]
+macro_rules! value {
+  ($func:expr, $value:expr) => {
+    $func.dfg().value($value)
+  };
 }
