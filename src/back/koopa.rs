@@ -29,8 +29,8 @@ struct VisitorImpl<'a, W: Write> {
 impl<'a, W: Write> VisitorImpl<'a, W> {
   /// Visits the program.
   fn visit(&mut self) -> Result<()> {
-    for var in self.program.borrow_values().values() {
-      self.visit_global_inst(var)?;
+    for value in self.program.borrow_values().values() {
+      self.visit_global_inst(value)?;
     }
     if !self.program.borrow_values().is_empty() {
       writeln!(self.w)?;
@@ -85,7 +85,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
       write!(self.w, ": {}", ret_ty)?;
     }
     // function body
-    if !func.dfg().bbs().is_empty() {
+    if !is_decl {
       writeln!(self.w, " {{")?;
       for (i, (bb, node)) in func.layout().bbs().iter().enumerate() {
         if i != 0 {
