@@ -3,7 +3,6 @@ use crate::ir::entities::{FunctionData, ValueData};
 use crate::ir::layout::BasicBlockNode;
 use crate::ir::values::*;
 use crate::ir::{BasicBlock, Program, Type, TypeKind, Value, ValueKind};
-use crate::value;
 use std::io::{Result, Write};
 
 /// Visitor for generating Koopa IR structures into text formatted Koopa IR.
@@ -14,7 +13,12 @@ impl<W: Write> back::Visitor<W> for Visitor {
   type Output = ();
 
   fn visit(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<()> {
-    let mut visitor = VisitorImpl { w, nm, program };
+    let mut visitor = VisitorImpl {
+      w,
+      nm,
+      program,
+      func: None,
+    };
     visitor.visit()
   }
 }
@@ -24,6 +28,21 @@ struct VisitorImpl<'a, W: Write> {
   w: &'a mut W,
   nm: &'a mut NameManager,
   program: &'a Program,
+  func: Option<&'a FunctionData>,
+}
+
+/// Returns a reference to the current function.
+macro_rules! func {
+  ($self:ident) => {
+    $self.func.unwrap()
+  };
+}
+
+/// Returns a reference to the given value in the current function.
+macro_rules! value {
+  ($self:ident, $value:expr) => {
+    func!($self).dfg().value($value)
+  };
 }
 
 impl<'a, W: Write> VisitorImpl<'a, W> {
@@ -39,6 +58,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
       if i != 0 {
         writeln!(self.w)?;
       }
+      self.func = Some(func);
       self.nm.enter_func_scope();
       self.visit_func(func)?;
       self.nm.exit_func_scope();
@@ -75,7 +95,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
         if i != 0 {
           write!(self.w, ", ")?;
         }
-        let param = value!(func, *param);
+        let param = value!(self, *param);
         write!(self.w, "{}: {}", self.nm.value_name(param), param.ty())?;
       }
     }
@@ -91,7 +111,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
         if i != 0 {
           writeln!(self.w)?;
         }
-        self.visit_bb(func, *bb, node)?;
+        self.visit_bb(*bb, node)?;
       }
       writeln!(self.w, "}}")
     } else {
@@ -100,9 +120,9 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   }
 
   /// Generates the specific basic block.
-  fn visit_bb(&mut self, func: &FunctionData, bb: BasicBlock, node: &BasicBlockNode) -> Result<()> {
+  fn visit_bb(&mut self, bb: BasicBlock, node: &BasicBlockNode) -> Result<()> {
     // basic block name
-    let bb = func.dfg().bb(bb);
+    let bb = func!(self).dfg().bb(bb);
     write!(self.w, "{}", self.nm.bb_name(bb))?;
     // basic block parameters
     if !bb.params().is_empty() {
@@ -111,7 +131,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
         if i != 0 {
           write!(self.w, ", ")?;
         }
-        let param = value!(func, *param);
+        let param = value!(self, *param);
         write!(self.w, "{}: {}", self.nm.value_name(param), param.ty())?;
       }
       write!(self.w, ")")?;
@@ -120,7 +140,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     // instrustions in basic block
     for inst in node.insts().keys() {
       write!(self.w, "  ")?;
-      self.visit_local_inst(func, value!(func, *inst))?;
+      self.visit_local_inst(value!(self, *inst))?;
     }
     Ok(())
   }
@@ -142,7 +162,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   }
 
   /// Generates the specific local instruction.
-  fn visit_local_inst(&mut self, func: &FunctionData, inst: &ValueData) -> Result<()> {
+  fn visit_local_inst(&mut self, inst: &ValueData) -> Result<()> {
     // definition
     if !inst.ty().is_unit() {
       write!(self.w, "{} = ", self.nm.value_name(inst))?;
@@ -150,22 +170,22 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     // content of instruction
     match inst.kind() {
       ValueKind::Alloc(_) => self.visit_alloc(inst.ty()),
-      ValueKind::Load(v) => self.visit_load(func, v),
-      ValueKind::Store(v) => self.visit_store(func, v),
-      ValueKind::GetPtr(v) => self.visit_getptr(func, v),
-      ValueKind::GetElemPtr(v) => self.visit_getelemptr(func, v),
-      ValueKind::Binary(v) => self.visit_binary(func, v),
-      ValueKind::Branch(v) => self.visit_branch(func, v),
-      ValueKind::Jump(v) => self.visit_jump(func, v),
-      ValueKind::Call(v) => self.visit_call(func, v),
-      ValueKind::Return(v) => self.visit_return(func, v),
+      ValueKind::Load(v) => self.visit_load(v),
+      ValueKind::Store(v) => self.visit_store(v),
+      ValueKind::GetPtr(v) => self.visit_getptr(v),
+      ValueKind::GetElemPtr(v) => self.visit_getelemptr(v),
+      ValueKind::Binary(v) => self.visit_binary(v),
+      ValueKind::Branch(v) => self.visit_branch(v),
+      ValueKind::Jump(v) => self.visit_jump(v),
+      ValueKind::Call(v) => self.visit_call(v),
+      ValueKind::Return(v) => self.visit_return(v),
       _ => panic!("invalid local instruction"),
     }?;
     writeln!(self.w)
   }
 
   /// Generates allocation.
-  fn visit_alloc(&self, ty: &Type) -> Result<()> {
+  fn visit_alloc(&mut self, ty: &Type) -> Result<()> {
     let base = match ty.kind() {
       TypeKind::Pointer(base) => base,
       _ => panic!("invalid pointer type"),
@@ -174,61 +194,61 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   }
 
   /// Generates memory load.
-  fn visit_load(&mut self, func: &FunctionData, load: &Load) -> Result<()> {
+  fn visit_load(&mut self, load: &Load) -> Result<()> {
     write!(self.w, "load ")?;
-    self.visit_value(func, value!(func, load.src()))
+    self.visit_value(value!(self, load.src()))
   }
 
   /// Generates memory store.
-  fn visit_store(&mut self, func: &FunctionData, store: &Store) -> Result<()> {
+  fn visit_store(&mut self, store: &Store) -> Result<()> {
     write!(self.w, "store ")?;
-    self.visit_value(func, value!(func, store.value()))?;
+    self.visit_value(value!(self, store.value()))?;
     write!(self.w, ", ")?;
-    self.visit_value(func, value!(func, store.dest()))
+    self.visit_value(value!(self, store.dest()))
   }
 
   /// Generates pointer calculation.
-  fn visit_getptr(&mut self, func: &FunctionData, gp: &GetPtr) -> Result<()> {
+  fn visit_getptr(&mut self, gp: &GetPtr) -> Result<()> {
     write!(self.w, "getptr ")?;
-    self.visit_value(func, value!(func, gp.src()))?;
+    self.visit_value(value!(self, gp.src()))?;
     write!(self.w, ", ")?;
-    self.visit_value(func, value!(func, gp.index()))
+    self.visit_value(value!(self, gp.index()))
   }
 
   /// Generates element pointer calculation.
-  fn visit_getelemptr(&mut self, func: &FunctionData, gep: &GetElemPtr) -> Result<()> {
+  fn visit_getelemptr(&mut self, gep: &GetElemPtr) -> Result<()> {
     write!(self.w, "getelemptr ")?;
-    self.visit_value(func, value!(func, gep.src()))?;
+    self.visit_value(value!(self, gep.src()))?;
     write!(self.w, ", ")?;
-    self.visit_value(func, value!(func, gep.index()))
+    self.visit_value(value!(self, gep.index()))
   }
 
   /// Generates binary operation.
-  fn visit_binary(&mut self, func: &FunctionData, bin: &Binary) -> Result<()> {
+  fn visit_binary(&mut self, bin: &Binary) -> Result<()> {
     write!(self.w, "{} ", bin.op())?;
-    self.visit_value(func, value!(func, bin.lhs()))?;
+    self.visit_value(value!(self, bin.lhs()))?;
     write!(self.w, ", ")?;
-    self.visit_value(func, value!(func, bin.rhs()))
+    self.visit_value(value!(self, bin.rhs()))
   }
 
   /// Generates branch.
-  fn visit_branch(&mut self, func: &FunctionData, br: &Branch) -> Result<()> {
+  fn visit_branch(&mut self, br: &Branch) -> Result<()> {
     write!(self.w, "br ")?;
-    self.visit_value(func, value!(func, br.cond()))?;
+    self.visit_value(value!(self, br.cond()))?;
     write!(self.w, ", ")?;
-    self.visit_bb_target(func, br.true_bb(), br.true_args())?;
+    self.visit_bb_target(br.true_bb(), br.true_args())?;
     write!(self.w, ", ")?;
-    self.visit_bb_target(func, br.false_bb(), br.false_args())
+    self.visit_bb_target(br.false_bb(), br.false_args())
   }
 
   /// Generates jump.
-  fn visit_jump(&mut self, func: &FunctionData, jump: &Jump) -> Result<()> {
+  fn visit_jump(&mut self, jump: &Jump) -> Result<()> {
     write!(self.w, "jump ")?;
-    self.visit_bb_target(func, jump.target(), jump.args())
+    self.visit_bb_target(jump.target(), jump.args())
   }
 
   /// Generates function call.
-  fn visit_call(&mut self, func: &FunctionData, call: &Call) -> Result<()> {
+  fn visit_call(&mut self, call: &Call) -> Result<()> {
     write!(
       self.w,
       "call {}(",
@@ -238,32 +258,32 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
       if i != 0 {
         write!(self.w, ", ")?;
       }
-      self.visit_value(func, value!(func, *arg))?;
+      self.visit_value(value!(self, *arg))?;
     }
     write!(self.w, ")")
   }
 
   /// Generates function return.
-  fn visit_return(&mut self, func: &FunctionData, ret: &Return) -> Result<()> {
+  fn visit_return(&mut self, ret: &Return) -> Result<()> {
     write!(self.w, "ret")?;
     if let Some(val) = ret.value() {
       write!(self.w, " ")?;
-      self.visit_value(func, value!(func, val))?;
+      self.visit_value(value!(self, val))?;
     }
     Ok(())
   }
 
   /// Generates the specific value.
-  fn visit_value(&mut self, func: &FunctionData, value: &ValueData) -> Result<()> {
+  fn visit_value(&mut self, value: &ValueData) -> Result<()> {
     if value.kind().is_const() {
-      self.visit_local_const(func, value)
+      self.visit_local_const(value)
     } else {
       write!(self.w, "{}", self.nm.value_name(value))
     }
   }
 
   /// Generates the specific global constant.
-  fn visit_global_const(&self, value: &ValueData) -> Result<()> {
+  fn visit_global_const(&mut self, value: &ValueData) -> Result<()> {
     match value.kind() {
       ValueKind::Integer(v) => write!(self.w, "{}", v.value()),
       ValueKind::ZeroInit(_) => write!(self.w, "zeroinit"),
@@ -283,7 +303,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   }
 
   /// Generates the specific local constant.
-  fn visit_local_const(&self, func: &FunctionData, value: &ValueData) -> Result<()> {
+  fn visit_local_const(&mut self, value: &ValueData) -> Result<()> {
     match value.kind() {
       ValueKind::Integer(v) => write!(self.w, "{}", v.value()),
       ValueKind::ZeroInit(_) => write!(self.w, "zeroinit"),
@@ -294,7 +314,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
           if i != 0 {
             write!(self.w, ", ")?;
           }
-          self.visit_local_const(func, value!(func, *elem))?;
+          self.visit_local_const(value!(self, *elem))?;
         }
         write!(self.w, "}}")
       }
@@ -303,20 +323,15 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   }
 
   /// Generates the specific basic block target.
-  fn visit_bb_target(
-    &mut self,
-    func: &FunctionData,
-    bb: BasicBlock,
-    params: &[Value],
-  ) -> Result<()> {
-    write!(self.w, "{}", self.nm.bb_name(func.dfg().bb(bb)))?;
+  fn visit_bb_target(&mut self, bb: BasicBlock, params: &[Value]) -> Result<()> {
+    write!(self.w, "{}", self.nm.bb_name(func!(self).dfg().bb(bb)))?;
     if !params.is_empty() {
       write!(self.w, "(")?;
       for (i, param) in params.iter().enumerate() {
         if i != 0 {
           write!(self.w, ", ")?;
         }
-        write!(self.w, "{}", self.nm.value_name(value!(func, *param)))?;
+        write!(self.w, "{}", self.nm.value_name(value!(self, *param)))?;
       }
       write!(self.w, ")")?;
     }
