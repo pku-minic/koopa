@@ -489,6 +489,11 @@ impl ValueKind {
         | ValueKind::Aggregate(..)
     )
   }
+
+  /// Returns `true` if the `ValueKind` represents a global allocation.
+  pub fn is_global_alloc(&self) -> bool {
+    matches!(self, ValueKind::GlobalAlloc(..))
+  }
 }
 
 /// An iterator over all values that used by a [`ValueKind`].
