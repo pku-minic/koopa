@@ -462,6 +462,18 @@ impl ValueData {
   }
 }
 
+impl Clone for ValueData {
+  /// Clones the current value data, except the `used_by` set.
+  fn clone(&self) -> Self {
+    Self {
+      ty: self.ty.clone(),
+      name: self.name.clone(),
+      kind: self.kind.clone(),
+      used_by: HashSet::new(),
+    }
+  }
+}
+
 /// Kind of Koopa IR value.
 #[derive(Clone)]
 pub enum ValueKind {
