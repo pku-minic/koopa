@@ -93,7 +93,7 @@ impl<T: Read> Lexer<T> {
     if let Ok(i) = num.parse() {
       Ok(Token::new(span, TokenKind::Int(i)))
     } else {
-      self.log_err_and_skip(span, "invalid integer literal")
+      self.log_err_and_skip(span, &format!("invalid integer literal '{}'", num))
     }
   }
 
@@ -136,7 +136,7 @@ impl<T: Read> Lexer<T> {
     }
     // check if only the prefix
     if symbol.len() == 1 {
-      self.log_err_and_skip(span, "invalid symbol")
+      self.log_err_and_skip(span, &format!("invalid symbol '{}'", symbol))
     } else {
       Ok(Token::new(span, TokenKind::Symbol(symbol)))
     }
@@ -158,7 +158,7 @@ impl<T: Read> Lexer<T> {
     } else if let Some(op) = BINARY_OPS.get(&keyword) {
       Ok(Token::new(span, TokenKind::BinaryOp(*op)))
     } else {
-      self.log_err_and_skip(span, "invalid keyword/operator")
+      self.log_err_and_skip(span, &format!("invalid keyword/operator '{}'", keyword))
     }
   }
 
