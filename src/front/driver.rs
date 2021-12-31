@@ -111,22 +111,21 @@ mod test {
     .into();
     let program = driver.generate_program().unwrap();
     assert_eq!(Span::error_num() + Span::warning_num(), 0);
-    for value in program.borrow_values().values() {
-      if !value.kind().is_const() {
-        assert_eq!(value.name(), &Some("@x".into()));
-        assert_eq!(
-          value.ty(),
-          &Type::get_pointer(Type::get_array(Type::get_i32(), 10))
-        );
-        match value.kind() {
-          ValueKind::GlobalAlloc(alloc) => {
-            assert!(matches!(
-              program.borrow_value(alloc.init()).kind(),
-              ValueKind::ZeroInit(..)
-            ));
-          }
-          _ => panic!(),
+    for inst in program.inst_layout() {
+      let inst = program.borrow_value(*inst);
+      assert_eq!(inst.name(), &Some("@x".into()));
+      assert_eq!(
+        inst.ty(),
+        &Type::get_pointer(Type::get_array(Type::get_i32(), 10))
+      );
+      match inst.kind() {
+        ValueKind::GlobalAlloc(alloc) => {
+          assert!(matches!(
+            program.borrow_value(alloc.init()).kind(),
+            ValueKind::ZeroInit(..)
+          ));
         }
+        _ => panic!(),
       }
     }
     for func in program.funcs().values() {
