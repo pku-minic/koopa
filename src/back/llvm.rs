@@ -2,7 +2,7 @@ use crate::back::{self, NameManager, Prefix};
 use crate::ir::entities::{FunctionData, ValueData};
 use crate::ir::layout::BasicBlockNode;
 use crate::ir::values::*;
-use crate::ir::{BasicBlock, Program, Type, TypeKind, ValueKind};
+use crate::ir::{BasicBlock, Program, Type, TypeKind, Value, ValueKind};
 use std::io::{Result, Write};
 
 /// Visitor for generating Koopa IR structures into LLVM IR.
@@ -45,6 +45,17 @@ macro_rules! value {
   };
 }
 
+/// Returns the type of the given value in the current function.
+macro_rules! value_ty {
+  ($self:ident, $value:expr) => {
+    if $value.is_global() {
+      $self.program.borrow_value($value).ty().clone()
+    } else {
+      func!($self).dfg().value($value).ty().clone()
+    }
+  };
+}
+
 impl<'a, W: Write> VisitorImpl<'a, W> {
   /// Visits the program.
   fn visit(&mut self) -> Result<()> {
@@ -53,17 +64,18 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
       named: "@".into(),
       temp: "@_".into(),
     });
-    for value in self.program.borrow_values().values() {
-      self.visit_global_inst(value)?;
+    for inst in self.program.inst_layout() {
+      self.visit_global_inst(&self.program.borrow_value(*inst))?;
     }
-    if !self.program.borrow_values().is_empty() {
+    if !self.program.inst_layout().is_empty() {
       writeln!(self.w)?;
     }
     // functions
-    for (i, func) in self.program.funcs().values().enumerate() {
+    for (i, func) in self.program.func_layout().iter().enumerate() {
       if i != 0 {
         writeln!(self.w)?;
       }
+      let func = self.program.func(*func);
       self.func = Some(func);
       self.nm.enter_func_scope();
       self.visit_func(func)?;
@@ -155,18 +167,19 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
         match value!(self, *user).kind() {
           ValueKind::Branch(br) => {
             if br.true_bb() == bb {
-              self.visit_value(false, value!(self, br.true_args()[i]))?;
+              self.visit_value(false, br.true_args()[i])?;
             } else {
-              self.visit_value(false, value!(self, br.false_args()[i]))?;
+              self.visit_value(false, br.false_args()[i])?;
             }
           }
-          ValueKind::Jump(jump) => self.visit_value(false, value!(self, jump.args()[i]))?,
+          ValueKind::Jump(jump) => self.visit_value(false, jump.args()[i])?,
           _ => panic!("invalid branch/jump instruction"),
         }
         write!(self.w, ", ")?;
         self.visit_bb_ref(func!(self).layout().parent_bb(*user).unwrap())?;
         write!(self.w, "]")?;
       }
+      writeln!(self.w)?;
     }
     // instrustions in basic block
     for inst in node.insts().keys() {
@@ -184,7 +197,8 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     };
     let init = self.program.borrow_value(alloc.init());
     write!(self.w, "{} = global ", self.nm.value_name(inst))?;
-    self.visit_global_const(&init)
+    self.visit_global_const(&init)?;
+    writeln!(self.w)
   }
 
   /// Generates the specific instruction.
@@ -225,43 +239,41 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     write!(self.w, "load ")?;
     self.visit_type(ty)?;
     write!(self.w, ", ")?;
-    self.visit_value(true, value!(self, load.src()))
+    self.visit_value(true, load.src())
   }
 
   /// Generates memory store.
   fn visit_store(&mut self, store: &Store) -> Result<()> {
     write!(self.w, "store ")?;
-    self.visit_value(true, value!(self, store.value()))?;
+    self.visit_value(true, store.value())?;
     write!(self.w, ", ")?;
-    self.visit_value(true, value!(self, store.dest()))
+    self.visit_value(true, store.dest())
   }
 
   /// Generates pointer calculation.
   fn visit_getptr(&mut self, gp: &GetPtr) -> Result<()> {
     write!(self.w, "getelementptr inbounds ")?;
-    let src = value!(self, gp.src());
-    self.visit_type(match src.ty().kind() {
+    self.visit_type(match value_ty!(self, gp.src()).kind() {
       TypeKind::Pointer(base) => base,
       _ => panic!("invalid pointer type"),
     })?;
     write!(self.w, ", ")?;
-    self.visit_value(true, src)?;
+    self.visit_value(true, gp.src())?;
     write!(self.w, ", ")?;
-    self.visit_value(true, value!(self, gp.index()))
+    self.visit_value(true, gp.index())
   }
 
   /// Generates element pointer calculation.
   fn visit_getelemptr(&mut self, gep: &GetElemPtr) -> Result<()> {
     write!(self.w, "getelementptr inbounds ")?;
-    let src = value!(self, gep.src());
-    self.visit_type(match src.ty().kind() {
+    self.visit_type(match value_ty!(self, gep.src()).kind() {
       TypeKind::Pointer(base) => base,
       _ => panic!("invalid pointer type"),
     })?;
     write!(self.w, ", ")?;
-    self.visit_value(true, src)?;
+    self.visit_value(true, gep.src())?;
     write!(self.w, ", i32 0, ")?;
-    self.visit_value(true, value!(self, gep.index()))
+    self.visit_value(true, gep.index())
   }
 
   /// Generates binary operation.
@@ -292,9 +304,9 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }?;
     write!(self.w, " i32 ")?;
     // generate lhs & rhs
-    self.visit_value(false, value!(self, bin.lhs()))?;
+    self.visit_value(false, bin.lhs())?;
     write!(self.w, ", ")?;
-    self.visit_value(false, value!(self, bin.rhs()))?;
+    self.visit_value(false, bin.rhs())?;
     // generate zero extension if is a compare instruction
     if let Some(t) = temp_name {
       write!(
@@ -310,10 +322,9 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   /// Generates branch.
   fn visit_branch(&mut self, br: &Branch) -> Result<()> {
     // generate condition
-    let cond = value!(self, br.cond());
     let temp = self.nm.temp_value_name();
     write!(self.w, "{} = icmp ne i32 ", temp)?;
-    self.visit_value(false, cond)?;
+    self.visit_value(false, br.cond())?;
     write!(self.w, ", 0\n  br i1 {}, label ", temp)?;
     // generate targets
     // ignore basic block parameters
@@ -344,7 +355,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
       if i != 0 {
         write!(self.w, ", ")?;
       }
-      self.visit_value(true, value!(self, *arg))?;
+      self.visit_value(true, *arg)?;
     }
     write!(self.w, ")")
   }
@@ -353,22 +364,33 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   fn visit_return(&mut self, ret: &Return) -> Result<()> {
     write!(self.w, "ret ")?;
     if let Some(val) = ret.value() {
-      self.visit_value(true, value!(self, val))
+      self.visit_value(true, val)
     } else {
       write!(self.w, "void")
     }
   }
 
   /// Generates the specific value.
-  fn visit_value(&mut self, with_ty: bool, value: &ValueData) -> Result<()> {
-    if value.kind().is_const() {
-      self.visit_local_const(with_ty, value)
-    } else {
+  fn visit_value(&mut self, with_ty: bool, value: Value) -> Result<()> {
+    if value.is_global() {
+      let value = self.program.borrow_value(value);
+      assert!(!value.kind().is_const());
       if with_ty {
         self.visit_type(value.ty())?;
         write!(self.w, " ")?;
       }
-      write!(self.w, "{}", self.nm.value_name(value))
+      write!(self.w, "{}", self.nm.value_name(&value))
+    } else {
+      let value = value!(self, value);
+      if value.kind().is_const() {
+        self.visit_local_const(with_ty, value)
+      } else {
+        if with_ty {
+          self.visit_type(value.ty())?;
+          write!(self.w, " ")?;
+        }
+        write!(self.w, "{}", self.nm.value_name(value))
+      }
     }
   }
 
@@ -458,7 +480,32 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
 mod test {
   use crate::back::LlvmGenerator;
   use crate::front::Driver;
+  use std::collections::VecDeque;
   use std::str;
+
+  fn remove_phi(mut ir: String) -> String {
+    let mut vec: VecDeque<_> = ir.match_indices("phi").map(|(pos, _)| pos).collect();
+    let mut pos = 0usize;
+    ir.retain(|c| {
+      let cur = pos;
+      pos += 1;
+      if let Some(p) = vec.front() {
+        if cur >= *p {
+          if c != '\n' {
+            false
+          } else {
+            vec.pop_front();
+            true
+          }
+        } else {
+          true
+        }
+      } else {
+        true
+      }
+    });
+    ir
+  }
 
   #[test]
   fn dump_ir() {
@@ -498,25 +545,23 @@ _entry:
   }
 
   #[test]
-  fn dump_ir_phi() {
+  fn dump_ir_bb_params() {
     let driver: Driver<_> = r#"
       decl @getint(): i32
 
       fun @main(): i32 {
       %entry:
         %ans_0 = call @getint()
-        jump %while_entry
+        jump %while_entry(0, %ans_0)
 
-      %while_entry:
-        %ind_var_0 = phi i32 (0, %entry), (%ind_var_1, %while_body)
-        %ans_1 = phi i32 (%ans_0, %entry), (%ans_2, %while_body)
+      %while_entry(%ind_var_0: i32, %ans_1: i32):
         %cond = lt %ind_var_0, 10
         br %cond, %while_body, %while_end
 
       %while_body:
         %ans_2 = add %ans_1, %ind_var_0
         %ind_var_1 = add %ind_var_0, 1
-        jump %while_entry
+        jump %while_entry(%ind_var_1, %ans_2)
 
       %while_end:
         ret %ans_1
@@ -527,8 +572,10 @@ _entry:
     gen
       .generate_on(&driver.generate_program().unwrap())
       .unwrap();
+    let ans = str::from_utf8(&gen.writer()).unwrap().to_string();
+    println!("{}", ans);
     assert_eq!(
-      str::from_utf8(&gen.writer()).unwrap(),
+      remove_phi(ans),
       r#"declare i32 @getint()
 
 define i32 @main() {
@@ -537,8 +584,8 @@ _entry:
   br label %_while_entry
 
 _while_entry:
-  %_ind_var_0 = phi i32 [ 0, %_entry ], [ %_ind_var_1, %_while_body ]
-  %_ans_1 = phi i32 [ %_ans_0, %_entry ], [ %_ans_2, %_while_body ]
+  %_ind_var_0 = 
+  %_ans_1 = 
   %_0 = icmp slt i32 %_ind_var_0, 10
   %_cond = zext i1 %_0 to i32
   %_1 = icmp ne i32 %_cond, 0
@@ -564,35 +611,31 @@ fun @main(): i32 {
 %args_0:
   %0 = call @getint()
   %1 = call @getint()
-  jump %while_cond_2
+  jump %while_cond_2(0, 0)
 
-%while_cond_2:
-  %2 = phi i32 (0, %args_0), (%3, %while_end_5)
-  %4 = phi i32 (0, %args_0), (%5, %while_end_5)
-  %6 = lt %4, %1
-  br %6, %while_body_3, %while_end_1
+%while_cond_2(%2: i32, %3: i32):
+  %4 = lt %3, %1
+  br %4, %while_body_3, %while_end_1
 
 %while_body_3:
-  jump %while_cond_4
+  jump %while_cond_4(%2, 0)
 
 %while_end_1:
   ret %2
 
-%while_cond_4:
-  %3 = phi i32 (%2, %while_body_3), (%7, %while_body_6)
-  %8 = phi i32 (0, %while_body_3), (%9, %while_body_6)
-  %10 = lt %8, %0
-  br %10, %while_body_6, %while_end_5
+%while_cond_4(%5: i32, %6: i32):
+  %7 = lt %6, %0
+  br %7, %while_body_6, %while_end_5
 
 %while_body_6:
-  %11 = add %3, %4
-  %7 = add %11, %8
-  %9 = add %8, 1
-  jump %while_cond_4
+  %8 = add %5, %3
+  %9 = add %8, %6
+  %10 = add %6, 1
+  jump %while_cond_4(%9, %10)
 
 %while_end_5:
-  %5 = add %4, 1
-  jump %while_cond_2
+  %11 = add %3, 1
+  jump %while_cond_2(%5, %11)
 }
 "#;
     let driver: Driver<_> = src.into();
@@ -600,8 +643,10 @@ fun @main(): i32 {
     gen
       .generate_on(&driver.generate_program().unwrap())
       .unwrap();
+    let ans = str::from_utf8(&gen.writer()).unwrap().to_string();
+    println!("{}", ans);
     assert_eq!(
-      str::from_utf8(&gen.writer()).unwrap(),
+      remove_phi(ans),
       r#"declare i32 @getint()
 
 define i32 @main() {
@@ -611,8 +656,8 @@ _args_0:
   br label %_while_cond_2
 
 _while_cond_2:
-  %_2 = phi i32 [ 0, %_args_0 ], [ %_3, %_while_end_5 ]
-  %_4 = phi i32 [ 0, %_args_0 ], [ %_5, %_while_end_5 ]
+  %_2 = 
+  %_4 = 
   %_6 = icmp slt i32 %_4, %_1
   %_7 = zext i1 %_6 to i32
   %_8 = icmp ne i32 %_7, 0
@@ -625,8 +670,8 @@ _while_end_1:
   ret i32 %_2
 
 _while_cond_4:
-  %_3 = phi i32 [ %_2, %_while_body_3 ], [ %_9, %_while_body_6 ]
-  %_10 = phi i32 [ 0, %_while_body_3 ], [ %_11, %_while_body_6 ]
+  %_3 = 
+  %_10 = 
   %_12 = icmp slt i32 %_10, %_0
   %_13 = zext i1 %_12 to i32
   %_14 = icmp ne i32 %_13, 0
