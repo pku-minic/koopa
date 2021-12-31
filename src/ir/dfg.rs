@@ -1,7 +1,7 @@
 use crate::ir::builder::{BlockBuilder, LocalBuilder, ReplaceBuilder};
 use crate::ir::entities::{BasicBlock, BasicBlockData, Value, ValueData};
 use crate::ir::entities::{FuncTypeMapCell, GlobalValueMapCell};
-use crate::ir::idman::{next_bb_id, next_value_id};
+use crate::ir::idman::{next_bb_id, next_local_value_id};
 use std::collections::HashMap;
 
 /// Data flow graph of a function.
@@ -68,7 +68,7 @@ impl DataFlowGraph {
   ///
   /// Panics if the given value data uses unexisted values or basic blocks.
   pub(crate) fn new_value_data(&mut self, data: ValueData) -> Value {
-    let value = Value(next_value_id());
+    let value = Value(next_local_value_id());
     for v in data.kind().value_uses() {
       data_mut!(self, v).used_by.insert(value);
     }
