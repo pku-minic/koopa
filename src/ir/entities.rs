@@ -15,8 +15,10 @@ use std::rc::{Rc, Weak};
 #[derive(Default)]
 pub struct Program {
   pub(crate) values: Rc<RefCell<HashMap<Value, ValueData>>>,
+  pub(crate) inst_layout: Vec<Value>,
   funcs: HashMap<Function, FunctionData>,
   func_tys: Rc<RefCell<HashMap<Function, Type>>>,
+  func_layout: Vec<Function>,
 }
 
 /// Returns a mutable reference to the global value data by the given
@@ -71,6 +73,11 @@ impl Program {
       .borrow_mut()
       .remove(&value)
       .expect("`value` does not exist");
+    if data.kind().is_global_alloc() {
+      self
+        .inst_layout
+        .remove(self.inst_layout.iter().position(|v| *v == value).unwrap());
+    }
     assert!(data.used_by.is_empty(), "`value` is used by other values");
     for v in data.kind().value_uses() {
       data_mut!(self, v).used_by.remove(&value);
@@ -81,6 +88,11 @@ impl Program {
   /// Immutably borrows the global value map.
   pub fn borrow_values(&self) -> Ref<HashMap<Value, ValueData>> {
     self.values.borrow()
+  }
+
+  /// Returns a reference to the layout of all global values.
+  pub fn inst_layout(&self) -> &[Value] {
+    &self.inst_layout
   }
 
   /// Immutably borrows the global value data by the given value handle.
@@ -112,6 +124,7 @@ impl Program {
     data.dfg.func_tys = Rc::downgrade(&self.func_tys);
     self.func_tys.borrow_mut().insert(func, data.ty.clone());
     self.funcs.insert(func, data);
+    self.func_layout.push(func);
     func
   }
 
@@ -120,6 +133,9 @@ impl Program {
   /// Returns the function data if the function was previously in the program.
   pub fn remove_func(&mut self, func: Function) -> Option<FunctionData> {
     self.func_tys.borrow_mut().remove(&func);
+    self
+      .func_layout
+      .remove(self.func_layout.iter().position(|f| *f == func).unwrap());
     self.funcs.remove(&func)
   }
 
@@ -131,6 +147,11 @@ impl Program {
   /// Returns a mutable reference to the function map.
   pub fn funcs_mut(&mut self) -> &mut HashMap<Function, FunctionData> {
     &mut self.funcs
+  }
+
+  /// Returns a reference to the layout of all functions.
+  pub fn func_layout(&self) -> &[Function] {
+    &self.func_layout
   }
 
   /// Returns a reference to the function data by
