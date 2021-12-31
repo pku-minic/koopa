@@ -159,7 +159,7 @@ impl DataFlowGraph {
   }
 
   /// Checks if the two given value data are equal.
-  fn data_eq(&self, lhs: &ValueData, rhs: &ValueData) -> bool {
+  pub fn data_eq(&self, lhs: &ValueData, rhs: &ValueData) -> bool {
     use crate::ir::entities::ValueKind::*;
     macro_rules! return_if {
       ($e:expr) => {
