@@ -1,6 +1,6 @@
 use crate::ir::builder::GlobalBuilder;
 use crate::ir::dfg::DataFlowGraph;
-use crate::ir::idman::{next_func_id, next_value_id};
+use crate::ir::idman::{is_global_id, next_func_id, next_global_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
 use crate::ir::layout::Layout;
 use crate::ir::types::Type;
@@ -50,7 +50,7 @@ impl Program {
   ///
   /// Panics if the given value data uses unexisted values.
   pub(crate) fn new_value_data(&mut self, data: ValueData) -> Value {
-    let value = Value(next_value_id());
+    let value = Value(next_global_value_id());
     for v in data.kind().value_uses() {
       data_mut!(self, v).used_by.insert(value);
     }
@@ -376,6 +376,13 @@ impl BasicBlockData {
 /// by using this handle.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Value(pub(crate) ValueId);
+
+impl Value {
+  /// Returns `true` if the current value handle is a global value handle.
+  pub fn is_global(self) -> bool {
+    is_global_id(self.0)
+  }
+}
 
 /// Data of Koopa IR value.
 ///
