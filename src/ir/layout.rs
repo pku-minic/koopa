@@ -119,6 +119,7 @@ impl Map<BasicBlock, BasicBlockNode> for BasicBlockMap {
     self.map.get_mut(k)
   }
 
+  #[allow(clippy::map_entry)]
   fn insert<T>(&mut self, k: BasicBlock, v: T) -> Result<(), (BasicBlock, T)>
   where
     T: Into<BasicBlockNode>,

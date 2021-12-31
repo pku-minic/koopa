@@ -164,7 +164,7 @@ impl Builder {
     let ret_ty = ast
       .ret
       .as_ref()
-      .map_or_else(|| Type::get_unit(), |a| self.generate_type(a));
+      .map_or_else(Type::get_unit, |a| self.generate_type(a));
     // create function definition
     let def = FunctionData::with_param_names(
       ast.name.clone(),
@@ -215,7 +215,7 @@ impl Builder {
       ast
         .ret
         .as_ref()
-        .map_or_else(|| Type::get_unit(), |a| self.generate_type(a)),
+        .map_or_else(Type::get_unit, |a| self.generate_type(a)),
     );
     // add to program
     let func = self.program.new_func(decl);
