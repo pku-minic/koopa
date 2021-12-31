@@ -48,16 +48,17 @@ macro_rules! value {
 impl<'a, W: Write> VisitorImpl<'a, W> {
   /// Visits the program.
   fn visit(&mut self) -> Result<()> {
-    for value in self.program.borrow_values().values() {
-      self.visit_global_inst(value)?;
+    for inst in self.program.inst_layout() {
+      self.visit_global_inst(&self.program.borrow_value(*inst))?;
     }
-    if !self.program.borrow_values().is_empty() {
+    if !self.program.inst_layout().is_empty() {
       writeln!(self.w)?;
     }
-    for (i, func) in self.program.funcs().values().enumerate() {
+    for (i, func) in self.program.func_layout().iter().enumerate() {
       if i != 0 {
         writeln!(self.w)?;
       }
+      let func = self.program.func(*func);
       self.func = Some(func);
       self.nm.enter_func_scope();
       self.visit_func(func)?;
@@ -158,7 +159,8 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
       self.nm.value_name(inst),
       init.ty()
     )?;
-    self.visit_global_const(&init)
+    self.visit_global_const(&init)?;
+    writeln!(self.w)
   }
 
   /// Generates the specific local instruction.
@@ -196,45 +198,45 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
   /// Generates memory load.
   fn visit_load(&mut self, load: &Load) -> Result<()> {
     write!(self.w, "load ")?;
-    self.visit_value(value!(self, load.src()))
+    self.visit_value(load.src())
   }
 
   /// Generates memory store.
   fn visit_store(&mut self, store: &Store) -> Result<()> {
     write!(self.w, "store ")?;
-    self.visit_value(value!(self, store.value()))?;
+    self.visit_value(store.value())?;
     write!(self.w, ", ")?;
-    self.visit_value(value!(self, store.dest()))
+    self.visit_value(store.dest())
   }
 
   /// Generates pointer calculation.
   fn visit_getptr(&mut self, gp: &GetPtr) -> Result<()> {
     write!(self.w, "getptr ")?;
-    self.visit_value(value!(self, gp.src()))?;
+    self.visit_value(gp.src())?;
     write!(self.w, ", ")?;
-    self.visit_value(value!(self, gp.index()))
+    self.visit_value(gp.index())
   }
 
   /// Generates element pointer calculation.
   fn visit_getelemptr(&mut self, gep: &GetElemPtr) -> Result<()> {
     write!(self.w, "getelemptr ")?;
-    self.visit_value(value!(self, gep.src()))?;
+    self.visit_value(gep.src())?;
     write!(self.w, ", ")?;
-    self.visit_value(value!(self, gep.index()))
+    self.visit_value(gep.index())
   }
 
   /// Generates binary operation.
   fn visit_binary(&mut self, bin: &Binary) -> Result<()> {
     write!(self.w, "{} ", bin.op())?;
-    self.visit_value(value!(self, bin.lhs()))?;
+    self.visit_value(bin.lhs())?;
     write!(self.w, ", ")?;
-    self.visit_value(value!(self, bin.rhs()))
+    self.visit_value(bin.rhs())
   }
 
   /// Generates branch.
   fn visit_branch(&mut self, br: &Branch) -> Result<()> {
     write!(self.w, "br ")?;
-    self.visit_value(value!(self, br.cond()))?;
+    self.visit_value(br.cond())?;
     write!(self.w, ", ")?;
     self.visit_bb_target(br.true_bb(), br.true_args())?;
     write!(self.w, ", ")?;
@@ -258,7 +260,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
       if i != 0 {
         write!(self.w, ", ")?;
       }
-      self.visit_value(value!(self, *arg))?;
+      self.visit_value(*arg)?;
     }
     write!(self.w, ")")
   }
@@ -268,17 +270,24 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     write!(self.w, "ret")?;
     if let Some(val) = ret.value() {
       write!(self.w, " ")?;
-      self.visit_value(value!(self, val))?;
+      self.visit_value(val)?;
     }
     Ok(())
   }
 
   /// Generates the specific value.
-  fn visit_value(&mut self, value: &ValueData) -> Result<()> {
-    if value.kind().is_const() {
-      self.visit_local_const(value)
+  fn visit_value(&mut self, value: Value) -> Result<()> {
+    if value.is_global() {
+      let value = self.program.borrow_value(value);
+      assert!(!value.kind().is_const());
+      write!(self.w, "{}", self.nm.value_name(&value))
     } else {
-      write!(self.w, "{}", self.nm.value_name(value))
+      let value = value!(self, value);
+      if value.kind().is_const() {
+        self.visit_local_const(value)
+      } else {
+        write!(self.w, "{}", self.nm.value_name(value))
+      }
     }
   }
 
@@ -331,7 +340,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
         if i != 0 {
           write!(self.w, ", ")?;
         }
-        write!(self.w, "{}", self.nm.value_name(value!(self, *param)))?;
+        self.visit_value(*param)?;
       }
       write!(self.w, ")")?;
     }
@@ -368,24 +377,22 @@ fun @test(@i: i32): i32 {
   }
 
   #[test]
-  fn dump_ir_phi() {
+  fn dump_ir_bb_params() {
     let src = r#"decl @getint(): i32
 
 fun @main(): i32 {
 %entry:
   %ans_0 = call @getint()
-  jump %while_entry
+  jump %while_entry(0, %ans_0)
 
-%while_entry:
-  %ind_var_0 = phi i32 (0, %entry), (%ind_var_1, %while_body)
-  %ans_1 = phi i32 (%ans_0, %entry), (%ans_2, %while_body)
+%while_entry(%ind_var_0: i32, %ans_1: i32):
   %cond = lt %ind_var_0, 10
   br %cond, %while_body, %while_end
 
 %while_body:
   %ans_2 = add %ans_1, %ind_var_0
   %ind_var_1 = add %ind_var_0, 1
-  jump %while_entry
+  jump %while_entry(%ind_var_1, %ans_2)
 
 %while_end:
   ret %ans_1
@@ -407,35 +414,31 @@ fun @main(): i32 {
 %args_0:
   %0 = call @getint()
   %1 = call @getint()
-  jump %while_cond_2
+  jump %while_cond_2(0, 0)
 
-%while_cond_2:
-  %2 = phi i32 (0, %args_0), (%3, %while_end_5)
-  %4 = phi i32 (0, %args_0), (%5, %while_end_5)
-  %6 = lt %4, %1
-  br %6, %while_body_3, %while_end_1
+%while_cond_2(%2: i32, %3: i32):
+  %4 = lt %3, %1
+  br %4, %while_body_3, %while_end_1
 
 %while_body_3:
-  jump %while_cond_4
+  jump %while_cond_4(%2, 0)
 
 %while_end_1:
   ret %2
 
-%while_cond_4:
-  %3 = phi i32 (%2, %while_body_3), (%7, %while_body_6)
-  %8 = phi i32 (0, %while_body_3), (%9, %while_body_6)
-  %10 = lt %8, %0
-  br %10, %while_body_6, %while_end_5
+%while_cond_4(%5: i32, %6: i32):
+  %7 = lt %6, %0
+  br %7, %while_body_6, %while_end_5
 
 %while_body_6:
-  %11 = add %3, %4
-  %7 = add %11, %8
-  %9 = add %8, 1
-  jump %while_cond_4
+  %8 = add %5, %3
+  %9 = add %8, %6
+  %10 = add %6, 1
+  jump %while_cond_4(%9, %10)
 
 %while_end_5:
-  %5 = add %4, 1
-  jump %while_cond_2
+  %11 = add %3, 1
+  jump %while_cond_2(%5, %11)
 }
 "#;
     let driver: Driver<_> = src.into();
