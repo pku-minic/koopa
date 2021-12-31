@@ -1,5 +1,5 @@
 use crate::front::span::Span;
-use crate::ir::values::BinaryOp;
+use crate::ir::BinaryOp;
 use std::cmp::PartialEq;
 
 /// An AST of Koopa IR.

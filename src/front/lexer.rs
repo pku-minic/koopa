@@ -1,6 +1,6 @@
 use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
-use crate::ir::values::BinaryOp;
+use crate::ir::BinaryOp;
 use crate::{log_raw_fatal_error, return_error};
 use phf::phf_map;
 use std::io::Read;
