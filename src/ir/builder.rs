@@ -577,7 +577,12 @@ impl<'a> EntityInfoQuerier for GlobalBuilder<'a> {
 
 impl<'a> ValueInserter for GlobalBuilder<'a> {
   fn insert_value(&mut self, data: ValueData) -> Value {
-    self.program.new_value_data(data)
+    let is_inst = data.kind().is_global_alloc();
+    let value = self.program.new_value_data(data);
+    if is_inst {
+      self.program.inst_layout.push(value);
+    }
+    value
   }
 }
 
