@@ -2,7 +2,6 @@ use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::{Error, Span};
 use crate::ir::builder_traits::*;
 use crate::ir::dfg::DataFlowGraph;
-use crate::ir::entities::ValueData;
 use crate::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind, Value};
 use crate::{log_error, log_warning, return_error};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -118,10 +117,13 @@ impl Builder {
     self.program.func_mut(func).dfg_mut()
   }
 
-  /// Returns a reference to the value data
-  /// by the given function and value.
-  fn value(&self, func: Function, value: Value) -> &ValueData {
-    self.program.func(func).dfg().value(value)
+  /// Returns the type of the given value.
+  fn value_ty(&self, func: Function, value: Value) -> Type {
+    if value.is_global() {
+      self.program.borrow_value(value).ty().clone()
+    } else {
+      self.program.func(func).dfg().value(value).ty().clone()
+    }
   }
 
   /// Returns the parameter types of the given basic block.
@@ -426,8 +428,8 @@ impl Builder {
       AstKind::SymbolRef(sym) => {
         let value = self.generate_symbol(&ast.span, bb_name, &sym.symbol)?;
         // check the type of the value to prevent duplication of definitions
-        let value_ty = self.value(func, value).ty();
-        if value_ty == ty {
+        let value_ty = self.value_ty(func, value);
+        if &value_ty == ty {
           Ok(value)
         } else {
           return_error!(
@@ -538,7 +540,7 @@ impl Builder {
         // generate the value of the instruction
         let inst = self.generate_inst(func, bb_name, &def.value)?;
         // check type
-        if self.value(func, inst).ty().is_unit() {
+        if self.value_ty(func, inst).is_unit() {
           return_error!(
             ast.span,
             "symbol '{}' is defined as a unit type, which is not allowed",
@@ -597,7 +599,7 @@ impl Builder {
     // get source value
     let src = self.generate_symbol(span, bb_name, &ast.symbol)?;
     // check source type
-    let src_ty = self.value(func, src).ty();
+    let src_ty = self.value_ty(func, src);
     if !matches!(src_ty.kind(), TypeKind::Pointer(..)) {
       return_error!(span, "expected pointer type, found '{}'", src_ty);
     }
@@ -615,13 +617,13 @@ impl Builder {
     // get destination value
     let dest = self.generate_symbol(span, bb_name, &ast.symbol)?;
     // check destination type & get source type
-    let dest_ty = self.value(func, dest).ty();
+    let dest_ty = self.value_ty(func, dest);
     let src_ty = match dest_ty.kind() {
-      TypeKind::Pointer(base) => base.clone(),
+      TypeKind::Pointer(base) => base,
       _ => return_error!(span, "expected pointer type, found '{}'", dest_ty),
     };
     // get source value
-    let value = self.generate_value(func, bb_name, &src_ty, &ast.value)?;
+    let value = self.generate_value(func, bb_name, src_ty, &ast.value)?;
     Ok(self.dfg_mut(func).new_value().store(value, dest))
   }
 
@@ -635,7 +637,7 @@ impl Builder {
   ) -> ValueResult {
     // get source value
     let src = self.generate_symbol(span, bb_name, &ast.symbol)?;
-    let src_ty = self.value(func, src).ty();
+    let src_ty = self.value_ty(func, src);
     if !matches!(src_ty.kind(), TypeKind::Pointer(..)) {
       return_error!(span, "expected pointer type, found '{}'", src_ty);
     }
@@ -654,7 +656,7 @@ impl Builder {
   ) -> ValueResult {
     // get source value
     let src = self.generate_symbol(span, bb_name, &ast.symbol)?;
-    let src_ty = self.value(func, src).ty();
+    let src_ty = self.value_ty(func, src);
     if !matches!(src_ty.kind(), TypeKind::Pointer(ty) if matches!(ty.kind(), TypeKind::Array(..))) {
       return_error!(span, "expected a pointer of array, found '{}'", src_ty);
     }
