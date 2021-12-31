@@ -18,7 +18,7 @@ pub struct NameManager {
   global_vars: HashMap<*const ValueData, Rc<String>>,
   funcs: HashMap<*const FunctionData, Rc<String>>,
   bbs: HashMap<*const BasicBlockData, Rc<String>>,
-  values: Option<HashMap<*const ValueData, Rc<String>>>,
+  values: HashMap<*const ValueData, Rc<String>>,
 }
 
 impl NameManager {
@@ -39,7 +39,7 @@ impl NameManager {
       "already in function scope"
     );
     self.cur_scope = ScopeKind::Function;
-    self.values = Some(HashMap::new());
+    self.values.clear();
   }
 
   /// Exits the function scope.
@@ -56,8 +56,7 @@ impl NameManager {
     self.cur_scope = ScopeKind::Global;
     self.bb_names.clear();
     self.bbs.clear();
-    let values = self.values.take().unwrap();
-    for name in values.values() {
+    for name in self.values.values() {
       self.global_names.remove(name);
     }
   }
@@ -92,10 +91,16 @@ impl NameManager {
   }
 
   /// Returns the name of the given value.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value is a constant.
   pub fn value_name(&mut self, value: &ValueData) -> Rc<String> {
-    match self.cur_scope {
-      ScopeKind::Global => self.value_name_impl(value, |s| &mut s.global_vars),
-      _ => self.value_name_impl(value, |s| s.values.as_mut().unwrap()),
+    assert!(!value.kind().is_const(), "can not name constants");
+    if value.kind().is_global_alloc() {
+      self.value_name_impl(value, |s| &mut s.global_vars)
+    } else {
+      self.value_name_impl(value, |s| &mut s.values)
     }
   }
 
