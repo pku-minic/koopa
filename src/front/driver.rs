@@ -111,20 +111,22 @@ mod test {
     .into();
     let program = driver.generate_program().unwrap();
     assert_eq!(Span::error_num() + Span::warning_num(), 0);
-    for var in program.borrow_values().values() {
-      assert_eq!(var.name(), &Some("@x".into()));
-      assert_eq!(
-        var.ty(),
-        &Type::get_pointer(Type::get_array(Type::get_i32(), 10))
-      );
-      match var.kind() {
-        ValueKind::GlobalAlloc(alloc) => {
-          assert!(matches!(
-            program.borrow_value(alloc.init()).kind(),
-            ValueKind::ZeroInit(..)
-          ));
+    for value in program.borrow_values().values() {
+      if !value.kind().is_const() {
+        assert_eq!(value.name(), &Some("@x".into()));
+        assert_eq!(
+          value.ty(),
+          &Type::get_pointer(Type::get_array(Type::get_i32(), 10))
+        );
+        match value.kind() {
+          ValueKind::GlobalAlloc(alloc) => {
+            assert!(matches!(
+              program.borrow_value(alloc.init()).kind(),
+              ValueKind::ZeroInit(..)
+            ));
+          }
+          _ => panic!(),
         }
-        _ => panic!(),
       }
     }
     for func in program.funcs().values() {
@@ -137,7 +139,7 @@ mod test {
   }
 
   #[test]
-  fn generate_ir_phi() {
+  fn generate_ir_bb_params() {
     let driver: Driver<_> = r#"
       //! version: 0.0.1
 
@@ -146,18 +148,16 @@ mod test {
       fun @main(): i32 {
       %entry:
         %ans_0 = call @getint()
-        jump %while_entry
+        jump %while_entry(0, %ans_0)
 
-      %while_entry: //! pred: %entry, %while_body
-        %ind_var_0 = phi i32 (0, %entry), (%ind_var_1, %while_body)
-        %ans_1 = phi i32 (%ans_0, %entry), (%ans_2, %while_body)
+      %while_entry(%ind_var_0: i32, %ans_1: i32): //! pred: %entry, %while_body
         %cond = lt %ind_var_0, 10
         br %cond, %while_body, %while_end
 
       %while_body: //! pred: %while_entry
         %ans_2 = add %ans_1, %ind_var_0
         %ind_var_1 = add %ind_var_0, 1
-        jump %while_entry
+        jump %while_entry(%ind_var_1, %ans_2)
 
       %while_end: //! pred: %while_entry
         ret %ans_1
@@ -177,35 +177,31 @@ mod test {
       %args_0:
         %7 = call @getint()
         %8 = call @getint()
-        jump %while_cond_2
+        jump %while_cond_2(0, 0)
 
       %while_end_1: //! preds: %while_cond_2
         ret %9
 
-      %while_cond_2: //! preds: %args_0, %while_end_5
-        %9 = phi i32 (0, %args_0), (%10, %while_end_5)
-        %11 = phi i32 (0, %args_0), (%12, %while_end_5)
+      %while_cond_2(%9: i32, %11: i32): //! preds: %args_0, %while_end_5
         %13 = lt %11, %8
         br %13, %while_body_3, %while_end_1
 
       %while_body_3: //! preds: %while_cond_2
-        jump %while_cond_4
+        jump %while_cond_4(%9, 0)
 
-      %while_cond_4: //! preds: %while_body_3, %while_body_6
-        %10 = phi i32 (%9, %while_body_3), (%14, %while_body_6)
-        %15 = phi i32 (0, %while_body_3), (%16, %while_body_6)
+      %while_cond_4(%10: i32, %15: i32): //! preds: %while_body_3, %while_body_6
         %17 = lt %15, %7
         br %17, %while_body_6, %while_end_5
 
       %while_end_5: //! preds: %while_cond_4
         %12 = add %11, 1
-        jump %while_cond_2
+        jump %while_cond_2(%10, %12)
 
       %while_body_6: //! preds: %while_cond_4
         %18 = add %10, %11
         %14 = add %18, %15
         %16 = add %15, 1
-        jump %while_cond_4
+        jump %while_cond_4(%14, %16)
       }
     "#
     .into();
