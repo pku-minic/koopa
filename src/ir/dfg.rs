@@ -23,7 +23,7 @@ macro_rules! data {
       .globals
       .upgrade()
       .unwrap()
-      .borrow_mut()
+      .borrow()
       .get(&$value)
       .or_else(|| $self.values.get(&$value))
       .expect("value does not exist")
@@ -251,5 +251,38 @@ impl DataFlowGraph {
   /// Returns a reference to the basic block map.
   pub fn bbs(&self) -> &HashMap<BasicBlock, BasicBlockData> {
     &self.bbs
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use crate::ir::builder_traits::*;
+  use crate::ir::{BinaryOp, FunctionData, Program, Type};
+
+  #[test]
+  fn value_eq() {
+    let mut program = Program::new();
+    let func = program.new_func(FunctionData::new("@test".into(), vec![], Type::get_unit()));
+    let func = program.func_mut(func);
+    // 10 == 10
+    let int1 = func.dfg_mut().new_value().integer(10);
+    let int2 = func.dfg_mut().new_value().integer(10);
+    assert!(func.dfg().value_eq(int1, int2));
+    // 10 + 10 - 10 == 10 + 10 - 10
+    let add1 = func.dfg_mut().new_value().binary(BinaryOp::Add, int1, int1);
+    let sub1 = func.dfg_mut().new_value().binary(BinaryOp::Sub, add1, int1);
+    let add2 = func.dfg_mut().new_value().binary(BinaryOp::Add, int2, int2);
+    let sub2 = func.dfg_mut().new_value().binary(BinaryOp::Sub, add2, int2);
+    assert!(func.dfg().value_eq(sub1, sub2));
+    // 10 != 9
+    let int1 = func.dfg_mut().new_value().integer(10);
+    let int2 = func.dfg_mut().new_value().integer(9);
+    assert!(!func.dfg().value_eq(int1, int2));
+    // 10 + 10 - 10 != 10 + 9 - 9 (lexical)
+    let add1 = func.dfg_mut().new_value().binary(BinaryOp::Add, int1, int1);
+    let sub1 = func.dfg_mut().new_value().binary(BinaryOp::Sub, add1, int1);
+    let add2 = func.dfg_mut().new_value().binary(BinaryOp::Add, int1, int2);
+    let sub2 = func.dfg_mut().new_value().binary(BinaryOp::Sub, add2, int2);
+    assert!(!func.dfg().value_eq(sub1, sub2));
   }
 }
