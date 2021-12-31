@@ -463,6 +463,7 @@ impl ValueData {
 }
 
 /// Kind of Koopa IR value.
+#[derive(Clone)]
 pub enum ValueKind {
   Integer(values::Integer),
   ZeroInit(values::ZeroInit),
