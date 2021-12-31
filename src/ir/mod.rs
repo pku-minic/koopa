@@ -13,3 +13,4 @@ pub mod builder_traits {
 
 pub use entities::{BasicBlock, Function, FunctionData, Program, Value, ValueKind};
 pub use types::{Type, TypeKind};
+pub use values::BinaryOp;
