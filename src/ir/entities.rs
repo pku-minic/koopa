@@ -85,6 +85,21 @@ impl Program {
     data
   }
 
+  /// Sets the name of the given global value.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value does not exist,
+  /// or the given name (if exists) not starts with `%` or `@`.
+  pub fn set_value_name(&mut self, value: Value, name: Option<String>) {
+    self
+      .values
+      .borrow_mut()
+      .get_mut(&value)
+      .expect("`value` does not exist")
+      .set_name(name);
+  }
+
   /// Immutably borrows the global value map.
   pub fn borrow_values(&self) -> Ref<HashMap<Value, ValueData>> {
     self.values.borrow()
@@ -442,7 +457,7 @@ impl ValueData {
   /// # Panics
   ///
   /// Panics if the given name (if exists) not starts with `%` or `@`.
-  pub fn set_name(&mut self, name: Option<String>) {
+  pub(crate) fn set_name(&mut self, name: Option<String>) {
     assert!(
       name.as_ref().map_or(true, |n| n.len() > 1
         && (n.starts_with('%') || n.starts_with('@'))),
