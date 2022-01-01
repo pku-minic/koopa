@@ -471,7 +471,6 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
         }
         write!(self.w, ")*")
       }
-      _ => panic!("invalid value type"),
     }
   }
 }
