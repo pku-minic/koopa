@@ -128,10 +128,15 @@ impl Builder {
 
   /// Returns the parameter types of the given basic block.
   fn bb_params_ty(&self, func: Function, bb: BasicBlock) -> Vec<Type> {
-    match self.program.func(func).dfg().bb(bb).ty().kind() {
-      TypeKind::BasicBlock(params) => params.clone(),
-      _ => panic!("invalid basic block"),
-    }
+    self
+      .program
+      .func(func)
+      .dfg()
+      .bb(bb)
+      .params()
+      .iter()
+      .map(|p| self.program.func(func).dfg().value(*p).ty().clone())
+      .collect()
   }
 
   /// Builds on global symbol definitions.
