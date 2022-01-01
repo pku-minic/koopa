@@ -16,8 +16,6 @@ pub enum TypeKind {
   Pointer(Type),
   /// Function (with parameter types and return type).
   Function(Vec<Type>, Type),
-  /// Basic block (with parameter types).
-  BasicBlock(Vec<Type>),
 }
 
 impl fmt::Display for TypeKind {
@@ -42,18 +40,6 @@ impl fmt::Display for TypeKind {
         } else {
           write!(f, ")")
         }
-      }
-      TypeKind::BasicBlock(params) => {
-        write!(f, "(")?;
-        let mut first = true;
-        for param in params {
-          if !first {
-            write!(f, ", ")?;
-          }
-          write!(f, "{}", param)?;
-          first = false;
-        }
-        write!(f, ")")
       }
     }
   }
@@ -110,11 +96,6 @@ impl Type {
     Type::get(TypeKind::Function(params, ret))
   }
 
-  /// Gets a basic block type.
-  pub fn get_basic_block(params: Vec<Type>) -> Type {
-    Type::get(TypeKind::BasicBlock(params))
-  }
-
   /// Sets the size of pointers.
   pub fn set_ptr_size(size: usize) {
     Self::PTR_SIZE.with(|ptr_size| ptr_size.set(size));
@@ -141,9 +122,7 @@ impl Type {
       TypeKind::Int32 => 4,
       TypeKind::Unit => 0,
       TypeKind::Array(ty, len) => ty.size() * len,
-      TypeKind::Pointer(..) | TypeKind::Function(..) | TypeKind::BasicBlock(..) => {
-        Self::PTR_SIZE.with(|s| s.get())
-      }
+      TypeKind::Pointer(..) | TypeKind::Function(..) => Self::PTR_SIZE.with(|s| s.get()),
     }
   }
 }
@@ -213,14 +192,6 @@ mod test {
       ),
       "(i32, i32): i32"
     );
-    assert_eq!(
-      format!(
-        "{}",
-        Type::get_basic_block(vec![Type::get_i32(), Type::get_i32()])
-      ),
-      "(i32, i32)"
-    );
-    assert_eq!(format!("{}", Type::get_basic_block(vec![])), "()");
   }
 
   #[test]
@@ -255,10 +226,6 @@ mod test {
     );
     assert_eq!(
       Type::get_function(vec![Type::get_i32(), Type::get_i32()], Type::get_unit()).size(),
-      mem::size_of::<usize>()
-    );
-    assert_eq!(
-      Type::get_basic_block(vec![Type::get_i32(), Type::get_i32()]).size(),
       mem::size_of::<usize>()
     );
     Type::set_ptr_size(4);
