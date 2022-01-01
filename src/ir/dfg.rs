@@ -130,6 +130,20 @@ impl DataFlowGraph {
     data
   }
 
+  /// Sets the name of the given value.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value does not exist,
+  /// or the given name (if exists) not starts with `%` or `@`.
+  pub fn set_value_name(&mut self, value: Value, name: Option<String>) {
+    self
+      .values
+      .get_mut(&value)
+      .expect("`value` does not exist")
+      .set_name(name);
+  }
+
   /// Returns a reference to the given local value.
   ///
   /// # Panics
