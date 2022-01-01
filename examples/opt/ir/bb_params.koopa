@@ -1,17 +1,16 @@
-fun @phi(): i32 {
+fun @bb_params(): i32 {
 %entry:
   %0 = add 1, 2
   br %0, %then, %else
 
 %then:
   %1 = add 4, 12
-  jump %end
+  jump %end(%1)
 
 %else:
   %2 = mul 4, 4
-  jump %end
+  jump %end(%2)
 
-%end:
-  %ans = phi i32 (%1, %then), (%2, %else)
+%end(%ans: i32):
   ret %ans
 }
