@@ -537,6 +537,23 @@ impl ValueKind {
   pub fn is_global_alloc(&self) -> bool {
     matches!(self, ValueKind::GlobalAlloc(..))
   }
+
+  /// Returns `true` if the `ValueKind` represents a local instruction.
+  pub fn is_local_inst(&self) -> bool {
+    matches!(
+      self,
+      ValueKind::Alloc(..)
+        | ValueKind::Load(..)
+        | ValueKind::Store(..)
+        | ValueKind::GetPtr(..)
+        | ValueKind::GetElemPtr(..)
+        | ValueKind::Binary(..)
+        | ValueKind::Branch(..)
+        | ValueKind::Jump(..)
+        | ValueKind::Call(..)
+        | ValueKind::Return(..)
+    )
+  }
 }
 
 /// An iterator over all values that used by a [`ValueKind`].
