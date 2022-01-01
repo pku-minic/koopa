@@ -260,6 +260,11 @@ impl DataFlowGraph {
   pub fn bbs(&self) -> &HashMap<BasicBlock, BasicBlockData> {
     &self.bbs
   }
+
+  /// Returns a mutable reference to the basic block map.
+  pub fn bbs_mut(&mut self) -> &mut HashMap<BasicBlock, BasicBlockData> {
+    &mut self.bbs
+  }
 }
 
 #[cfg(test)]
