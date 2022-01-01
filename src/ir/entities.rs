@@ -348,7 +348,6 @@ pub struct BasicBlock(pub(in crate::ir) BasicBlockId);
 /// in this basic block, can be found in [`FunctionData`] (in the data flow
 /// graph or the layout).
 pub struct BasicBlockData {
-  ty: Type,
   name: Option<String>,
   params: Vec<Value>,
   pub(in crate::ir) used_by: HashSet<Value>,
@@ -357,25 +356,18 @@ pub struct BasicBlockData {
 impl BasicBlockData {
   pub(in crate::ir) fn new(name: Option<String>) -> Self {
     Self {
-      ty: Type::get_basic_block(Vec::new()),
       name,
       params: Vec::new(),
       used_by: HashSet::new(),
     }
   }
 
-  pub(in crate::ir) fn with_params(name: Option<String>, params: Vec<Value>, ty: Type) -> Self {
+  pub(in crate::ir) fn with_params(name: Option<String>, params: Vec<Value>) -> Self {
     Self {
-      ty,
       name,
       params,
       used_by: HashSet::new(),
     }
-  }
-
-  /// Returns a reference to the basic block's type.
-  pub fn ty(&self) -> &Type {
-    &self.ty
   }
 
   /// Returns a reference to the basic block's name.
@@ -383,9 +375,19 @@ impl BasicBlockData {
     &self.name
   }
 
+  /// Sets the basic block's name.
+  pub fn set_name(&mut self, name: Option<String>) {
+    self.name = name;
+  }
+
   /// Returns a reference to the basic block parameters.
   pub fn params(&self) -> &[Value] {
     &self.params
+  }
+
+  /// Returns a mutable reference to the basic block parameters.
+  pub fn params_mut(&mut self) -> &mut Vec<Value> {
+    &mut self.params
   }
 
   /// Returns a reference to the values that the current basic block
