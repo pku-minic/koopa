@@ -225,17 +225,31 @@ impl DataFlowGraph {
     bb
   }
 
-  /// Removes the given basic block. Returns the corresponding
-  /// basic block data.
-  ///
-  /// Note: the parameters used by the given basic block
-  /// will not be removed.
+  /// Removes the given basic block, also removes all basic block
+  /// parameters. Returns the corresponding basic block data.
   ///
   /// # Panics
   ///
-  /// Panics if the given basic block does not exist.
+  /// Panics if:
+  ///
+  /// * the given basic block does not exist, or
+  /// * the removed basic block is currently used by other values, or
+  /// * the parameters of the removed basic block do not exist, or
+  ///   are currently used by other values.
   pub fn remove_bb(&mut self, bb: BasicBlock) -> BasicBlockData {
-    self.bbs.remove(&bb).expect("`bb` does not exist")
+    let data = self.bbs.remove(&bb).expect("`bb` does not exist");
+    assert!(data.used_by.is_empty(), "`bb` is used by other values");
+    for p in data.params() {
+      let param = self
+        .values
+        .remove(&p)
+        .expect("basic block parameter does not exist");
+      assert!(
+        param.used_by.is_empty(),
+        "basic block parameter is used by other values"
+      );
+    }
+    data
   }
 
   /// Returns a reference to the given basic block.
