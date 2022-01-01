@@ -14,8 +14,8 @@ use std::rc::{Rc, Weak};
 /// Programs can hold global values and functions.
 #[derive(Default)]
 pub struct Program {
-  pub(crate) values: Rc<RefCell<HashMap<Value, ValueData>>>,
-  pub(crate) inst_layout: Vec<Value>,
+  pub(in crate::ir) values: Rc<RefCell<HashMap<Value, ValueData>>>,
+  pub(in crate::ir) inst_layout: Vec<Value>,
   funcs: HashMap<Function, FunctionData>,
   func_tys: Rc<RefCell<HashMap<Function, Type>>>,
   func_layout: Vec<Function>,
@@ -51,7 +51,7 @@ impl Program {
   /// # Panics
   ///
   /// Panics if the given value data uses unexisted values.
-  pub(crate) fn new_value_data(&mut self, data: ValueData) -> Value {
+  pub(in crate::ir) fn new_value_data(&mut self, data: ValueData) -> Value {
     let value = Value(next_global_value_id());
     for v in data.kind().value_uses() {
       data_mut!(self, v).used_by.insert(value);
@@ -193,12 +193,12 @@ impl Program {
 /// Weak pointer for the `RefCell` of global value map.
 ///
 /// For [`DataFlowGraph`]s in function.
-pub(crate) type GlobalValueMapCell = Weak<RefCell<HashMap<Value, ValueData>>>;
+pub(in crate::ir) type GlobalValueMapCell = Weak<RefCell<HashMap<Value, ValueData>>>;
 
 /// Weak pointer for the `RefCell` of function type map.
 ///
 /// For [`DataFlowGraph`]s in function.
-pub(crate) type FuncTypeMapCell = Weak<RefCell<HashMap<Function, Type>>>;
+pub(in crate::ir) type FuncTypeMapCell = Weak<RefCell<HashMap<Function, Type>>>;
 
 /// A handle of Koopa IR function.
 ///
@@ -349,7 +349,7 @@ impl FunctionData {
 /// You can fetch [`BasicBlockData`] from [`DataFlowGraph`] in
 /// [`FunctionData`] by using this handle.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct BasicBlock(pub(crate) BasicBlockId);
+pub struct BasicBlock(pub(in crate::ir) BasicBlockId);
 
 /// Data of Koopa IR basic block.
 ///
@@ -362,11 +362,11 @@ pub struct BasicBlockData {
   ty: Type,
   name: Option<String>,
   params: Vec<Value>,
-  pub(crate) used_by: HashSet<Value>,
+  pub(in crate::ir) used_by: HashSet<Value>,
 }
 
 impl BasicBlockData {
-  pub(crate) fn new(name: Option<String>) -> Self {
+  pub(in crate::ir) fn new(name: Option<String>) -> Self {
     Self {
       ty: Type::get_basic_block(Vec::new()),
       name,
@@ -375,7 +375,7 @@ impl BasicBlockData {
     }
   }
 
-  pub(crate) fn with_params(name: Option<String>, params: Vec<Value>, ty: Type) -> Self {
+  pub(in crate::ir) fn with_params(name: Option<String>, params: Vec<Value>, ty: Type) -> Self {
     Self {
       ty,
       name,
@@ -411,7 +411,7 @@ impl BasicBlockData {
 /// You can fetch [`ValueData`] from [`DataFlowGraph`] in [`FunctionData`]
 /// by using this handle.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Value(pub(crate) ValueId);
+pub struct Value(pub(in crate::ir) ValueId);
 
 impl Value {
   /// Returns `true` if the current value handle is a global value handle.
@@ -428,12 +428,12 @@ pub struct ValueData {
   ty: Type,
   name: Option<String>,
   kind: ValueKind,
-  pub(crate) used_by: HashSet<Value>,
+  pub(in crate::ir) used_by: HashSet<Value>,
 }
 
 impl ValueData {
   /// Creates a new `ValueData` with the given type and kind.
-  pub(crate) fn new(ty: Type, kind: ValueKind) -> Self {
+  pub(in crate::ir) fn new(ty: Type, kind: ValueKind) -> Self {
     Self {
       ty,
       name: None,
@@ -457,7 +457,7 @@ impl ValueData {
   /// # Panics
   ///
   /// Panics if the given name (if exists) not starts with `%` or `@`.
-  pub(crate) fn set_name(&mut self, name: Option<String>) {
+  pub(in crate::ir) fn set_name(&mut self, name: Option<String>) {
     assert!(
       name.as_ref().map_or(true, |n| n.len() > 1
         && (n.starts_with('%') || n.starts_with('@'))),

@@ -6,7 +6,7 @@ use std::num::NonZeroU32;
 /// The IDs of `Value`s are unique, but two different IDs may correspond to
 /// the same `Value`. For example, two integer constants are the same but
 /// have different IDs.
-pub(crate) type ValueId = NonZeroU32;
+pub(in crate::ir) type ValueId = NonZeroU32;
 
 /// The value of `ValueId` (global value) should start from 1,
 /// because we want to use `NonZeroU32` to enable some
@@ -21,7 +21,7 @@ const LOCAL_VALUE_ID_STARTS_FROM: ValueId = unsafe { NonZeroU32::new_unchecked(0
 /// Type of `BasicBlock` identifier.
 ///
 /// The IDs of `BasicBlock`s are unique.
-pub(crate) type BasicBlockId = NonZeroU32;
+pub(in crate::ir) type BasicBlockId = NonZeroU32;
 
 /// The value of `BasicBlockId` should start from 1,
 /// because we want to use `NonZeroU32` to enable some
@@ -31,7 +31,7 @@ const BB_ID_STARTS_FROM: BasicBlockId = unsafe { NonZeroU32::new_unchecked(1) };
 /// Type of `Function` identifier.
 ///
 /// The IDs of `Function`s are unique.
-pub(crate) type FunctionId = NonZeroU32;
+pub(in crate::ir) type FunctionId = NonZeroU32;
 
 /// The value of `FunctionId` should start from 1,
 /// because we want to use `NonZeroU32` to enable some
@@ -50,28 +50,28 @@ thread_local! {
 }
 
 /// Returns the next global value ID.
-pub(crate) fn next_global_value_id() -> ValueId {
+pub(in crate::ir) fn next_global_value_id() -> ValueId {
   NEXT_GLOBAL_VALUE_ID
     .with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
 }
 
 /// Returns the next local value ID.
-pub(crate) fn next_local_value_id() -> ValueId {
+pub(in crate::ir) fn next_local_value_id() -> ValueId {
   NEXT_LOCAL_VALUE_ID
     .with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
 }
 
 /// Returns `true` if the given value ID is a global value ID.
-pub(crate) fn is_global_id(value: ValueId) -> bool {
+pub(in crate::ir) fn is_global_id(value: ValueId) -> bool {
   value >= GLOBAL_VALUE_ID_STARTS_FROM && value < LOCAL_VALUE_ID_STARTS_FROM
 }
 
 /// Returns the next basic block ID.
-pub(crate) fn next_bb_id() -> BasicBlockId {
+pub(in crate::ir) fn next_bb_id() -> BasicBlockId {
   NEXT_BB_ID.with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
 }
 
 /// Returns the next function ID.
-pub(crate) fn next_func_id() -> FunctionId {
+pub(in crate::ir) fn next_func_id() -> FunctionId {
   NEXT_FUNC_ID.with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
 }

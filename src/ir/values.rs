@@ -9,7 +9,7 @@ pub struct Integer {
 }
 
 impl Integer {
-  pub(crate) fn new_data(value: i32) -> ValueData {
+  pub(in crate::ir) fn new_data(value: i32) -> ValueData {
     ValueData::new(Type::get_i32(), ValueKind::Integer(Self { value }))
   }
 
@@ -24,7 +24,7 @@ impl Integer {
 pub struct ZeroInit;
 
 impl ZeroInit {
-  pub(crate) fn new_data(ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::ZeroInit(Self))
   }
 }
@@ -34,7 +34,7 @@ impl ZeroInit {
 pub struct Undef;
 
 impl Undef {
-  pub(crate) fn new_data(ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Undef(Self))
   }
 }
@@ -46,7 +46,7 @@ pub struct Aggregate {
 }
 
 impl Aggregate {
-  pub(crate) fn new_data(elems: Vec<Value>, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(elems: Vec<Value>, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Aggregate(Self { elems }))
   }
 
@@ -63,7 +63,7 @@ pub struct FuncArgRef {
 }
 
 impl FuncArgRef {
-  pub(crate) fn new_data(index: usize, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(index: usize, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::FuncArgRef(Self { index }))
   }
 
@@ -80,7 +80,7 @@ pub struct BlockArgRef {
 }
 
 impl BlockArgRef {
-  pub(crate) fn new_data(index: usize, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(index: usize, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::BlockArgRef(Self { index }))
   }
 
@@ -95,7 +95,7 @@ impl BlockArgRef {
 pub struct Alloc;
 
 impl Alloc {
-  pub(crate) fn new_data(ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(ty: Type) -> ValueData {
     assert!(!ty.is_unit(), "`ty` can not be unit");
     ValueData::new(ty, ValueKind::Alloc(Self))
   }
@@ -108,7 +108,7 @@ pub struct GlobalAlloc {
 }
 
 impl GlobalAlloc {
-  pub(crate) fn new_data(init: Value, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(init: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::GlobalAlloc(Self { init }))
   }
 
@@ -125,7 +125,7 @@ pub struct Load {
 }
 
 impl Load {
-  pub(crate) fn new_data(src: Value, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(src: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Load(Self { src }))
   }
 
@@ -143,7 +143,7 @@ pub struct Store {
 }
 
 impl Store {
-  pub(crate) fn new_data(value: Value, dest: Value) -> ValueData {
+  pub(in crate::ir) fn new_data(value: Value, dest: Value) -> ValueData {
     ValueData::new(Type::get_unit(), ValueKind::Store(Self { value, dest }))
   }
 
@@ -166,7 +166,7 @@ pub struct GetPtr {
 }
 
 impl GetPtr {
-  pub(crate) fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::GetPtr(Self { src, index }))
   }
 
@@ -189,7 +189,7 @@ pub struct GetElemPtr {
 }
 
 impl GetElemPtr {
-  pub(crate) fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(src: Value, index: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::GetElemPtr(Self { src, index }))
   }
 
@@ -213,7 +213,7 @@ pub struct Binary {
 }
 
 impl Binary {
-  pub(crate) fn new_data(op: BinaryOp, lhs: Value, rhs: Value, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(op: BinaryOp, lhs: Value, rhs: Value, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Binary(Self { op, lhs, rhs }))
   }
 
@@ -282,7 +282,11 @@ pub struct Branch {
 }
 
 impl Branch {
-  pub(crate) fn new_data(cond: Value, true_bb: BasicBlock, false_bb: BasicBlock) -> ValueData {
+  pub(in crate::ir) fn new_data(
+    cond: Value,
+    true_bb: BasicBlock,
+    false_bb: BasicBlock,
+  ) -> ValueData {
     ValueData::new(
       Type::get_unit(),
       ValueKind::Branch(Self {
@@ -295,7 +299,7 @@ impl Branch {
     )
   }
 
-  pub(crate) fn with_args(
+  pub(in crate::ir) fn with_args(
     cond: Value,
     true_bb: BasicBlock,
     false_bb: BasicBlock,
@@ -350,7 +354,7 @@ pub struct Jump {
 }
 
 impl Jump {
-  pub(crate) fn new_data(target: BasicBlock) -> ValueData {
+  pub(in crate::ir) fn new_data(target: BasicBlock) -> ValueData {
     ValueData::new(
       Type::get_unit(),
       ValueKind::Jump(Self {
@@ -360,7 +364,7 @@ impl Jump {
     )
   }
 
-  pub(crate) fn with_args(target: BasicBlock, args: Vec<Value>) -> ValueData {
+  pub(in crate::ir) fn with_args(target: BasicBlock, args: Vec<Value>) -> ValueData {
     ValueData::new(Type::get_unit(), ValueKind::Jump(Self { target, args }))
   }
 
@@ -383,7 +387,7 @@ pub struct Call {
 }
 
 impl Call {
-  pub(crate) fn new_data(callee: Function, args: Vec<Value>, ty: Type) -> ValueData {
+  pub(in crate::ir) fn new_data(callee: Function, args: Vec<Value>, ty: Type) -> ValueData {
     ValueData::new(ty, ValueKind::Call(Self { callee, args }))
   }
 
@@ -405,7 +409,7 @@ pub struct Return {
 }
 
 impl Return {
-  pub(crate) fn new_data(value: Option<Value>) -> ValueData {
+  pub(in crate::ir) fn new_data(value: Option<Value>) -> ValueData {
     ValueData::new(Type::get_unit(), ValueKind::Return(Self { value }))
   }
 

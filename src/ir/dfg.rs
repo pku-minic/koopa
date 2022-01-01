@@ -10,8 +10,8 @@ use std::collections::HashMap;
 /// blocks ([`BasicBlockData`]), and maintains their use-define and
 /// define-use chain.
 pub struct DataFlowGraph {
-  pub(crate) globals: GlobalValueMapCell,
-  pub(crate) func_tys: FuncTypeMapCell,
+  pub(in crate::ir) globals: GlobalValueMapCell,
+  pub(in crate::ir) func_tys: FuncTypeMapCell,
   values: HashMap<Value, ValueData>,
   bbs: HashMap<BasicBlock, BasicBlockData>,
 }
@@ -46,7 +46,7 @@ macro_rules! data_mut {
 
 impl DataFlowGraph {
   /// Creates a new data flow graph.
-  pub(crate) fn new() -> Self {
+  pub(in crate::ir) fn new() -> Self {
     Self {
       globals: GlobalValueMapCell::new(),
       func_tys: FuncTypeMapCell::new(),
@@ -67,7 +67,7 @@ impl DataFlowGraph {
   /// # Panics
   ///
   /// Panics if the given value data uses unexisted values or basic blocks.
-  pub(crate) fn new_value_data(&mut self, data: ValueData) -> Value {
+  pub(in crate::ir) fn new_value_data(&mut self, data: ValueData) -> Value {
     let value = Value(next_local_value_id());
     for v in data.kind().value_uses() {
       data_mut!(self, v).used_by.insert(value);
@@ -95,7 +95,7 @@ impl DataFlowGraph {
   /// # Panics
   ///
   /// Panics if the given value does not exist.
-  pub(crate) fn replace_value_with_data(&mut self, value: Value, data: ValueData) {
+  pub(in crate::ir) fn replace_value_with_data(&mut self, value: Value, data: ValueData) {
     let old = self.values.remove(&value).unwrap();
     for v in old.kind().value_uses() {
       data_mut!(self, v).used_by.remove(&value);
@@ -228,7 +228,7 @@ impl DataFlowGraph {
 
   /// Creates a new basic block in the current data flow graph.
   /// Returns the handle of the created basic block.
-  pub(crate) fn new_bb_data(&mut self, data: BasicBlockData) -> BasicBlock {
+  pub(in crate::ir) fn new_bb_data(&mut self, data: BasicBlockData) -> BasicBlock {
     let bb = BasicBlock(next_bb_id());
     self.bbs.insert(bb, data);
     bb

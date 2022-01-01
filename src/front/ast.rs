@@ -14,7 +14,7 @@ pub type AstBox = Box<Ast>;
 
 impl Ast {
   /// Creates a new AST box.
-  pub(crate) fn new_boxed(span: Span, kind: AstKind) -> AstBox {
+  pub(in crate::front) fn new_boxed(span: Span, kind: AstKind) -> AstBox {
     Box::new(Self { span, kind })
   }
 }
