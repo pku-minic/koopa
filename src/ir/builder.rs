@@ -12,12 +12,19 @@ pub trait EntityInfoQuerier {
   /// Panics if the given value does not exist.
   fn value_type(&self, value: Value) -> Type;
 
-  /// Returns the type information of the given basic block.
+  /// Checks if the given value is a constant.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given value does not exist.
+  fn is_const(&self, value: Value) -> bool;
+
+  /// Returns a reference to the parameters of the given basic block.
   ///
   /// # Panics
   ///
   /// Panics if the given basic block does not exist.
-  fn bb_type(&self, bb: BasicBlock) -> Type;
+  fn bb_params(&self, bb: BasicBlock) -> &[Value];
 
   /// Returns the type information of the given function.
   ///
@@ -25,13 +32,6 @@ pub trait EntityInfoQuerier {
   ///
   /// Panics if the given function does not exist.
   fn func_type(&self, func: Function) -> Type;
-
-  /// Checks if the given value is a constant.
-  ///
-  /// # Panics
-  ///
-  /// Panics if the given value does not exist.
-  fn is_const(&self, value: Value) -> bool;
 }
 
 /// A builder trait that provides method for inserting value data
@@ -225,8 +225,14 @@ pub trait LocalInstBuilder: ValueBuilder {
   /// basic block has parameters.
   fn branch(mut self, cond: Value, true_bb: BasicBlock, false_bb: BasicBlock) -> Value {
     assert!(self.value_type(cond).is_i32(), "`cond` must be integer");
-    check_bb_no_params(self.bb_type(true_bb));
-    check_bb_no_params(self.bb_type(false_bb));
+    assert!(
+      self.bb_params(true_bb).is_empty(),
+      "`true_bb` must not have parameters"
+    );
+    assert!(
+      self.bb_params(false_bb).is_empty(),
+      "`false_bb` must not have parameters"
+    );
     self.insert_value(Branch::new_data(cond, true_bb, false_bb))
   }
 
@@ -246,8 +252,8 @@ pub trait LocalInstBuilder: ValueBuilder {
     false_args: Vec<Value>,
   ) -> Value {
     assert!(self.value_type(cond).is_i32(), "`cond` must be integer");
-    check_bb_arg_types(&self, self.bb_type(true_bb), &true_args);
-    check_bb_arg_types(&self, self.bb_type(false_bb), &false_args);
+    check_bb_arg_types(&self, self.bb_params(true_bb), &true_args);
+    check_bb_arg_types(&self, self.bb_params(false_bb), &false_args);
     self.insert_value(Branch::with_args(
       cond, true_bb, false_bb, true_args, false_args,
     ))
@@ -259,7 +265,10 @@ pub trait LocalInstBuilder: ValueBuilder {
   ///
   /// Panics if the target basic block has parameters.
   fn jump(mut self, target: BasicBlock) -> Value {
-    check_bb_no_params(self.bb_type(target));
+    assert!(
+      self.bb_params(target).is_empty(),
+      "`target` must not have parameters"
+    );
     self.insert_value(Jump::new_data(target))
   }
 
@@ -269,7 +278,7 @@ pub trait LocalInstBuilder: ValueBuilder {
   ///
   /// Panics if the argument types of the target basic block do not match.
   fn jump_with_args(mut self, target: BasicBlock, args: Vec<Value>) -> Value {
-    check_bb_arg_types(&self, self.bb_type(target), &args);
+    check_bb_arg_types(&self, self.bb_params(target), &args);
     self.insert_value(Jump::with_args(target, args))
   }
 
@@ -342,8 +351,7 @@ pub trait BasicBlockBuilder: Sized + ValueInserter {
       .enumerate()
       .map(|(i, ty)| self.insert_value(BlockArgRef::new_data(i, ty.clone())))
       .collect();
-    let ty = Type::get_basic_block(params_ty);
-    self.insert_bb(BasicBlockData::with_params(name, params, ty))
+    self.insert_bb(BasicBlockData::with_params(name, params))
   }
 
   /// Creates a new basic block with the given name, parameter names
@@ -362,30 +370,17 @@ pub trait BasicBlockBuilder: Sized + ValueInserter {
       params.iter().all(|(_, p)| !p.is_unit()),
       "parameter type must not be `unit`!"
     );
-    let (params, params_ty) = params
+    let params = params
       .into_iter()
       .enumerate()
       .map(|(i, (n, ty))| {
-        let mut arg = BlockArgRef::new_data(i, ty.clone());
+        let mut arg = BlockArgRef::new_data(i, ty);
         arg.set_name(n);
-        (self.insert_value(arg), ty)
+        self.insert_value(arg)
       })
-      .unzip();
-    let ty = Type::get_basic_block(params_ty);
-    self.insert_bb(BasicBlockData::with_params(name, params, ty))
+      .collect();
+    self.insert_bb(BasicBlockData::with_params(name, params))
   }
-}
-
-/// Checks if the given basic block type has no parameters.
-///
-/// # Panics
-///
-/// Panics if the given basic block type has parameters.
-fn check_bb_no_params(bb_ty: Type) {
-  assert!(
-    matches!(bb_ty.kind(), TypeKind::BasicBlock(p) if p.is_empty()),
-    "basic block must not have parameters"
-  );
 }
 
 /// Checks if the parameter types of the given basic block type matches
@@ -395,18 +390,15 @@ fn check_bb_no_params(bb_ty: Type) {
 ///
 /// Panics if the parameter types of the given basic block type does not
 /// match the given argument types.
-fn check_bb_arg_types(querier: &impl EntityInfoQuerier, bb_ty: Type, args: &[Value]) {
-  match bb_ty.kind() {
-    TypeKind::BasicBlock(params) => assert!(
-      params.len() == args.len()
-        && params
-          .iter()
-          .zip(args.iter())
-          .all(|(ty, a)| ty == &querier.value_type(*a)),
-      "arguments type of basic block mismatch"
-    ),
-    _ => panic!("expected a basic block type"),
-  }
+fn check_bb_arg_types(querier: &impl EntityInfoQuerier, params: &[Value], args: &[Value]) {
+  assert!(
+    params.len() == args.len()
+      && params
+        .iter()
+        .zip(args.iter())
+        .all(|(p, a)| querier.value_type(*p) == querier.value_type(*a)),
+    "arguments type of basic block mismatch"
+  );
 }
 
 /// Checks if the given name is a valid basic block name.
@@ -442,28 +434,6 @@ impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
       .clone()
   }
 
-  fn bb_type(&self, bb: BasicBlock) -> Type {
-    self
-      .dfg()
-      .bbs()
-      .get(&bb)
-      .expect("basic block does not exist")
-      .ty()
-      .clone()
-  }
-
-  fn func_type(&self, func: Function) -> Type {
-    self
-      .dfg()
-      .func_tys
-      .upgrade()
-      .unwrap()
-      .borrow()
-      .get(&func)
-      .expect("function does not exist")
-      .clone()
-  }
-
   fn is_const(&self, value: Value) -> bool {
     self
       .dfg()
@@ -476,6 +446,27 @@ impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
       .expect("value does not exist")
       .kind()
       .is_const()
+  }
+
+  fn bb_params(&self, bb: BasicBlock) -> &[Value] {
+    self
+      .dfg()
+      .bbs()
+      .get(&bb)
+      .expect("basic block does not exist")
+      .params()
+  }
+
+  fn func_type(&self, func: Function) -> Type {
+    self
+      .dfg()
+      .func_tys
+      .upgrade()
+      .unwrap()
+      .borrow()
+      .get(&func)
+      .expect("function does not exist")
+      .clone()
   }
 }
 
@@ -560,14 +551,6 @@ impl<'a> EntityInfoQuerier for GlobalBuilder<'a> {
       .clone()
   }
 
-  fn bb_type(&self, _: BasicBlock) -> Type {
-    unimplemented!()
-  }
-
-  fn func_type(&self, _: Function) -> Type {
-    unimplemented!()
-  }
-
   fn is_const(&self, value: Value) -> bool {
     self
       .program
@@ -577,6 +560,14 @@ impl<'a> EntityInfoQuerier for GlobalBuilder<'a> {
       .expect("value does not exist")
       .kind()
       .is_const()
+  }
+
+  fn bb_params(&self, _: BasicBlock) -> &[Value] {
+    unimplemented!()
+  }
+
+  fn func_type(&self, _: Function) -> Type {
+    unimplemented!()
   }
 }
 
