@@ -242,7 +242,7 @@ impl DataFlowGraph {
     for p in data.params() {
       let param = self
         .values
-        .remove(&p)
+        .remove(p)
         .expect("basic block parameter does not exist");
       assert!(
         param.used_by.is_empty(),
