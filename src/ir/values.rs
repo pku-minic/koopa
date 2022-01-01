@@ -17,6 +17,11 @@ impl Integer {
   pub fn value(&self) -> i32 {
     self.value
   }
+
+  /// Returns a mutable reference to the integer value.
+  pub fn value_mut(&mut self) -> &mut i32 {
+    &mut self.value
+  }
 }
 
 /// Zero initializer.
@@ -54,6 +59,11 @@ impl Aggregate {
   pub fn elems(&self) -> &[Value] {
     &self.elems
   }
+
+  /// Returns a mutable reference to the aggregate elements.
+  pub fn elems_mut(&mut self) -> &mut Vec<Value> {
+    &mut self.elems
+  }
 }
 
 /// Function argument reference.
@@ -71,6 +81,11 @@ impl FuncArgRef {
   pub fn index(&self) -> usize {
     self.index
   }
+
+  /// Returns a mutable reference to the argument index.
+  pub fn index_mut(&mut self) -> &mut usize {
+    &mut self.index
+  }
 }
 
 /// Basic block argument reference.
@@ -87,6 +102,11 @@ impl BlockArgRef {
   /// Returns the argument index.
   pub fn index(&self) -> usize {
     self.index
+  }
+
+  /// Returns a mutable reference to the argument index.
+  pub fn index_mut(&mut self) -> &mut usize {
+    &mut self.index
   }
 }
 
@@ -112,9 +132,14 @@ impl GlobalAlloc {
     ValueData::new(ty, ValueKind::GlobalAlloc(Self { init }))
   }
 
-  /// Returns a reference to the initializer.
+  /// Returns the initializer.
   pub fn init(&self) -> Value {
     self.init
+  }
+
+  /// Returns a mutable reference to the initializer.
+  pub fn init_mut(&mut self) -> &mut Value {
+    &mut self.init
   }
 }
 
@@ -129,9 +154,14 @@ impl Load {
     ValueData::new(ty, ValueKind::Load(Self { src }))
   }
 
-  /// Returns a reference to the source memory location.
+  /// Returns the source memory location.
   pub fn src(&self) -> Value {
     self.src
+  }
+
+  /// Returns a mutable reference to the source memory location.
+  pub fn src_mut(&mut self) -> &mut Value {
+    &mut self.src
   }
 }
 
@@ -147,14 +177,24 @@ impl Store {
     ValueData::new(Type::get_unit(), ValueKind::Store(Self { value, dest }))
   }
 
-  /// Returns a reference to the value of the memory store.
+  /// Returns the value of the memory store.
   pub fn value(&self) -> Value {
     self.value
   }
 
-  /// Returns a reference to the destination of the memory store.
+  /// Returns a mutable reference to the value of the memory store.
+  pub fn value_mut(&mut self) -> &mut Value {
+    &mut self.value
+  }
+
+  /// Returns the destination of the memory store.
   pub fn dest(&self) -> Value {
     self.dest
+  }
+
+  /// Returns a mutable reference to the destination of the memory store.
+  pub fn dest_mut(&mut self) -> &mut Value {
+    &mut self.dest
   }
 }
 
@@ -170,14 +210,24 @@ impl GetPtr {
     ValueData::new(ty, ValueKind::GetPtr(Self { src, index }))
   }
 
-  /// Returns a reference to the source memory location.
+  /// Returns the source memory location.
   pub fn src(&self) -> Value {
     self.src
   }
 
-  /// Returns a reference to the index of pointer calculation.
+  /// Returns a mutable reference to the source memory location.
+  pub fn src_mut(&mut self) -> &mut Value {
+    &mut self.src
+  }
+
+  /// Returns the index of pointer calculation.
   pub fn index(&self) -> Value {
     self.index
+  }
+
+  /// Returns a mutable reference to the index of pointer calculation.
+  pub fn index_mut(&mut self) -> &mut Value {
+    &mut self.index
   }
 }
 
@@ -193,14 +243,24 @@ impl GetElemPtr {
     ValueData::new(ty, ValueKind::GetElemPtr(Self { src, index }))
   }
 
-  /// Returns a reference to the source memory location.
+  /// Returns the source memory location.
   pub fn src(&self) -> Value {
     self.src
   }
 
-  /// Returns a reference to the index of element pointer calculation.
+  /// Returns a mutable reference to the source memory location.
+  pub fn src_mut(&mut self) -> &mut Value {
+    &mut self.src
+  }
+
+  /// Returns the index of element pointer calculation.
   pub fn index(&self) -> Value {
     self.index
+  }
+
+  /// Returns a mutable reference to the index of element pointer calculation.
+  pub fn index_mut(&mut self) -> &mut Value {
+    &mut self.index
   }
 }
 
@@ -217,19 +277,34 @@ impl Binary {
     ValueData::new(ty, ValueKind::Binary(Self { op, lhs, rhs }))
   }
 
-  /// Returns a reference to the binary operator.
+  /// Returns the binary operator.
   pub fn op(&self) -> BinaryOp {
     self.op
   }
 
-  /// Returns a reference to the left-hand side use.
+  /// Returns a mutable reference to the binary operator.
+  pub fn op_mut(&mut self) -> &mut BinaryOp {
+    &mut self.op
+  }
+
+  /// Returns the left-hand side use.
   pub fn lhs(&self) -> Value {
     self.lhs
   }
 
-  /// Returns a reference to the right-hand side use.
+  /// Returns a mutable reference to the left-hand side use.
+  pub fn lhs_mut(&mut self) -> &mut Value {
+    &mut self.lhs
+  }
+
+  /// Returns the right-hand side use.
   pub fn rhs(&self) -> Value {
     self.rhs
+  }
+
+  /// Returns a mutable reference to the right-hand side use.
+  pub fn rhs_mut(&mut self) -> &mut Value {
+    &mut self.rhs
   }
 }
 
@@ -318,19 +393,34 @@ impl Branch {
     )
   }
 
-  /// Returns a reference to the branch condition.
+  /// Returns the branch condition.
   pub fn cond(&self) -> Value {
     self.cond
   }
 
-  /// Returns a reference to the true target basic block.
+  /// Returns a mutable reference to the branch condition.
+  pub fn cond_mut(&mut self) -> &mut Value {
+    &mut self.cond
+  }
+
+  /// Returns the true target basic block.
   pub fn true_bb(&self) -> BasicBlock {
     self.true_bb
   }
 
-  /// Returns a reference to the false target basic block.
+  /// Returns a mutable reference to the true target basic block.
+  pub fn true_bb_mut(&mut self) -> &mut BasicBlock {
+    &mut self.true_bb
+  }
+
+  /// Returns the false target basic block.
   pub fn false_bb(&self) -> BasicBlock {
     self.false_bb
+  }
+
+  /// Returns a mutable reference to the false target basic block.
+  pub fn false_bb_mut(&mut self) -> &mut BasicBlock {
+    &mut self.false_bb
   }
 
   /// Returns a reference to the arguments passed to
@@ -339,10 +429,22 @@ impl Branch {
     &self.true_args
   }
 
+  /// Returns a mutable reference to the arguments passed to
+  /// the true target basic block.
+  pub fn true_args_mut(&mut self) -> &mut Vec<Value> {
+    &mut self.true_args
+  }
+
   /// Returns a reference to the arguments passed to
   /// the false target basic block.
   pub fn false_args(&self) -> &[Value] {
     &self.false_args
+  }
+
+  /// Returns a mutable reference to the arguments passed to
+  /// the false target basic block.
+  pub fn false_args_mut(&mut self) -> &mut Vec<Value> {
+    &mut self.false_args
   }
 }
 
@@ -368,14 +470,24 @@ impl Jump {
     ValueData::new(Type::get_unit(), ValueKind::Jump(Self { target, args }))
   }
 
-  /// Returns a reference to the target basic block.
+  /// Returns the target basic block.
   pub fn target(&self) -> BasicBlock {
     self.target
+  }
+
+  /// Returns a mutable reference to the target basic block.
+  pub fn target_mut(&mut self) -> &mut BasicBlock {
+    &mut self.target
   }
 
   /// Returns a reference to the arguments passed to the target basic block.
   pub fn args(&self) -> &[Value] {
     &self.args
+  }
+
+  /// Returns a mutable reference to the arguments passed to the target basic block.
+  pub fn args_mut(&mut self) -> &mut Vec<Value> {
+    &mut self.args
   }
 }
 
@@ -391,14 +503,24 @@ impl Call {
     ValueData::new(ty, ValueKind::Call(Self { callee, args }))
   }
 
-  /// Returns a reference to the callee.
+  /// Returns the callee.
   pub fn callee(&self) -> Function {
     self.callee
+  }
+
+  /// Returns a mutable reference to the callee.
+  pub fn callee_mut(&mut self) -> &mut Function {
+    &mut self.callee
   }
 
   /// Returns a reference to the argument list.
   pub fn args(&self) -> &[Value] {
     &self.args
+  }
+
+  /// Returns a mutable reference to the argument list.
+  pub fn args_mut(&mut self) -> &mut Vec<Value> {
+    &mut self.args
   }
 }
 
@@ -413,8 +535,13 @@ impl Return {
     ValueData::new(Type::get_unit(), ValueKind::Return(Self { value }))
   }
 
-  /// Returns a reference to the return value.
+  /// Returns the return value.
   pub fn value(&self) -> Option<Value> {
     self.value
+  }
+
+  /// Returns a mutable reference to the return value.
+  pub fn value_mut(&mut self) -> &mut Option<Value> {
+    &mut self.value
   }
 }
