@@ -228,6 +228,9 @@ impl DataFlowGraph {
   /// Removes the given basic block. Returns the corresponding
   /// basic block data.
   ///
+  /// Note: the parameters used by the given basic block
+  /// will not be removed.
+  ///
   /// # Panics
   ///
   /// Panics if the given basic block does not exist.
@@ -249,7 +252,7 @@ impl DataFlowGraph {
   /// # Panics
   ///
   /// Panics if the given basic block does not exist.
-  fn bb_mut(&mut self, bb: BasicBlock) -> &mut BasicBlockData {
+  pub fn bb_mut(&mut self, bb: BasicBlock) -> &mut BasicBlockData {
     self.bbs.get_mut(&bb).expect("`bb` does not exist")
   }
 
