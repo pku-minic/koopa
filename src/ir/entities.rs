@@ -460,6 +460,11 @@ impl ValueData {
     &self.kind
   }
 
+  /// Returns a mutable reference to the value's kind.
+  pub fn kind_mut(&mut self) -> &mut ValueKind {
+    &mut self.kind
+  }
+
   /// Returns a reference to the values that the current value is used by.
   pub fn used_by(&self) -> &HashSet<Value> {
     &self.used_by
