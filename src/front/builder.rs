@@ -142,10 +142,7 @@ impl Builder {
       let alloc = self.program.new_value().global_alloc(init);
       // set name for the created value
       if !ast.name.is_temp() {
-        self
-          .program
-          .borrow_value_mut(alloc)
-          .set_name(Some(ast.name.clone()));
+        self.program.set_value_name(alloc, Some(ast.name.clone()));
       }
       // add to global variable map
       if self.global_funcs.contains_key(&ast.name)
@@ -551,8 +548,7 @@ impl Builder {
         if !def.name.is_temp() {
           self
             .dfg_mut(func)
-            .value_mut(inst)
-            .set_name(Some(def.name.clone()));
+            .set_value_name(inst, Some(def.name.clone()));
         }
         // add to local basic block
         self
