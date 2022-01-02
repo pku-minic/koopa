@@ -415,6 +415,7 @@ impl Value {
 ///
 /// `ValueData` can hold the type and the kind of the value, and which
 /// values the current value is used by.
+#[derive(Debug)]
 pub struct ValueData {
   ty: Type,
   name: Option<String>,
@@ -486,7 +487,7 @@ impl Clone for ValueData {
 }
 
 /// Kind of Koopa IR value.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ValueKind {
   Integer(values::Integer),
   ZeroInit(values::ZeroInit),
