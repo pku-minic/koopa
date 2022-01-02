@@ -78,10 +78,10 @@ impl ConstantFolding {
     for (b, bb) in data.dfg().bbs() {
       // collect parameters that can be evaluated in the current basic block
       let mut evaluated = Vec::new();
-      'outer: for (i, param) in bb.params().iter().enumerate() {
+      'outer: for i in 0..bb.params().len() {
         let mut ans = None;
         // check if all corresponding arguments are constant
-        for user in data.dfg().value(*param).used_by() {
+        for user in bb.used_by() {
           // get the argument value handle
           let value = match data.dfg().value(*user).kind() {
             ValueKind::Branch(branch) => {
@@ -111,8 +111,11 @@ impl ConstantFolding {
     for (bb, evals) in bb_params {
       // replace all parameters to constants
       for (i, value) in evals {
-        let param = data.dfg().bb(bb).params()[i];
-        data.dfg_mut().replace_value_with(param).raw(value);
+        let p = data.dfg().bb(bb).params()[i];
+        let param = data.dfg().value(p).clone();
+        data.dfg_mut().replace_value_with(p).raw(value);
+        let p = data.dfg_mut().new_value().raw(param);
+        data.dfg_mut().bb_mut(bb).params_mut()[i] = p;
       }
     }
   }
