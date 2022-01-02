@@ -102,8 +102,8 @@ impl DeadCodeElimination {
     bbs.into_iter().for_each(|(b, m)| {
       let users = data.dfg().bb(b).used_by().clone();
       users.into_iter().for_each(|user| {
-        // remove instruction from DFG
-        let mut inst = data.dfg_mut().remove_value(user);
+        // get instruction from DFG
+        let mut inst = data.dfg().value(user).clone();
         // get argument list
         let args = match inst.kind_mut() {
           ValueKind::Branch(br) => {
@@ -117,18 +117,25 @@ impl DeadCodeElimination {
           _ => panic!("invalid branch/jump instruction"),
         };
         // update argument list
+        let mut removed_args = HashSet::new();
         let mut index = 0;
         args.retain(|a| {
           index += 1;
           let removed = !m.contains_key(&(index - 1));
-          if removed && data.dfg().value(*a).used_by().is_empty() {
-            // remove unused values
-            data.dfg_mut().remove_value(*a);
+          // record removed values
+          if removed {
+            removed_args.insert(*a);
           }
           removed
         });
-        // add instruction to DFG
-        data.dfg_mut().new_value().raw(inst);
+        // replace the existing instruction
+        data.dfg_mut().replace_value_with(user).raw(inst);
+        // remove unused values
+        removed_args.into_iter().for_each(|v| {
+          if data.dfg().value(v).used_by().is_empty() {
+            data.dfg_mut().remove_value(v);
+          }
+        });
       });
     });
     changed
