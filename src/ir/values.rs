@@ -3,7 +3,7 @@ use crate::ir::types::Type;
 use std::fmt;
 
 /// Integer constant.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Integer {
   value: i32,
 }
@@ -25,7 +25,7 @@ impl Integer {
 }
 
 /// Zero initializer.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ZeroInit;
 
 impl ZeroInit {
@@ -35,7 +35,7 @@ impl ZeroInit {
 }
 
 /// Undefined value.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Undef;
 
 impl Undef {
@@ -45,7 +45,7 @@ impl Undef {
 }
 
 /// Aggregate constant.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Aggregate {
   elems: Vec<Value>,
 }
@@ -67,7 +67,7 @@ impl Aggregate {
 }
 
 /// Function argument reference.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FuncArgRef {
   index: usize,
 }
@@ -89,7 +89,7 @@ impl FuncArgRef {
 }
 
 /// Basic block argument reference.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockArgRef {
   index: usize,
 }
@@ -111,7 +111,7 @@ impl BlockArgRef {
 }
 
 /// Local memory allocation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Alloc;
 
 impl Alloc {
@@ -122,7 +122,7 @@ impl Alloc {
 }
 
 /// Global memory allocation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GlobalAlloc {
   init: Value,
 }
@@ -144,7 +144,7 @@ impl GlobalAlloc {
 }
 
 /// Memory load.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Load {
   src: Value,
 }
@@ -166,7 +166,7 @@ impl Load {
 }
 
 /// Memory store.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Store {
   value: Value,
   dest: Value,
@@ -199,7 +199,7 @@ impl Store {
 }
 
 /// Pointer calculation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GetPtr {
   src: Value,
   index: Value,
@@ -232,7 +232,7 @@ impl GetPtr {
 }
 
 /// Element pointer calculation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct GetElemPtr {
   src: Value,
   index: Value,
@@ -265,7 +265,7 @@ impl GetElemPtr {
 }
 
 /// Binary operation.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Binary {
   op: BinaryOp,
   lhs: Value,
@@ -347,7 +347,7 @@ impl fmt::Display for BinaryOp {
 }
 
 /// Conditional branch.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Branch {
   cond: Value,
   true_bb: BasicBlock,
@@ -449,7 +449,7 @@ impl Branch {
 }
 
 /// Unconditional jump.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Jump {
   target: BasicBlock,
   args: Vec<Value>,
@@ -492,7 +492,7 @@ impl Jump {
 }
 
 /// Function call.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Call {
   callee: Function,
   args: Vec<Value>,
@@ -525,7 +525,7 @@ impl Call {
 }
 
 /// Function return.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Return {
   value: Option<Value>,
 }
