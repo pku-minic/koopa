@@ -31,7 +31,7 @@ fn try_main() -> result::Result<i32, MainError> {
   // interpret the program
   let ext_funcs = unsafe { ExternFuncs::new(&libs) }.map_err(MainError::LibError)?;
   let interpreter = Interpreter::new(ext_funcs);
-  Generator::new_with_visitor(sink(), interpreter)
+  Generator::with_visitor(sink(), interpreter)
     .generate_on(&program)
     .map_err(MainError::OtherError)
 }
