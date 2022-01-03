@@ -2,17 +2,16 @@ decl @putchar(i32): i32
 
 fun @putstr(@arr: *i32) {
 %entry:
-  jump %loop_entry
+  jump %loop_entry(@arr)
 
-%loop_entry:
-  %ptr = phi *i32 (@arr, %entry), (%next, %loop_body)
+%loop_entry(%ptr: *i32):
   %cur = load %ptr
   br %cur, %loop_body, %end
 
 %loop_body:
   call @putchar(%cur)
   %next = getptr %ptr, 1
-  jump %loop_entry
+  jump %loop_entry(%next)
 
 %end:
   ret
