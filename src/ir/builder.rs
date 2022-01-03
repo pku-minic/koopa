@@ -131,7 +131,7 @@ pub trait LocalInstBuilder: ValueBuilder {
   /// Panics if the given type is an unit type.
   fn alloc(mut self, ty: Type) -> Value {
     assert!(!ty.is_unit(), "`ty` can not be unit");
-    self.insert_value(Alloc::new_data(ty))
+    self.insert_value(Alloc::new_data(Type::get_pointer(ty)))
   }
 
   /// Creates a memory load with the given source.
