@@ -1,9 +1,8 @@
 use koopa::back::{KoopaGenerator, LlvmGenerator};
-use koopa::ir::{instructions as insts, values};
-use koopa::ir::{BasicBlock, BasicBlockRc, Function, FunctionRc, Program, Type, ValueRc};
+use koopa::ir::builder_traits::*;
+use koopa::ir::{BasicBlock, BinaryOp, Function, FunctionData, Program, Type, Value};
 use std::env::args;
 use std::fs::File;
-use std::rc::Rc;
 use std::{fmt, io, process};
 
 fn main() {
@@ -89,34 +88,28 @@ fn parse_cmd_args() -> Result<CommandLineArgs, Error> {
 fn build_program(input: impl io::Read) -> Result<Program, Error> {
   let mut program = Program::new();
   // create data array
-  let ptr = insts::GlobalAlloc::new(values::ZeroInit::get(Type::get_array(
-    Type::get_i32(),
-    65536,
-  )));
-  ptr.inner_mut().set_name(Some("@data_arr".into()));
-  program.add_var(ptr.clone());
+  let zero = program
+    .new_value()
+    .zero_init(Type::get_array(Type::get_i32(), 65536));
+  let ptr = program.new_value().global_alloc(zero);
+  program.set_value_name(ptr, Some("@data_arr".into()));
   // create function declarations
-  let putchar = Function::new_decl(
-    "@putchar".into(),
-    Type::get_function(vec![Type::get_i32()], Type::get_i32()),
-  );
-  let getchar = Function::new_decl(
-    "@getchar".into(),
-    Type::get_function(Vec::new(), Type::get_i32()),
-  );
-  program.add_func(putchar.clone());
-  program.add_func(getchar.clone());
+  let putchar = FunctionData::new_decl("@putchar".into(), vec![Type::get_i32()], Type::get_i32());
+  let putchar = program.new_func(putchar);
+  let getchar = FunctionData::new_decl("@getchar".into(), Vec::new(), Type::get_i32());
+  let getchar = program.new_func(getchar);
   // generate main function
-  let main = Function::new("@main".into(), Vec::new(), Type::get_i32());
-  program.add_func(generate_main(
+  let main = FunctionData::new("@main".into(), Vec::new(), Type::get_i32());
+  let main = program.new_func(main);
+  generate_main(
     input,
     Environment {
       ptr,
       putchar,
       getchar,
-      main,
+      main: program.func_mut(main),
     },
-  )?);
+  )?;
   Ok(program)
 }
 
@@ -133,49 +126,78 @@ fn emit_ir(program: &Program, output: impl io::Write, emit_llvm: bool) -> Result
 //   Stuffs that generate Koopa IR from the brainfuck input.   //
 // =========================================================== //
 
-struct Environment {
-  ptr: ValueRc,
-  putchar: FunctionRc,
-  getchar: FunctionRc,
-  main: FunctionRc,
+struct Environment<'a> {
+  ptr: Value,
+  putchar: Function,
+  getchar: Function,
+  main: &'a mut FunctionData,
 }
 
-fn generate_main(input: impl io::Read, mut env: Environment) -> Result<FunctionRc, Error> {
+macro_rules! new_bb {
+  ($func:expr) => {
+    $func.dfg_mut().new_bb()
+  };
+}
+
+macro_rules! new_value {
+  ($func:expr) => {
+    $func.dfg_mut().new_value()
+  };
+}
+
+macro_rules! add_bb {
+  ($func:expr, $bb:expr) => {
+    $func.layout_mut().bbs_mut().push_key_back($bb).unwrap()
+  };
+}
+
+macro_rules! add_inst {
+  ($func:expr, $bb:expr, $inst:expr) => {
+    $func
+      .layout_mut()
+      .bb_mut($bb)
+      .insts_mut()
+      .push_key_back($inst)
+      .unwrap()
+  };
+}
+
+fn generate_main(input: impl io::Read, mut env: Environment) -> Result<(), Error> {
   // generate entry basic block
-  let entry = BasicBlock::new(Some("%entry".into()));
-  env.main.inner_mut().add_bb(entry.clone());
-  let mut entry_inner = entry.inner_mut();
-  let ptr = insts::Alloc::new(Type::get_pointer(Type::get_i32()));
-  ptr.inner_mut().set_name(Some("%ptr".into()));
-  entry_inner.add_inst(ptr.clone());
-  let data_ptr = insts::GetElemPtr::new(env.ptr, values::Integer::get(0));
-  entry_inner.add_inst(data_ptr.clone());
-  entry_inner.add_inst(insts::Store::new(data_ptr, ptr.clone()));
+  let main = &mut env.main;
+  let entry = new_bb!(main).basic_block(Some("%entry".into()));
+  add_bb!(main, entry);
+  let ptr = new_value!(main).alloc(Type::get_pointer(Type::get_i32()));
+  main.dfg_mut().set_value_name(ptr, Some("%ptr".into()));
+  add_inst!(main, entry, ptr);
+  let zero = new_value!(main).integer(0);
+  let data_ptr = new_value!(main).get_elem_ptr(env.ptr, zero);
+  add_inst!(main, entry, data_ptr);
+  let store = new_value!(main).store(data_ptr, ptr);
+  add_inst!(main, entry, store);
   env.ptr = ptr;
   // generate other basic blocks by the specific input
-  drop(entry_inner);
-  let bb = generate_bbs(input, &env, entry)?;
+  let bb = generate_bbs(input, &mut env, entry)?;
   // generate end basic block
-  let end = BasicBlock::new(Some("%end".into()));
-  bb.inner_mut()
-    .add_inst(insts::Jump::new(Rc::downgrade(&end)));
-  end
-    .inner_mut()
-    .add_inst(insts::Return::new(Some(values::Integer::get(0))));
-  env.main.inner_mut().add_bb(end);
-  Ok(env.main)
+  let main = &mut env.main;
+  let end = new_bb!(main).basic_block(Some("%end".into()));
+  add_bb!(main, end);
+  let jump = new_value!(main).jump(end);
+  add_inst!(main, bb, jump);
+  let ret = new_value!(main).ret(Some(zero));
+  add_inst!(main, end, ret);
+  Ok(())
 }
 
 fn generate_bbs(
   input: impl io::Read,
-  env: &Environment,
-  entry: BasicBlockRc,
-) -> Result<BasicBlockRc, Error> {
-  let mut bb = BasicBlock::new(None);
-  env.main.inner_mut().add_bb(bb.clone());
-  entry
-    .inner_mut()
-    .add_inst(insts::Jump::new(Rc::downgrade(&bb)));
+  env: &mut Environment,
+  entry: BasicBlock,
+) -> Result<BasicBlock, Error> {
+  let mut bb = new_bb!(env.main).basic_block(None);
+  add_bb!(env.main, bb);
+  let jump = new_value!(env.main).jump(bb);
+  add_inst!(env.main, entry, jump);
   let mut loop_info = Vec::new();
   for result in input.bytes() {
     bb = match result.map_err(Error::Io)? {
@@ -193,93 +215,92 @@ fn generate_bbs(
   Ok(bb)
 }
 
-fn generate_ptr_op(env: &Environment, bb: BasicBlockRc, i: i32) -> Result<BasicBlockRc, Error> {
-  let mut inner = bb.inner_mut();
-  let load = insts::Load::new(env.ptr.clone());
-  inner.add_inst(load.clone());
-  let gp = insts::GetPtr::new(load, values::Integer::get(i));
-  inner.add_inst(gp.clone());
-  inner.add_inst(insts::Store::new(gp, env.ptr.clone()));
-  drop(inner);
+fn generate_ptr_op(env: &mut Environment, bb: BasicBlock, i: i32) -> Result<BasicBlock, Error> {
+  let main = &mut env.main;
+  let load = new_value!(main).load(env.ptr);
+  add_inst!(main, bb, load);
+  let index = new_value!(main).integer(i);
+  let gp = new_value!(main).get_ptr(load, index);
+  add_inst!(main, bb, gp);
+  let store = new_value!(main).store(gp, env.ptr);
+  add_inst!(main, bb, store);
   Ok(bb)
 }
 
-fn generate_data_op(env: &Environment, bb: BasicBlockRc, i: i32) -> Result<BasicBlockRc, Error> {
-  let mut inner = bb.inner_mut();
-  let load = insts::Load::new(env.ptr.clone());
-  inner.add_inst(load.clone());
-  let data = insts::Load::new(load.clone());
-  inner.add_inst(data.clone());
-  let add = insts::Binary::new(insts::BinaryOp::Add, data, values::Integer::get(i));
-  inner.add_inst(add.clone());
-  inner.add_inst(insts::Store::new(add, load));
-  drop(inner);
+fn generate_data_op(env: &mut Environment, bb: BasicBlock, i: i32) -> Result<BasicBlock, Error> {
+  let main = &mut env.main;
+  let load = new_value!(main).load(env.ptr);
+  add_inst!(main, bb, load);
+  let data = new_value!(main).load(load);
+  add_inst!(main, bb, data);
+  let rhs = new_value!(main).integer(i);
+  let add = new_value!(main).binary(BinaryOp::Add, data, rhs);
+  add_inst!(main, bb, add);
+  let store = new_value!(main).store(add, load);
+  add_inst!(main, bb, store);
   Ok(bb)
 }
 
 fn generate_start(
-  env: &Environment,
-  bb: BasicBlockRc,
-  loop_info: &mut Vec<(BasicBlockRc, BasicBlockRc)>,
-) -> Result<BasicBlockRc, Error> {
+  env: &mut Environment,
+  bb: BasicBlock,
+  loop_info: &mut Vec<(BasicBlock, BasicBlock)>,
+) -> Result<BasicBlock, Error> {
+  let main = &mut env.main;
   // create while condition
-  let cond_bb = BasicBlock::new(Some("%while_cond".into()));
-  env.main.inner_mut().add_bb(cond_bb.clone());
-  bb.inner_mut()
-    .add_inst(insts::Jump::new(Rc::downgrade(&cond_bb)));
+  let cond_bb = new_bb!(main).basic_block(Some("%while_cond".into()));
+  add_bb!(main, cond_bb);
+  let jump = new_value!(main).jump(cond_bb);
+  add_inst!(main, bb, jump);
   // add instructions
-  let mut inner = cond_bb.inner_mut();
-  let load = insts::Load::new(env.ptr.clone());
-  inner.add_inst(load.clone());
-  let data = insts::Load::new(load);
-  inner.add_inst(data.clone());
-  let cmp = insts::Binary::new(insts::BinaryOp::NotEq, data, values::Integer::get(0));
-  inner.add_inst(cmp.clone());
+  let load = new_value!(main).load(env.ptr);
+  add_inst!(main, cond_bb, load);
+  let data = new_value!(main).load(load);
+  add_inst!(main, cond_bb, data);
+  let zero = new_value!(main).integer(0);
+  let cmp = new_value!(main).binary(BinaryOp::NotEq, data, zero);
+  add_inst!(main, cond_bb, cmp);
   // create while body and while end
-  let body_bb = BasicBlock::new(Some("%while_body".into()));
-  let end_bb = BasicBlock::new(Some("%while_end".into()));
-  inner.add_inst(insts::Branch::new(
-    cmp,
-    Rc::downgrade(&body_bb),
-    Rc::downgrade(&end_bb),
-  ));
-  env.main.inner_mut().add_bb(body_bb.clone());
+  let body_bb = new_bb!(main).basic_block(Some("%while_body".into()));
+  let end_bb = new_bb!(main).basic_block(Some("%while_end".into()));
+  let br = new_value!(main).branch(cmp, body_bb, end_bb);
+  add_inst!(main, cond_bb, br);
+  add_bb!(main, body_bb);
   // update loop info
-  drop(inner);
   loop_info.push((cond_bb, end_bb));
   Ok(body_bb)
 }
 
 fn generate_end(
-  env: &Environment,
-  bb: BasicBlockRc,
-  loop_info: &mut Vec<(BasicBlockRc, BasicBlockRc)>,
-) -> Result<BasicBlockRc, Error> {
+  env: &mut Environment,
+  bb: BasicBlock,
+  loop_info: &mut Vec<(BasicBlock, BasicBlock)>,
+) -> Result<BasicBlock, Error> {
   let (cond_bb, end_bb) = loop_info.pop().ok_or(Error::Parse)?;
-  bb.inner_mut()
-    .add_inst(insts::Jump::new(Rc::downgrade(&cond_bb)));
-  env.main.inner_mut().add_bb(end_bb.clone());
+  let jump = new_value!(env.main).jump(cond_bb);
+  add_inst!(env.main, bb, jump);
+  add_bb!(env.main, end_bb);
   Ok(end_bb)
 }
 
-fn generate_put(env: &Environment, bb: BasicBlockRc) -> Result<BasicBlockRc, Error> {
-  let mut inner = bb.inner_mut();
-  let load = insts::Load::new(env.ptr.clone());
-  inner.add_inst(load.clone());
-  let data = insts::Load::new(load);
-  inner.add_inst(data.clone());
-  inner.add_inst(insts::Call::new(Rc::downgrade(&env.putchar), vec![data]));
-  drop(inner);
+fn generate_put(env: &mut Environment, bb: BasicBlock) -> Result<BasicBlock, Error> {
+  let main = &mut env.main;
+  let load = new_value!(main).load(env.ptr);
+  add_inst!(main, bb, load);
+  let data = new_value!(main).load(load);
+  add_inst!(main, bb, data);
+  let call = new_value!(main).call(env.putchar, vec![data]);
+  add_inst!(main, bb, call);
   Ok(bb)
 }
 
-fn generate_get(env: &Environment, bb: BasicBlockRc) -> Result<BasicBlockRc, Error> {
-  let mut inner = bb.inner_mut();
-  let call = insts::Call::new(Rc::downgrade(&env.getchar), Vec::new());
-  inner.add_inst(call.clone());
-  let load = insts::Load::new(env.ptr.clone());
-  inner.add_inst(load.clone());
-  inner.add_inst(insts::Store::new(call, load));
-  drop(inner);
+fn generate_get(env: &mut Environment, bb: BasicBlock) -> Result<BasicBlock, Error> {
+  let main = &mut env.main;
+  let call = new_value!(main).call(env.getchar, Vec::new());
+  add_inst!(main, bb, call);
+  let load = new_value!(main).load(env.ptr);
+  add_inst!(main, bb, load);
+  let store = new_value!(main).store(call, load);
+  add_inst!(main, bb, store);
   Ok(bb)
 }
