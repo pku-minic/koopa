@@ -1,11 +1,9 @@
 mod ext_funcs;
 mod interpreter;
 
-use ext_funcs::ExternFuncs;
 use interpreter::Interpreter;
 use koopa::back::Generator;
 use koopa::front::Driver;
-use libloading::Error as LibError;
 use std::io::{sink, stdin, Error};
 use std::{env, fmt, process, result};
 
@@ -29,8 +27,7 @@ fn try_main() -> result::Result<i32, MainError> {
   }
   .map_err(|_| MainError::ParseError)?;
   // interpret the program
-  let ext_funcs = unsafe { ExternFuncs::new(&libs) }.map_err(MainError::LibError)?;
-  let interpreter = Interpreter::new(ext_funcs);
+  let interpreter = Interpreter::new(libs);
   Generator::with_visitor(sink(), interpreter)
     .generate_on(&program)
     .map_err(MainError::OtherError)
@@ -40,7 +37,6 @@ enum MainError {
   InvalidArgs,
   InvalidFile(Error),
   ParseError,
-  LibError(LibError),
   OtherError(Error),
 }
 
@@ -56,7 +52,6 @@ Options:
       ),
       MainError::InvalidFile(error) => write!(f, "invalid file operation: {}", error),
       MainError::ParseError => write!(f, "error occurred when parsing the input"),
-      MainError::LibError(error) => write!(f, "invalid library: {}", error),
       MainError::OtherError(error) => write!(f, "{}", error),
     }
   }
