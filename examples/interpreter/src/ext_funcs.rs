@@ -1,5 +1,5 @@
 use super::interpreter::{new_error, Val};
-use koopa::ir::{Function, Type, TypeKind};
+use koopa::ir::{FunctionData, Type, TypeKind};
 use libloading::{Error, Library, Symbol};
 use std::ffi::{CString, OsStr};
 use std::io::Result as IoResult;
@@ -20,9 +20,9 @@ impl ExternFuncs {
     })
   }
 
-  pub unsafe fn call(&mut self, func: &Function, args: Vec<Val>) -> IoResult<Val> {
+  pub unsafe fn call(&mut self, func: &FunctionData, args: Vec<Val>) -> IoResult<Val> {
     assert!(
-      func.inner().bbs().is_empty(),
+      func.layout().bbs().is_empty(),
       "expected function declaration"
     );
     assert!(!func.name().is_empty(), "invalid function name");
