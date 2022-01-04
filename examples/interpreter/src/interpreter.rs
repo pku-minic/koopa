@@ -5,46 +5,97 @@
 
 use super::ext_funcs::ExternFuncs;
 use koopa::back::{NameManager, Visitor};
-use koopa::ir::instructions::*;
-use koopa::ir::{BasicBlock, Function, Program, Type, TypeKind, Value, ValueKind};
-use koopa::value;
+use koopa::ir::entities::ValueData;
+use koopa::ir::layout::BasicBlockNode;
+use koopa::ir::values::*;
+use koopa::ir::{BasicBlock, BinaryOp, FunctionData, Program, Type, TypeKind, Value, ValueKind};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result, Write};
 use std::ptr::{null, NonNull};
-use std::rc::Rc;
 
 pub fn new_error(message: &str) -> Error {
   Error::new(ErrorKind::Other, message)
 }
 
 pub struct Interpreter {
-  global_allocs: Vec<Box<Val>>,
-  vars: HashMap<*const Value, Val>,
-  envs: Vec<Environment>,
-  ext_funcs: ExternFuncs,
+  libs: Vec<String>,
+}
+
+impl Interpreter {
+  pub fn new(libs: Vec<String>) -> Self {
+    Self { libs }
+  }
 }
 
 impl<W: Write> Visitor<W> for Interpreter {
   type Output = i32;
 
   fn visit(&mut self, _: &mut W, _: &mut NameManager, program: &Program) -> Result<Self::Output> {
+    let ext_funcs = unsafe { ExternFuncs::new(&self.libs) }
+      .map_err(|e| new_error(&format!("invalid library: {}", e)))?;
+    let mut interpreter = InterpreterImpl::new(program, ext_funcs);
+    interpreter.interpret()
+  }
+}
+
+struct InterpreterImpl<'a> {
+  program: &'a Program,
+  global_allocs: Vec<Box<Val>>,
+  vars: HashMap<*const ValueData, Val>,
+  envs: Vec<Environment<'a>>,
+  ext_funcs: ExternFuncs,
+}
+
+macro_rules! func {
+  ($self:ident) => {
+    $self.envs.last().unwrap().func
+  };
+}
+
+macro_rules! value {
+  ($self:ident, $value:expr) => {
+    func!($self).dfg().value($value)
+  };
+}
+
+macro_rules! bb_node {
+  ($self:ident, $bb:expr) => {
+    func!($self).layout().bbs().node(&$bb).unwrap()
+  };
+}
+
+impl<'a> InterpreterImpl<'a> {
+  fn new(program: &'a Program, ext_funcs: ExternFuncs) -> Self {
+    Self {
+      program,
+      global_allocs: Vec::new(),
+      vars: HashMap::new(),
+      envs: Vec::new(),
+      ext_funcs,
+    }
+  }
+
+  fn interpret(&mut self) -> Result<i32> {
     // evaluate all global variables
-    for var in program.vars() {
-      match var.kind() {
+    for var in self.program.inst_layout() {
+      let value = self.program.borrow_value(*var);
+      match value.kind() {
         ValueKind::GlobalAlloc(ga) => {
-          let val = Self::eval_const(value!(ga.init()));
+          let val = self.eval_global_const(&self.program.borrow_value(ga.init()));
           self.global_allocs.push(Box::new(val));
-          self
-            .vars
-            .insert(var, Val::new_val_pointer(self.global_allocs.last()));
+          self.vars.insert(
+            &value as &ValueData,
+            Val::new_val_pointer(self.global_allocs.last()),
+          );
         }
         _ => panic!("invalid global variable"),
       }
     }
     // evaluate on the main function
-    program
+    self
+      .program
       .funcs()
-      .iter()
+      .values()
       .find(|f| f.name() == "@main")
       .ok_or_else(|| new_error("function '@main' not found"))
       .and_then(|f| self.eval_func(f, Vec::new()))
@@ -56,19 +107,8 @@ impl<W: Write> Visitor<W> for Interpreter {
         }
       })
   }
-}
 
-impl Interpreter {
-  pub fn new(ext_funcs: ExternFuncs) -> Self {
-    Self {
-      global_allocs: Vec::new(),
-      vars: HashMap::new(),
-      envs: Vec::new(),
-      ext_funcs,
-    }
-  }
-
-  fn eval_const(value: &Value) -> Val {
+  fn eval_global_const(&self, value: &ValueData) -> Val {
     match value.kind() {
       ValueKind::Integer(v) => Val::Int(v.value()),
       ValueKind::ZeroInit(_) => Self::new_zeroinit(value.ty()),
@@ -76,7 +116,22 @@ impl Interpreter {
       ValueKind::Aggregate(v) => Val::Array(
         v.elems()
           .iter()
-          .map(|e| Self::eval_const(value!(e)))
+          .map(|e| self.eval_global_const(&self.program.borrow_value(*e)))
+          .collect(),
+      ),
+      _ => panic!("invalid constant"),
+    }
+  }
+
+  fn eval_local_const(&self, value: &ValueData) -> Val {
+    match value.kind() {
+      ValueKind::Integer(v) => Val::Int(v.value()),
+      ValueKind::ZeroInit(_) => Self::new_zeroinit(value.ty()),
+      ValueKind::Undef(_) => Val::Undef,
+      ValueKind::Aggregate(v) => Val::Array(
+        v.elems()
+          .iter()
+          .map(|e| self.eval_local_const(func!(self).dfg().value(*e)))
           .collect(),
       ),
       _ => panic!("invalid constant"),
@@ -118,7 +173,7 @@ impl Interpreter {
     }
   }
 
-  fn eval_func(&mut self, func: &Function, args: Vec<Val>) -> Result<Val> {
+  fn eval_func(&mut self, func: &'a FunctionData, args: Vec<Val>) -> Result<Val> {
     // check parameter count
     let param_len = match func.ty().kind() {
       TypeKind::Function(params, _) => params.len(),
@@ -126,13 +181,14 @@ impl Interpreter {
     };
     assert_eq!(param_len, args.len(), "parameter count mismatch");
     // check if is a function declaration
-    if let Some(bb) = func.inner().bbs().front().get() {
+    if let Some(bb) = func.layout().bbs().front_node() {
       // setup the environment
       self.envs.push(Environment::new(
+        func,
         func
           .params()
           .iter()
-          .map(Rc::as_ptr)
+          .map(|p| func.dfg().value(*p) as *const ValueData)
           .zip(args.into_iter())
           .collect(),
       ));
@@ -146,9 +202,10 @@ impl Interpreter {
     }
   }
 
-  fn eval_bb(&mut self, bb: &BasicBlock) -> Result<Val> {
+  fn eval_bb(&mut self, bb: &BasicBlockNode) -> Result<Val> {
     // evaluate on all instructions
-    for inst in bb.inner().insts() {
+    for inst in bb.insts().keys() {
+      let inst = func!(self).dfg().value(*inst);
       match inst.kind() {
         ValueKind::Alloc(_) => self.eval_alloc(inst),
         ValueKind::Load(v) => self.eval_load(inst, v)?,
@@ -157,9 +214,8 @@ impl Interpreter {
         ValueKind::GetElemPtr(v) => self.eval_getelemptr(inst, v)?,
         ValueKind::Binary(v) => self.eval_binary(inst, v),
         ValueKind::Call(v) => self.eval_call(inst, v)?,
-        ValueKind::Phi(v) => self.eval_phi(inst, v),
-        ValueKind::Branch(v) => return self.eval_branch(bb, v),
-        ValueKind::Jump(v) => return self.eval_jump(bb, v),
+        ValueKind::Branch(v) => return self.eval_branch(v),
+        ValueKind::Jump(v) => return self.eval_jump(v),
         ValueKind::Return(v) => return Ok(self.eval_return(v)),
         _ => panic!("invalid instruction"),
       }
@@ -167,7 +223,7 @@ impl Interpreter {
     unreachable!()
   }
 
-  fn eval_alloc(&mut self, inst: &Value) {
+  fn eval_alloc(&mut self, inst: &ValueData) {
     let base = match inst.ty().kind() {
       TypeKind::Pointer(base) => base,
       _ => panic!("invalid pointer type"),
@@ -179,8 +235,8 @@ impl Interpreter {
       .insert(inst, Val::new_val_pointer(env.allocs.last()));
   }
 
-  fn eval_load(&mut self, inst: &Value, load: &Load) -> Result<()> {
-    let val = match self.eval_value(value!(load.src())) {
+  fn eval_load(&mut self, inst: &ValueData, load: &Load) -> Result<()> {
+    let val = match self.eval_value(load.src()) {
       Val::Pointer { ptr, .. } => ptr.map(|p| unsafe { p.as_ref().clone() }),
       Val::UnsafePointer(ptr) => Val::load_from_unsafe_ptr(ptr, inst.ty()),
       _ => panic!("invalid pointer"),
@@ -191,19 +247,19 @@ impl Interpreter {
   }
 
   fn eval_store(&self, store: &Store) -> Result<()> {
-    let val = self.eval_value(value!(store.value()));
-    match self.eval_value(value!(store.dest())) {
+    let val = self.eval_value(store.value());
+    match self.eval_value(store.dest()) {
       Val::Pointer { ptr, .. } => ptr
         .map(|p| unsafe { *p.as_ptr() = val })
         .ok_or_else(|| new_error("accessing to null pointer")),
-      Val::UnsafePointer(ptr) => val.store_to_unsafe_ptr(ptr, value!(store.value()).ty()),
+      Val::UnsafePointer(ptr) => val.store_to_unsafe_ptr(ptr, value!(self, store.value()).ty()),
       _ => panic!("invalid pointer"),
     }
   }
 
-  fn eval_getptr(&mut self, inst: &Value, gp: &GetPtr) -> Result<()> {
+  fn eval_getptr(&mut self, inst: &ValueData, gp: &GetPtr) -> Result<()> {
     // evaluate on index (offset)
-    let offset = match self.eval_value(value!(gp.index())) {
+    let offset = match self.eval_value(gp.index()) {
       Val::Int(i) => i as isize,
       _ => panic!("invalid index"),
     };
@@ -212,14 +268,14 @@ impl Interpreter {
       TypeKind::Pointer(base) => base.size(),
       _ => panic!("invalid pointer"),
     };
-    let ptr = Self::get_pointer(self.eval_value(value!(gp.src())), offset, base_size)?;
+    let ptr = Self::get_pointer(self.eval_value(gp.src()), offset, base_size)?;
     self.insert_val(inst, ptr);
     Ok(())
   }
 
-  fn eval_getelemptr(&mut self, inst: &Value, gep: &GetElemPtr) -> Result<()> {
+  fn eval_getelemptr(&mut self, inst: &ValueData, gep: &GetElemPtr) -> Result<()> {
     // evaluate on index (offset)
-    let offset = match self.eval_value(value!(gep.index())) {
+    let offset = match self.eval_value(gep.index()) {
       Val::Int(i) => i as isize,
       _ => panic!("invalid index"),
     };
@@ -228,7 +284,7 @@ impl Interpreter {
       TypeKind::Pointer(base) => base.size(),
       _ => panic!("invalid pointer"),
     };
-    let ptr = match self.eval_value(value!(gep.src())) {
+    let ptr = match self.eval_value(gep.src()) {
       Val::Pointer { ptr, .. } => ptr
         .map(|p| match unsafe { p.as_ref() } {
           Val::Array(arr) => Self::get_pointer(Val::new_array_pointer(arr), offset, base_size),
@@ -244,10 +300,10 @@ impl Interpreter {
     Ok(())
   }
 
-  fn eval_binary(&mut self, inst: &Value, bin: &Binary) {
+  fn eval_binary(&mut self, inst: &ValueData, bin: &Binary) {
     // evaluate lhs & rhs
-    let lhs = self.eval_value(value!(bin.lhs()));
-    let rhs = self.eval_value(value!(bin.rhs()));
+    let lhs = self.eval_value(bin.lhs());
+    let rhs = self.eval_value(bin.rhs());
     let (lv, rv) = match (lhs, rhs) {
       (Val::Int(lv), Val::Int(rv)) => (lv, rv),
       _ => panic!("invalid lhs or rhs"),
@@ -275,88 +331,83 @@ impl Interpreter {
     self.insert_val(inst, Val::Int(ans));
   }
 
-  fn eval_call(&mut self, inst: &Value, call: &Call) -> Result<()> {
+  fn eval_call(&mut self, inst: &ValueData, call: &Call) -> Result<()> {
     // evaluate arguments
-    let args = call
-      .args()
-      .iter()
-      .map(|u| self.eval_value(value!(u)))
-      .collect();
+    let args = call.args().iter().map(|u| self.eval_value(*u)).collect();
     // perform function call
-    let ret = self.eval_func(call.callee().upgrade().unwrap().as_ref(), args)?;
+    let ret = self.eval_func(self.program.func(call.callee()), args)?;
     self.insert_val(inst, ret);
     Ok(())
   }
 
-  fn eval_phi(&mut self, inst: &Value, phi: &Phi) {
-    let val = phi
-      .oprs()
-      .iter()
-      .find_map(|(o, b)| {
-        (self.envs.last().unwrap().last_bb == b.as_ptr()).then(|| self.eval_value(value!(o)))
-      })
-      .unwrap();
-    self.insert_val(inst, val);
-  }
-
-  fn eval_branch(&mut self, cur_bb: &BasicBlock, br: &Branch) -> Result<Val> {
-    // update last basic block
-    self.envs.last_mut().unwrap().last_bb = cur_bb;
+  fn eval_branch(&mut self, br: &Branch) -> Result<Val> {
     // evaluate on condition
-    let cond = self.eval_value(value!(br.cond()));
+    let cond = self.eval_value(br.cond());
     // perform branching
     if cond.as_bool() {
-      self.eval_bb(br.true_bb().upgrade().unwrap().as_ref())
+      self.update_bb_params(br.true_bb(), br.true_args());
+      self.eval_bb(bb_node!(self, br.true_bb()))
     } else {
-      self.eval_bb(br.false_bb().upgrade().unwrap().as_ref())
+      self.update_bb_params(br.false_bb(), br.false_args());
+      self.eval_bb(bb_node!(self, br.false_bb()))
     }
   }
 
-  fn eval_jump(&mut self, cur_bb: &BasicBlock, jump: &Jump) -> Result<Val> {
-    // update last basic block
-    self.envs.last_mut().unwrap().last_bb = cur_bb;
-    // just jump
-    self.eval_bb(jump.target().upgrade().unwrap().as_ref())
+  fn eval_jump(&mut self, jump: &Jump) -> Result<Val> {
+    self.update_bb_params(jump.target(), jump.args());
+    self.eval_bb(bb_node!(self, jump.target()))
   }
 
   fn eval_return(&self, ret: &Return) -> Val {
-    ret
-      .value()
-      .value()
-      .map_or(Val::Undef, |v| self.eval_value(v.as_ref()))
+    ret.value().map_or(Val::Undef, |v| self.eval_value(v))
   }
 
-  fn eval_value(&self, value: &Value) -> Val {
-    if value.is_const() {
-      Self::eval_const(value)
+  fn eval_value(&self, value: Value) -> Val {
+    if value.is_global() {
+      let value = self.program.borrow_value(value);
+      assert!(!value.kind().is_const());
+      let v: *const ValueData = &value as &ValueData;
+      self.vars.get(&v).unwrap().clone()
     } else {
-      let v = value as *const Value;
-      self
-        .vars
-        .get(&v)
-        .or_else(|| self.envs.last().unwrap().vals.get(&v))
-        .unwrap()
-        .clone()
+      let value = value!(self, value);
+      if value.kind().is_const() {
+        self.eval_local_const(value)
+      } else {
+        let v: *const ValueData = value;
+        self
+          .vars
+          .get(&v)
+          .or_else(|| self.envs.last().unwrap().vals.get(&v))
+          .unwrap()
+          .clone()
+      }
     }
   }
 
-  fn insert_val(&mut self, inst: &Value, val: Val) {
+  fn insert_val(&mut self, inst: &ValueData, val: Val) {
     self.envs.last_mut().unwrap().vals.insert(inst, val);
+  }
+
+  fn update_bb_params(&mut self, bb: BasicBlock, args: &[Value]) {
+    let bb = func!(self).dfg().bb(bb);
+    for (param, arg) in bb.params().iter().zip(args.iter()) {
+      self.insert_val(func!(self).dfg().value(*param), self.eval_value(*arg));
+    }
   }
 }
 
-struct Environment {
+struct Environment<'a> {
+  func: &'a FunctionData,
   allocs: Vec<Box<Val>>,
-  vals: HashMap<*const Value, Val>,
-  last_bb: *const BasicBlock,
+  vals: HashMap<*const ValueData, Val>,
 }
 
-impl Environment {
-  fn new(vals: HashMap<*const Value, Val>) -> Self {
+impl<'a> Environment<'a> {
+  fn new(func: &'a FunctionData, vals: HashMap<*const ValueData, Val>) -> Self {
     Self {
+      func,
       allocs: Vec::new(),
       vals,
-      last_bb: null(),
     }
   }
 }
