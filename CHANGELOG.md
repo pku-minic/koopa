@@ -2,6 +2,12 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+* Brand new design with a lot of changes.
+
 ## 0.0.2 - 2021-12-24
 
 ### Added
