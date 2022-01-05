@@ -1,3 +1,5 @@
+//! Definitions of Koopa IR values, including constants and instructions.
+
 use crate::ir::entities::{BasicBlock, Function, Value, ValueData, ValueKind};
 use crate::ir::types::Type;
 use std::fmt;

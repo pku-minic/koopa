@@ -1,3 +1,5 @@
+//! Data flow graph ([`DataFlowGraph`]) related implementations.
+
 use crate::ir::builder::{BlockBuilder, LocalBuilder, ReplaceBuilder};
 use crate::ir::entities::{BasicBlock, BasicBlockData, Value, ValueData};
 use crate::ir::entities::{FuncTypeMapCell, GlobalValueMapCell};

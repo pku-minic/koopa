@@ -1,3 +1,7 @@
+//! Koopa IR entities, including programs ([`Program`]), functions
+//! ([`Function`], [`FunctionData`]), basic blocks ([`BasicBlock`],
+//! [`BasicBlockData`]) and values ([`Value`], [`ValueData`]).
+
 use crate::ir::builder::GlobalBuilder;
 use crate::ir::dfg::DataFlowGraph;
 use crate::ir::idman::{is_global_id, next_func_id, next_global_value_id};

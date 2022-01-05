@@ -65,7 +65,7 @@ pub trait ValueBuilder: Sized + EntityInfoQuerier + ValueInserter {
   ///
   /// # Panics
   ///
-  /// Panics if the given type is an unit type.
+  /// Panics if the given type is a unit type.
   fn zero_init(mut self, ty: Type) -> Value {
     assert!(!ty.is_unit(), "`ty` can not be unit");
     self.insert_value(ZeroInit::new_data(ty))
@@ -75,7 +75,7 @@ pub trait ValueBuilder: Sized + EntityInfoQuerier + ValueInserter {
   ///
   /// # Panics
   ///
-  /// Panics if the given type is an unit type.
+  /// Panics if the given type is a unit type.
   fn undef(mut self, ty: Type) -> Value {
     assert!(!ty.is_unit(), "`ty` can not be unit");
     self.insert_value(Undef::new_data(ty))
@@ -120,7 +120,7 @@ pub trait GlobalInstBuilder: ValueBuilder {
   ///
   /// # Panics
   ///
-  /// Panics if the type of the initialize is an unit type.
+  /// Panics if the type of the initialize is a unit type.
   fn global_alloc(mut self, init: Value) -> Value {
     let init_ty = self.value_type(init);
     assert!(!init_ty.is_unit(), "the type of `init` must not be unit");
@@ -135,7 +135,7 @@ pub trait LocalInstBuilder: ValueBuilder {
   ///
   /// # Panics
   ///
-  /// Panics if the given type is an unit type.
+  /// Panics if the given type is a unit type.
   fn alloc(mut self, ty: Type) -> Value {
     assert!(!ty.is_unit(), "`ty` can not be unit");
     self.insert_value(Alloc::new_data(Type::get_pointer(ty)))
@@ -315,7 +315,7 @@ pub trait LocalInstBuilder: ValueBuilder {
   ///
   /// # Panics
   ///
-  /// Panics if the value type (if value is not `None`) is an unit type.
+  /// Panics if the value type (if value is not `None`) is a unit type.
   fn ret(mut self, value: Option<Value>) -> Value {
     assert!(
       value.map_or(true, |v| !self.value_type(v).is_unit()),

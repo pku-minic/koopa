@@ -1,3 +1,5 @@
+//! Value/basic block/function ID manager.
+
 use std::cell::Cell;
 use std::num::NonZeroU32;
 
