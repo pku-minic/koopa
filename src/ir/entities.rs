@@ -311,6 +311,11 @@ impl FunctionData {
     &self.name
   }
 
+  /// Sets the function's name.
+  pub fn set_name(&mut self, name: String) {
+    self.name = name;
+  }
+
   /// Returns a reference to the function parameters.
   pub fn params(&self) -> &[Value] {
     &self.params
