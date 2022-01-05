@@ -1,3 +1,9 @@
+//! Types of Koopa IR values.
+//! 
+//! Each Koopa IR value and function should have a type. A type can be
+//! a 32-bit integer type, a unit type, an array type, a pointer type,
+//! or a function type.
+
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -45,7 +51,7 @@ impl fmt::Display for TypeKind {
   }
 }
 
-/// Types in Koopa.
+/// Types of Koopa IR values.
 #[derive(Clone, Eq)]
 pub struct Type(Rc<TypeKind>);
 
@@ -58,7 +64,7 @@ impl Type {
     static PTR_SIZE: Cell<usize> = Cell::new(mem::size_of::<*const ()>());
   }
 
-  /// Gets a specific type.
+  /// Returns a type by the given [`TypeKind`].
   pub fn get(type_data: TypeKind) -> Type {
     Self::POOL.with(|pool| {
       let mut pool = pool.borrow_mut();
@@ -70,28 +76,28 @@ impl Type {
     })
   }
 
-  /// Gets an `i32` type.
+  /// Returns an `i32` type.
   pub fn get_i32() -> Type {
     Type::get(TypeKind::Int32)
   }
 
-  /// Gets an `unit` type.
+  /// Returns an `unit` type.
   pub fn get_unit() -> Type {
     Type::get(TypeKind::Unit)
   }
 
-  /// Gets an array type.
+  /// Returns an array type.
   pub fn get_array(base: Type, len: usize) -> Type {
     assert!(len != 0, "`len` can not be zero!");
     Type::get(TypeKind::Array(base, len))
   }
 
-  /// Gets an pointer type.
+  /// Returns an pointer type.
   pub fn get_pointer(base: Type) -> Type {
     Type::get(TypeKind::Pointer(base))
   }
 
-  /// Gets an function type.
+  /// Returns an function type.
   pub fn get_function(params: Vec<Type>, ret: Type) -> Type {
     Type::get(TypeKind::Function(params, ret))
   }
@@ -101,7 +107,7 @@ impl Type {
     Self::PTR_SIZE.with(|ptr_size| ptr_size.set(size));
   }
 
-  /// Gets the kind of the current type.
+  /// Returns a reference to the kind of the current type.
   pub fn kind(&self) -> &TypeKind {
     &self.0
   }
@@ -116,7 +122,7 @@ impl Type {
     matches!(self.0.as_ref(), TypeKind::Unit)
   }
 
-  /// Gets the size of the current type in bytes.
+  /// Returns the size of the current type in bytes.
   pub fn size(&self) -> usize {
     match self.kind() {
       TypeKind::Int32 => 4,
