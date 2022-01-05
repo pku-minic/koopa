@@ -74,7 +74,7 @@ pub struct Span {
   end: Pos,
 }
 
-/// Gets the string of the specific line.
+/// Gets the string of the given line.
 #[cfg(not(feature = "no-front-logger"))]
 macro_rules! get_line_str {
   ($line:expr) => {
@@ -307,7 +307,7 @@ impl Span {
     self.end = span.end;
   }
 
-  /// Checks if the current span is in the same line as the specific span.
+  /// Checks if the current span is in the same line as the given span.
   pub fn is_in_same_line_as(&self, span: &Span) -> bool {
     self.end.line == span.start.line
   }

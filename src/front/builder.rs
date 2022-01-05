@@ -41,7 +41,7 @@ pub struct Builder {
 /// Result returned by value generator methods in `Builder`.
 type ValueResult = Result<Value, Error>;
 
-/// Unwraps the specific AST by its kind.
+/// Unwraps the given AST by its kind.
 macro_rules! unwrap_ast {
   ($ast:expr, $kind:ident) => {
     match &$ast.kind {
@@ -98,7 +98,7 @@ impl Builder {
     Self::default()
   }
 
-  /// Builds the specific AST into IR.
+  /// Builds the given AST into IR.
   pub fn build_on(&mut self, ast: &AstBox) {
     match &ast.kind {
       AstKind::GlobalDef(def) => self.build_on_global_def(&ast.span, def),
@@ -384,7 +384,7 @@ impl Builder {
     }
   }
 
-  /// Generates the type by the specific AST.
+  /// Generates the type by the given AST.
   fn generate_type(&self, ast: &AstBox) -> Type {
     match &ast.kind {
       AstKind::IntType(_) => Type::get_i32(),
@@ -401,7 +401,7 @@ impl Builder {
     }
   }
 
-  /// Generates the global initializer by the specific AST.
+  /// Generates the global initializer by the given AST.
   fn generate_global_init(&mut self, ty: &Type, ast: &AstBox) -> ValueResult {
     generate_init!(
       ty,
@@ -412,7 +412,7 @@ impl Builder {
     )
   }
 
-  /// Generates the local initializer by the specific AST.
+  /// Generates the local initializer by the given AST.
   fn generate_local_init(&mut self, func: Function, ty: &Type, ast: &AstBox) -> ValueResult {
     generate_init!(
       ty,
@@ -423,7 +423,7 @@ impl Builder {
     )
   }
 
-  /// Generates the value by the specific AST.
+  /// Generates the value by the given AST.
   fn generate_value(
     &mut self,
     func: Function,
@@ -523,7 +523,7 @@ impl Builder {
       .collect()
   }
 
-  /// Generates the statement by the specific AST.
+  /// Generates the statement by the given AST.
   fn generate_stmt(
     &mut self,
     func: Function,
@@ -573,7 +573,7 @@ impl Builder {
     }
   }
 
-  /// Generates the instruction by the specific AST.
+  /// Generates the instruction by the given AST.
   fn generate_inst(&mut self, func: Function, bb_name: &str, ast: &AstBox) -> ValueResult {
     match &ast.kind {
       AstKind::MemDecl(ast) => self.generate_mem_decl(func, ast),
@@ -793,7 +793,7 @@ impl Symbol for String {
   }
 }
 
-/// Helper trait, for getting plural form of a specific word.
+/// Helper trait, for getting plural form of a given word.
 trait ToPlural {
   fn to_plural(self, num: usize) -> String;
 }

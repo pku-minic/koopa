@@ -176,7 +176,7 @@ fn generate_main(input: impl io::Read, mut env: Environment) -> Result<(), Error
   let store = new_value!(main).store(data_ptr, ptr);
   add_inst!(main, entry, store);
   env.ptr = ptr;
-  // generate other basic blocks by the specific input
+  // generate other basic blocks by the given input
   let bb = generate_bbs(input, &mut env, entry)?;
   // generate end basic block
   let main = &mut env.main;

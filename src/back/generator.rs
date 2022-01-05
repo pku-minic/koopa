@@ -124,8 +124,8 @@ impl NameManager {
     self.next_name(&None, |s| &mut s.global_names)
   }
 
-  /// Generates the next name by the specific `Option<String>`
-  /// and stores it to the specific name set.
+  /// Generates the next name by the given `Option<String>`
+  /// and stores it to the given name set.
   fn next_name<F>(&mut self, name: &Option<String>, name_set: F) -> Rc<String>
   where
     F: for<'a> FnOnce(&'a mut Self) -> &'a mut HashSet<StringRc>,
@@ -143,8 +143,8 @@ impl NameManager {
     }
   }
 
-  /// Generates the next name by the specific string
-  /// and stores it to the specific name set.
+  /// Generates the next name by the given string
+  /// and stores it to the given name set.
   fn next_name_str<F>(&mut self, name: &str, name_set: F) -> Rc<String>
   where
     F: for<'a> FnOnce(&'a mut Self) -> &'a mut HashSet<StringRc>,
@@ -209,7 +209,7 @@ impl Prefix {
     }
   }
 
-  /// Returns a temp name by the specific id.
+  /// Returns a temp name by the given id.
   fn temp_name(&self, id: usize) -> String {
     match self {
       Prefix::Default => format!("%{}", id),
@@ -284,7 +284,7 @@ impl<W: Write, V: Visitor<W>> Generator<W, V> {
     }
   }
 
-  /// Creates a new generator with the specific visitor.
+  /// Creates a new generator with the given visitor.
   pub fn with_visitor(writer: W, visitor: V) -> Self {
     Self {
       writer,

@@ -67,7 +67,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     Ok(())
   }
 
-  /// Generates the specific function.
+  /// Generates the given function.
   fn visit_func(&mut self, func: &FunctionData) -> Result<()> {
     // header
     let is_decl = func.dfg().bbs().is_empty();
@@ -120,7 +120,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific basic block.
+  /// Generates the given basic block.
   fn visit_bb(&mut self, bb: BasicBlock, node: &BasicBlockNode) -> Result<()> {
     // basic block name
     let bb = func!(self).dfg().bb(bb);
@@ -146,7 +146,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     Ok(())
   }
 
-  /// Generates the specific global instruction.
+  /// Generates the given global instruction.
   fn visit_global_inst(&mut self, inst: &ValueData) -> Result<()> {
     let alloc = match inst.kind() {
       ValueKind::GlobalAlloc(alloc) => alloc,
@@ -163,7 +163,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     writeln!(self.w)
   }
 
-  /// Generates the specific local instruction.
+  /// Generates the given local instruction.
   fn visit_local_inst(&mut self, inst: &ValueData) -> Result<()> {
     // definition
     if !inst.ty().is_unit() {
@@ -275,7 +275,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     Ok(())
   }
 
-  /// Generates the specific value.
+  /// Generates the given value.
   fn visit_value(&mut self, value: Value) -> Result<()> {
     if value.is_global() {
       let value = self.program.borrow_value(value);
@@ -291,7 +291,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific global constant.
+  /// Generates the given global constant.
   fn visit_global_const(&mut self, value: &ValueData) -> Result<()> {
     match value.kind() {
       ValueKind::Integer(v) => write!(self.w, "{}", v.value()),
@@ -311,7 +311,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific local constant.
+  /// Generates the given local constant.
   fn visit_local_const(&mut self, value: &ValueData) -> Result<()> {
     match value.kind() {
       ValueKind::Integer(v) => write!(self.w, "{}", v.value()),
@@ -331,7 +331,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific basic block target.
+  /// Generates the given basic block target.
   fn visit_bb_target(&mut self, bb: BasicBlock, params: &[Value]) -> Result<()> {
     write!(self.w, "{}", self.nm.bb_name(func!(self).dfg().bb(bb)))?;
     if !params.is_empty() {

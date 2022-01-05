@@ -21,7 +21,7 @@ impl PassManager {
     self.passes.push(pass);
   }
 
-  /// Runs all registered passes on the specific IR program.
+  /// Runs all registered passes on the given IR program.
   pub fn run_passes(&mut self, program: &mut Program) {
     for pass in &mut self.passes {
       match pass {

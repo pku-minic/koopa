@@ -84,7 +84,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     Ok(())
   }
 
-  /// Generates the specific function.
+  /// Generates the given function.
   fn visit_func(&mut self, func: &FunctionData) -> Result<()> {
     // header
     let is_decl = func.dfg().bbs().is_empty();
@@ -148,7 +148,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     Ok(())
   }
 
-  /// Generates the specific basic block.
+  /// Generates the given basic block.
   fn visit_bb(&mut self, bb: BasicBlock, node: &BasicBlockNode) -> Result<()> {
     // basic block name
     let data = func!(self).dfg().bb(bb);
@@ -189,7 +189,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     Ok(())
   }
 
-  /// Generates the specific global instruction.
+  /// Generates the given global instruction.
   fn visit_global_inst(&mut self, inst: &ValueData) -> Result<()> {
     let alloc = match inst.kind() {
       ValueKind::GlobalAlloc(alloc) => alloc,
@@ -201,7 +201,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     writeln!(self.w)
   }
 
-  /// Generates the specific instruction.
+  /// Generates the given instruction.
   fn visit_local_inst(&mut self, inst: &ValueData) -> Result<()> {
     // definition
     if !matches!(inst.kind(), ValueKind::Binary(_)) && !inst.ty().is_unit() {
@@ -370,7 +370,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific value.
+  /// Generates the given value.
   fn visit_value(&mut self, with_ty: bool, value: Value) -> Result<()> {
     if value.is_global() {
       let value = self.program.borrow_value(value);
@@ -394,7 +394,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific global constant.
+  /// Generates the given global constant.
   fn visit_global_const(&mut self, value: &ValueData) -> Result<()> {
     self.visit_type(value.ty())?;
     write!(self.w, " ")?;
@@ -416,7 +416,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific local constant.
+  /// Generates the given local constant.
   fn visit_local_const(&mut self, with_ty: bool, value: &ValueData) -> Result<()> {
     if with_ty {
       self.visit_type(value.ty())?;
@@ -440,12 +440,12 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     }
   }
 
-  /// Generates the specific basic block reference.
+  /// Generates the given basic block reference.
   fn visit_bb_ref(&mut self, bb: BasicBlock) -> Result<()> {
     write!(self.w, "{}", self.nm.bb_name(func!(self).dfg().bb(bb)))
   }
 
-  /// Generates the specific type.
+  /// Generates the given type.
   fn visit_type(&mut self, ty: &Type) -> Result<()> {
     match ty.kind() {
       TypeKind::Int32 => write!(self.w, "i32"),

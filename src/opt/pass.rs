@@ -12,7 +12,7 @@ pub enum Pass {
 ///
 /// Module passes can run on IR programs.
 pub trait ModulePass {
-  /// Runs on the specific IR program.
+  /// Runs on the given IR program.
   fn run_on(&mut self, program: &mut Program);
 }
 
@@ -20,6 +20,6 @@ pub trait ModulePass {
 ///
 /// Function passes can run on functions.
 pub trait FunctionPass {
-  /// Runs on the specific function data.
+  /// Runs on the given function data.
   fn run_on(&mut self, func: Function, data: &mut FunctionData);
 }

@@ -19,7 +19,7 @@ pub struct Parser<T: Read> {
 /// Result that returned by [`Parser`].
 pub type Result = std::result::Result<AstBox, Error>;
 
-/// Reads the value of the specific kind of token from lexer.
+/// Reads the value of the given kind of token from lexer.
 macro_rules! read {
   ($self:ident, $p:path, $prompt:expr) => {{
     let Token { span, kind } = &$self.cur_token;
@@ -68,7 +68,7 @@ macro_rules! match_token {
 }
 
 impl<T: Read> Parser<T> {
-  /// Creates a new parser from the specific [`Lexer`].
+  /// Creates a new parser from the given [`Lexer`].
   pub fn new(lexer: Lexer<T>) -> Self {
     let mut parser = Self {
       lexer,
@@ -586,12 +586,12 @@ impl<T: Read> Parser<T> {
     }
   }
 
-  /// Checks if the current token is the specific token.
+  /// Checks if the current token is the given token.
   fn is_token(&self, tk: TokenKind) -> bool {
     self.cur_token.kind == tk
   }
 
-  /// Expects the specific token from lexer.
+  /// Expects the given token from lexer.
   fn expect(&mut self, tk: TokenKind) -> std::result::Result<Span, Error> {
     let Token { span, kind } = &self.cur_token;
     if kind == &tk {

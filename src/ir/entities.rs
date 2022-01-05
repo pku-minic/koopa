@@ -64,7 +64,7 @@ impl Program {
     value
   }
 
-  /// Removes the specific global value by its handle. Returns the
+  /// Removes the given global value by its handle. Returns the
   /// corresponding value data.
   ///
   /// # Panics
@@ -136,7 +136,7 @@ impl Program {
     func
   }
 
-  /// Removes the specific function by its handle.
+  /// Removes the given function by its handle.
   ///
   /// Returns the function data if the function was previously in the program.
   pub fn remove_func(&mut self, func: Function) -> Option<FunctionData> {
