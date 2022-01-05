@@ -153,9 +153,9 @@ impl<T: Read> Lexer<T> {
       self.next_char()?;
     }
     // check the string
-    if let Some(keyword) = KEYWORDS.with(|m| m.get(keyword.as_str()).cloned()) {
+    if let Some(keyword) = KEYWORDS.with(|m| m.get(keyword.as_str()).copied()) {
       Ok(Token::new(span, TokenKind::Keyword(keyword)))
-    } else if let Some(op) = BINARY_OPS.with(|m| m.get(keyword.as_str()).cloned()) {
+    } else if let Some(op) = BINARY_OPS.with(|m| m.get(keyword.as_str()).copied()) {
       Ok(Token::new(span, TokenKind::BinaryOp(op)))
     } else {
       self.log_err_and_skip(span, &format!("invalid keyword/operator '{}'", keyword))

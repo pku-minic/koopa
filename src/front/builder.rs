@@ -184,7 +184,7 @@ impl Builder {
       .params
       .iter()
       .map(|(n, _)| n.clone())
-      .zip(def.params().iter().cloned())
+      .zip(def.params().iter().copied())
       .collect();
     // add to program
     let func = self.program.new_func(def);
@@ -454,7 +454,7 @@ impl Builder {
     self
       .global_vars
       .get(symbol)
-      .cloned()
+      .copied()
       .or_else(|| self.generate_local_symbol(&mut visited_bbs, bb_name, symbol))
       .ok_or_else(|| return_error!(span, "symbol '{}' not found", symbol))
   }
@@ -470,7 +470,7 @@ impl Builder {
       // find symbol in local scope of the current basic block
       // if not found, try to find symbol in all predecessors
       let bb_info = &self.local_bbs[bb_name];
-      bb_info.local_defs.get(symbol).cloned().or_else(|| {
+      bb_info.local_defs.get(symbol).copied().or_else(|| {
         bb_info
           .preds
           .iter()
