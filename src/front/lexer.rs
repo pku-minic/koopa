@@ -1,3 +1,5 @@
+//! The Koopa IR lexer ([`Lexer`]) related implementations.
+
 use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
 use crate::ir::BinaryOp;
@@ -6,6 +8,9 @@ use std::collections::HashMap;
 use std::io::Read;
 
 /// A lexer for lexing text form Koopa IR.
+/// 
+/// `Lexer` scans the input text form Koopa IR, and produces
+/// token stream for the [`Parser`](crate::front::parser::Parser).
 pub struct Lexer<T: Read> {
   reader: T,
   pos: Pos,
@@ -17,7 +22,7 @@ pub struct Lexer<T: Read> {
 pub type Result = std::result::Result<Token, Error>;
 
 impl<T: Read> Lexer<T> {
-  /// Creates a new lexer from the specific reader.
+  /// Creates a new lexer from the given reader.
   pub fn new(reader: T) -> Self {
     Self {
       reader,

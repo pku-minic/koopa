@@ -1,3 +1,5 @@
+//! The Koopa IR frontend driver ([`Driver`]) related implementations.
+
 use crate::front::ast::AstKind;
 use crate::front::builder::Builder;
 use crate::front::lexer::Lexer;
@@ -10,6 +12,8 @@ use std::io::{self, Read};
 use std::path::Path;
 
 /// A driver for converting text form Koopa IR to IR structures.
+///
+/// See the [module-level documentation](crate::front) for more examples.
 pub struct Driver<T: Read> {
   parser: Parser<T>,
   builder: Builder,
@@ -28,7 +32,8 @@ impl<T: Read> Driver<T> {
     }
   }
 
-  /// Generates Koopa IR program from the reader.
+  /// Consumes the current driver and generates Koopa IR program
+  /// from the reader.
   pub fn generate_program(mut self) -> Result<Program, Error> {
     loop {
       // parse & get the next AST
@@ -58,7 +63,7 @@ impl<T: Read> Driver<T> {
 }
 
 impl Driver<File> {
-  /// Creates a new driver from the specific path.
+  /// Creates a new driver from the given path.
   pub fn from_path<P>(path: P) -> io::Result<Self>
   where
     P: AsRef<Path> + Clone,

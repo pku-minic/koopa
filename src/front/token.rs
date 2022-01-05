@@ -1,3 +1,10 @@
+//! Definitions of Koopa IR tokens.
+//!
+//! Tokens can represent integer literals, symbols, keywords, binary
+//! operators, characters and EOFs. The Koopa IR lexer
+//! ([`Lexer`](crate::front::lexer::Lexer)) will produce tokens during
+//! the lexing process.
+
 use crate::front::span::Span;
 use crate::ir::BinaryOp;
 use std::fmt;
@@ -28,11 +35,17 @@ impl Default for Token {
 /// Kind of token.
 #[derive(Debug, PartialEq)]
 pub enum TokenKind {
+  /// Integer literal.
   Int(i64),
+  /// Symbol (identifier like `@id` or `%id`).
   Symbol(String),
+  /// Keyword.
   Keyword(Keyword),
+  /// Binary operator.
   BinaryOp(BinaryOp),
+  /// Other characters.
   Other(char),
+  /// End of file.
   End,
 }
 
@@ -50,13 +63,38 @@ impl fmt::Display for TokenKind {
 }
 
 /// Keywords of Koopa IR.
-#[rustfmt::skip]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Keyword {
+  /// Keyword `i32`.
   I32,
-  Undef, ZeroInit,
-  Global, Alloc, Load, Store, GetPtr, GetElemPtr,
-  Br, Jump, Call, Ret, Fun, Decl,
+  /// Keyword `undef`.
+  Undef,
+  /// Keyword `zeroinit`.
+  ZeroInit,
+  /// Keyword `global`.
+  Global,
+  /// Keyword `alloc`.
+  Alloc,
+  /// Keyword `load`.
+  Load,
+  /// Keyword `store`.
+  Store,
+  /// Keyword `getptr`.
+  GetPtr,
+  /// Keyword `getelemptr`.
+  GetElemPtr,
+  /// Keyword `br`.
+  Br,
+  /// Keyword `jump`.
+  Jump,
+  /// Keyword `call`.
+  Call,
+  /// Keyword `ret`.
+  Ret,
+  /// Keyword `fun`.
+  Fun,
+  /// Keyword `decl`.
+  Decl,
 }
 
 impl fmt::Display for Keyword {

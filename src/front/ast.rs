@@ -1,19 +1,25 @@
+//! Definitions of Koopa IR ASTs.
+//!
+//! ASTs can represent the tree structures of the text form Koopa IR,
+//! and they will be built by the Koopa IR parser
+//! ([`Parser`](crate::front::parser::Parser)) during the parsing process.
+
 use crate::front::span::Span;
 use crate::ir::BinaryOp;
 use std::cmp::PartialEq;
 
-/// An AST of Koopa IR.
+/// An abstract syntax tree (AST) of Koopa IR.
 #[derive(Debug)]
 pub struct Ast {
   pub span: Span,
   pub kind: AstKind,
 }
 
-/// A [`Box`] of Koopa IR AST.
+/// A boxed Koopa IR AST.
 pub type AstBox = Box<Ast>;
 
 impl Ast {
-  /// Creates a new AST box.
+  /// Creates a new boxed AST.
   pub(in crate::front) fn new_boxed(span: Span, kind: AstKind) -> AstBox {
     Box::new(Self { span, kind })
   }
@@ -29,32 +35,59 @@ impl PartialEq for Ast {
 /// Kind of AST.
 #[derive(Debug, PartialEq)]
 pub enum AstKind {
+  /// 32-bit integer type.
   IntType(IntType),
+  /// Array type.
   ArrayType(ArrayType),
+  /// Pointer type.
   PointerType(PointerType),
+  /// Function type.
   FunType(FunType),
+  /// Symbol refernce.
   SymbolRef(SymbolRef),
+  /// Integer literal.
   IntVal(IntVal),
+  /// Undefined value.
   UndefVal(UndefVal),
+  /// Aggregate value.
   Aggregate(Aggregate),
+  /// Zero initializer.
   ZeroInit(ZeroInit),
+  /// Symbol definition.
   SymbolDef(SymbolDef),
+  /// Global symbol definition.
   GlobalDef(GlobalDef),
+  /// Memory declaration.
   MemDecl(MemDecl),
+  /// Global memory declaration.
   GlobalDecl(GlobalDecl),
+  /// Load.
   Load(Load),
+  /// Store.
   Store(Store),
+  /// Pointer calculation.
   GetPointer(GetPointer),
+  /// Element pointer calculation.
   GetElementPointer(GetElementPointer),
+  /// Binary expression.
   BinaryExpr(BinaryExpr),
+  /// Branch.
   Branch(Branch),
+  /// Jump.
   Jump(Jump),
+  /// Function call.
   FunCall(FunCall),
+  /// Return.
   Return(Return),
+  /// Function definition.
   FunDef(FunDef),
+  /// Basic block.
   Block(Block),
+  /// Function declaration.
   FunDecl(FunDecl),
+  /// End of file.
   End(End),
+  /// Error.
   Error(Error),
 }
 
@@ -63,7 +96,7 @@ pub enum AstKind {
 pub struct IntType;
 
 impl IntType {
-  /// Creates a new box of `IntType` AST.
+  /// Creates a new boxed `IntType` AST.
   pub fn new_boxed(span: Span) -> AstBox {
     Ast::new_boxed(span, AstKind::IntType(Self))
   }
@@ -77,7 +110,7 @@ pub struct ArrayType {
 }
 
 impl ArrayType {
-  /// Creates a new box of `ArrayType` AST.
+  /// Creates a new boxed `ArrayType` AST.
   pub fn new_boxed(span: Span, base: AstBox, len: usize) -> AstBox {
     Ast::new_boxed(span, AstKind::ArrayType(Self { base, len }))
   }
@@ -90,7 +123,7 @@ pub struct PointerType {
 }
 
 impl PointerType {
-  /// Creates a new box of `PointerType` AST.
+  /// Creates a new boxed `PointerType` AST.
   pub fn new_boxed(span: Span, base: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::PointerType(Self { base }))
   }
@@ -104,7 +137,7 @@ pub struct FunType {
 }
 
 impl FunType {
-  /// Creates a new box of `FunType` AST.
+  /// Creates a new boxed `FunType` AST.
   pub fn new_boxed(span: Span, params: Vec<AstBox>, ret: Option<AstBox>) -> AstBox {
     Ast::new_boxed(span, AstKind::FunType(Self { params, ret }))
   }
@@ -117,7 +150,7 @@ pub struct SymbolRef {
 }
 
 impl SymbolRef {
-  /// Creates a new box of `SymbolRef` AST.
+  /// Creates a new boxed `SymbolRef` AST.
   pub fn new_boxed(span: Span, symbol: String) -> AstBox {
     Ast::new_boxed(span, AstKind::SymbolRef(Self { symbol }))
   }
@@ -130,7 +163,7 @@ pub struct IntVal {
 }
 
 impl IntVal {
-  /// Creates a new box of `IntVal` AST.
+  /// Creates a new boxed `IntVal` AST.
   pub fn new_boxed(span: Span, value: i32) -> AstBox {
     Ast::new_boxed(span, AstKind::IntVal(Self { value }))
   }
@@ -141,7 +174,7 @@ impl IntVal {
 pub struct UndefVal;
 
 impl UndefVal {
-  /// Creates a new box of `UndefVal` AST.
+  /// Creates a new boxed `UndefVal` AST.
   pub fn new_boxed(span: Span) -> AstBox {
     Ast::new_boxed(span, AstKind::UndefVal(Self))
   }
@@ -154,7 +187,7 @@ pub struct Aggregate {
 }
 
 impl Aggregate {
-  /// Creates a new box of `Aggregate` AST.
+  /// Creates a new boxed `Aggregate` AST.
   pub fn new_boxed(span: Span, elems: Vec<AstBox>) -> AstBox {
     Ast::new_boxed(span, AstKind::Aggregate(Self { elems }))
   }
@@ -165,7 +198,7 @@ impl Aggregate {
 pub struct ZeroInit;
 
 impl ZeroInit {
-  /// Creates a new box of `ZeroInit` AST.
+  /// Creates a new boxed `ZeroInit` AST.
   pub fn new_boxed(span: Span) -> AstBox {
     Ast::new_boxed(span, AstKind::ZeroInit(Self))
   }
@@ -179,7 +212,7 @@ pub struct SymbolDef {
 }
 
 impl SymbolDef {
-  /// Creates a new box of `SymbolDef` AST.
+  /// Creates a new boxed `SymbolDef` AST.
   pub fn new_boxed(span: Span, name: String, value: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::SymbolDef(Self { name, value }))
   }
@@ -193,7 +226,7 @@ pub struct GlobalDef {
 }
 
 impl GlobalDef {
-  /// Creates a new box of `GlobalDef` AST.
+  /// Creates a new boxed `GlobalDef` AST.
   pub fn new_boxed(span: Span, name: String, value: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::GlobalDef(Self { name, value }))
   }
@@ -206,7 +239,7 @@ pub struct MemDecl {
 }
 
 impl MemDecl {
-  /// Creates a new box of `MemDecl` AST.
+  /// Creates a new boxed `MemDecl` AST.
   pub fn new_boxed(span: Span, ty: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::MemDecl(Self { ty }))
   }
@@ -220,7 +253,7 @@ pub struct GlobalDecl {
 }
 
 impl GlobalDecl {
-  /// Creates a new box of `GlobalDecl` AST.
+  /// Creates a new boxed `GlobalDecl` AST.
   pub fn new_boxed(span: Span, ty: AstBox, init: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::GlobalDecl(Self { ty, init }))
   }
@@ -233,7 +266,7 @@ pub struct Load {
 }
 
 impl Load {
-  /// Creates a new box of `Load` AST.
+  /// Creates a new boxed `Load` AST.
   pub fn new_boxed(span: Span, symbol: String) -> AstBox {
     Ast::new_boxed(span, AstKind::Load(Self { symbol }))
   }
@@ -247,7 +280,7 @@ pub struct Store {
 }
 
 impl Store {
-  /// Creates a new box of `Store` AST.
+  /// Creates a new boxed `Store` AST.
   pub fn new_boxed(span: Span, value: AstBox, symbol: String) -> AstBox {
     Ast::new_boxed(span, AstKind::Store(Self { value, symbol }))
   }
@@ -261,7 +294,7 @@ pub struct GetPointer {
 }
 
 impl GetPointer {
-  /// Creates a new box of `GetPointer` AST.
+  /// Creates a new boxed `GetPointer` AST.
   pub fn new_boxed(span: Span, symbol: String, value: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::GetPointer(Self { symbol, value }))
   }
@@ -275,7 +308,7 @@ pub struct GetElementPointer {
 }
 
 impl GetElementPointer {
-  /// Creates a new box of `GetElementPointer` AST.
+  /// Creates a new boxed `GetElementPointer` AST.
   pub fn new_boxed(span: Span, symbol: String, value: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::GetElementPointer(Self { symbol, value }))
   }
@@ -290,7 +323,7 @@ pub struct BinaryExpr {
 }
 
 impl BinaryExpr {
-  /// Creates a new box of `BinaryExpr` AST.
+  /// Creates a new boxed `BinaryExpr` AST.
   pub fn new_boxed(span: Span, op: BinaryOp, lhs: AstBox, rhs: AstBox) -> AstBox {
     Ast::new_boxed(span, AstKind::BinaryExpr(Self { op, lhs, rhs }))
   }
@@ -307,7 +340,7 @@ pub struct Branch {
 }
 
 impl Branch {
-  /// Creates a new box of `Branch` AST.
+  /// Creates a new boxed `Branch` AST.
   pub fn new_boxed(
     span: Span,
     cond: AstBox,
@@ -337,7 +370,7 @@ pub struct Jump {
 }
 
 impl Jump {
-  /// Creates a new box of `Jump` AST.
+  /// Creates a new boxed `Jump` AST.
   pub fn new_boxed(span: Span, target: String, args: Vec<AstBox>) -> AstBox {
     Ast::new_boxed(span, AstKind::Jump(Self { target, args }))
   }
@@ -351,7 +384,7 @@ pub struct FunCall {
 }
 
 impl FunCall {
-  /// Creates a new box of `FunCall` AST.
+  /// Creates a new boxed `FunCall` AST.
   pub fn new_boxed(span: Span, fun: String, args: Vec<AstBox>) -> AstBox {
     Ast::new_boxed(span, AstKind::FunCall(Self { fun, args }))
   }
@@ -364,7 +397,7 @@ pub struct Return {
 }
 
 impl Return {
-  /// Creates a new box of `Return` AST.
+  /// Creates a new boxed `Return` AST.
   pub fn new_boxed(span: Span, value: Option<AstBox>) -> AstBox {
     Ast::new_boxed(span, AstKind::Return(Self { value }))
   }
@@ -380,7 +413,7 @@ pub struct FunDef {
 }
 
 impl FunDef {
-  /// Creates a new box of `FunDef` AST.
+  /// Creates a new boxed `FunDef` AST.
   pub fn new_boxed(
     span: Span,
     name: String,
@@ -409,7 +442,7 @@ pub struct Block {
 }
 
 impl Block {
-  /// Creates a new box of `Block` AST.
+  /// Creates a new boxed `Block` AST.
   pub fn new_boxed(
     span: Span,
     name: String,
@@ -436,7 +469,7 @@ pub struct FunDecl {
 }
 
 impl FunDecl {
-  /// Creates a new box of `FunDecl` AST.
+  /// Creates a new boxed `FunDecl` AST.
   pub fn new_boxed(span: Span, name: String, params: Vec<AstBox>, ret: Option<AstBox>) -> AstBox {
     Ast::new_boxed(span, AstKind::FunDecl(Self { name, params, ret }))
   }
@@ -447,18 +480,18 @@ impl FunDecl {
 pub struct End;
 
 impl End {
-  /// Creates a new box of `End` AST.
+  /// Creates a new boxed `End` AST.
   pub fn new_boxed(span: Span) -> AstBox {
     Ast::new_boxed(span, AstKind::End(Self))
   }
 }
 
-/// Error
+/// Error.
 #[derive(Debug, PartialEq)]
 pub struct Error;
 
 impl Error {
-  /// Creates a new box of `Error` AST.
+  /// Creates a new boxed `Error` AST.
   pub fn new_boxed(span: Span) -> AstBox {
     Ast::new_boxed(span, AstKind::Error(Self))
   }

@@ -1,3 +1,5 @@
+//! Span ([`Span`]) and error ([`Error`]) related implementations.
+
 use std::cell::RefCell;
 use std::fmt::{self, Arguments};
 use std::path::PathBuf;
@@ -11,7 +13,9 @@ use std::{fs::File, io::BufRead, io::BufReader, io::Result as IoResult};
 #[cfg(feature = "no-front-logger")]
 #[derive(Debug)]
 pub enum Error {
+  /// Normal error.
   Normal(String),
+  /// Fatal error.
   Fatal(String),
 }
 
@@ -19,7 +23,9 @@ pub enum Error {
 #[cfg(not(feature = "no-front-logger"))]
 #[derive(Debug)]
 pub enum Error {
+  /// Normal error.
   Normal,
+  /// Fatal error.
   Fatal,
 }
 

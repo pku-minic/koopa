@@ -1,3 +1,5 @@
+//! The Koopa IR builder ([`Builder`]) related implementations.
+
 use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::{Error, Span};
 use crate::ir::builder_traits::*;
@@ -23,7 +25,10 @@ impl BasicBlockInfo {
   }
 }
 
-/// Builder for building Koopa IR from AST.
+/// Builder for building Koopa IR from ASTs.
+///
+/// `Builder` performs semantic checks (e.g. type checking) on
+/// Koopa IR ASTs, and then builds the in-memory form Koopa IR.
 #[derive(Default)]
 pub struct Builder {
   program: Program,
