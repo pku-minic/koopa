@@ -493,22 +493,39 @@ impl Clone for ValueData {
 /// Kind of Koopa IR value.
 #[derive(Clone, Debug)]
 pub enum ValueKind {
+  /// Integer constant.
   Integer(values::Integer),
+  /// Zero initializer.
   ZeroInit(values::ZeroInit),
+  /// Undefined value.
   Undef(values::Undef),
+  /// Aggregate constant.
   Aggregate(values::Aggregate),
+  /// Function argument reference.
   FuncArgRef(values::FuncArgRef),
+  /// Basic block argument reference.
   BlockArgRef(values::BlockArgRef),
+  /// Local memory allocation.
   Alloc(values::Alloc),
+  /// Global memory allocation.
   GlobalAlloc(values::GlobalAlloc),
+  /// Memory load.
   Load(values::Load),
+  /// Memory store.
   Store(values::Store),
+  /// Pointer calculation.
   GetPtr(values::GetPtr),
+  /// Element pointer calculation.
   GetElemPtr(values::GetElemPtr),
+  /// Binary operation.
   Binary(values::Binary),
+  /// Conditional branch.
   Branch(values::Branch),
+  /// Unconditional jump.
   Jump(values::Jump),
+  /// Function call.
   Call(values::Call),
+  /// Function return.
   Return(values::Return),
 }
 

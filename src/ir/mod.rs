@@ -1,7 +1,7 @@
 //! The core part of Koopa IR.
 //!
 //! This module provides in-memory form IR related implementations,
-//! containing:
+//! including:
 //!
 //! * Structs of Koopa IR programs ([`Program`]), functions ([`Function`],
 //!   [`FunctionData`]), basic blocks ([`BasicBlock`], [`BasicBlockData`])
