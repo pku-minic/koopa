@@ -47,13 +47,13 @@ impl Layout {
   /// Returns the entry basic block of the function, returns `None` if
   /// the function is a declaration.
   pub fn entry_bb(&self) -> Option<BasicBlock> {
-    self.bbs.front_key().cloned()
+    self.bbs.front_key().copied()
   }
 
   /// Returns the parent basic block of the given instruction, returns
   /// `None` if the given instruction is not in the current layout.
   pub fn parent_bb(&self, inst: Value) -> Option<BasicBlock> {
-    self.inst_bb.as_ref().borrow().get(&inst).cloned()
+    self.inst_bb.as_ref().borrow().get(&inst).copied()
   }
 }
 
