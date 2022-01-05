@@ -1,4 +1,4 @@
-//! The Koopa IR frontend driver ([`Driver`]) related implementations.
+//! Koopa IR frontend driver ([`Driver`]) related implementations.
 
 use crate::front::ast::AstKind;
 use crate::front::builder::Builder;

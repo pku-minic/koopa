@@ -1,4 +1,4 @@
-//! The Koopa IR lexer ([`Lexer`]) related implementations.
+//! Koopa IR lexer ([`Lexer`]) related implementations.
 
 use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};

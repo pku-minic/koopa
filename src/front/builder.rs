@@ -1,4 +1,4 @@
-//! The Koopa IR builder ([`Builder`]) related implementations.
+//! Koopa IR builder ([`Builder`]) related implementations.
 
 use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::{Error, Span};

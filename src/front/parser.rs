@@ -1,4 +1,4 @@
-//! The Koopa IR parser ([`Parser`]) related implementations.
+//! Koopa IR parser ([`Parser`]) related implementations.
 
 use crate::front::ast::{self, AstBox};
 use crate::front::lexer::Lexer;
