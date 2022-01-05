@@ -16,5 +16,5 @@ exclude = ["/.github", "/examples"]
 no-front-logger = []
 
 [dependencies]
-key-node-list = "0.0.2"
+key-node-list = "0.0.3"
 colored = "2"
