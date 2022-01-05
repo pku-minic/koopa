@@ -4,8 +4,9 @@
 //! including:
 //!
 //! * Structs of Koopa IR programs ([`Program`]), functions ([`Function`],
-//!   [`FunctionData`]), basic blocks ([`BasicBlock`], [`BasicBlockData`])
-//!   and values ([`Value`], [`ValueData`]).
+//!   [`FunctionData`]), basic blocks ([`BasicBlock`],
+//!   [`BasicBlockData`](entities::BasicBlockData)) and values ([`Value`],
+//!   [`ValueData`](entities::ValueData)).
 //! * Types of IR values ([`Type`]).
 //! * IR builders and IR builder traits ([`builder`]).
 //!

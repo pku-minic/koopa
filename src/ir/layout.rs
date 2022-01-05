@@ -76,8 +76,8 @@ impl Default for Layout {
 /// You can push or insert new basic blocks to the list by calling
 /// [`push_key_front`](BasicBlockList::push_key_front),
 /// [`push_key_back`](BasicBlockList::push_key_back),
-/// [`insert_key_before`](BasicBlockList::insert_key_before) or
-/// [`insert_key_after`](BasicBlockList::insert_key_after).
+/// [`insert_key_before`](key_node_list::CursorMut::insert_key_before) or
+/// [`insert_key_after`](key_node_list::CursorMut::insert_key_after).
 pub type BasicBlockList = KeyNodeList<BasicBlock, BasicBlockNode, BasicBlockMap>;
 
 type InstBBCell = Weak<RefCell<HashMap<Value, BasicBlock>>>;
@@ -196,8 +196,8 @@ impl From<()> for BasicBlockNode {
 /// You can push or insert new instructions to the list by calling
 /// [`push_key_front`](BasicBlockList::push_key_front),
 /// [`push_key_back`](BasicBlockList::push_key_back),
-/// [`insert_key_before`](BasicBlockList::insert_key_before) or
-/// [`insert_key_after`](BasicBlockList::insert_key_after).
+/// [`insert_key_before`](key_node_list::CursorMut::insert_key_before) or
+/// [`insert_key_after`](key_node_list::CursorMut::insert_key_after).
 pub type InstList = KeyNodeList<Value, InstNode, InstMap>;
 
 /// The underlying hash map of the [`InstList`].

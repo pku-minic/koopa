@@ -4,7 +4,7 @@
 //!
 //! * Tokens ([`token`]) and abstract syntax tree ([`ast`]) of Koopa IR.
 //! * [`Span`](span::Span) struct for holding source code locations.
-//! * Lexer ([`Lexer`](lexer::Lexer)), parser ([`Parser`](parser::parser))
+//! * Lexer ([`Lexer`](lexer::Lexer)), parser ([`Parser`](parser::Parser))
 //!   and analyzer ([`Builder`](builder::Builder)) of Koopa IR.
 //! * Koopa IR frontend driver ([`Driver`]).
 //!
