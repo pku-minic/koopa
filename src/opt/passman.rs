@@ -1,7 +1,9 @@
+//! Pass manager ([`PassManager`]) related implementations.
+
 use crate::ir::Program;
 use crate::opt::pass::Pass;
 
-/// A pass manager.
+/// The Koopa IR pass manager.
 ///
 /// Pass manager manages all registed passes, and processes the input
 /// IR program by using registered passes.
