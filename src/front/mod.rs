@@ -8,9 +8,9 @@
 //!   and analyzer ([`Builder`](builder::Builder)) of Koopa IR.
 //! * Koopa IR frontend driver ([`Driver`]).
 //!
-//! # Example
+//! # Examples
 //!
-//! Convert text form Koopa IR program to in-memory form:
+//! Convert text form Koopa IR program into the in-memory form:
 //!
 //! ```
 //! use koopa::front::Driver;
