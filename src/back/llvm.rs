@@ -1,3 +1,5 @@
+//! Implementations of the visitor for the LLVM IR generator.
+
 use crate::back::{self, NameManager, Prefix};
 use crate::ir::entities::{FunctionData, ValueData};
 use crate::ir::layout::BasicBlockNode;
@@ -5,7 +7,8 @@ use crate::ir::values::*;
 use crate::ir::{BasicBlock, Program, Type, TypeKind, Value, ValueKind};
 use std::io::{Result, Write};
 
-/// Visitor for generating Koopa IR structures into LLVM IR.
+/// Visitor for generating the in-memory form Koopa IR program into
+/// the text form LLVM IR program.
 #[derive(Default)]
 pub struct Visitor;
 

@@ -1,3 +1,10 @@
+//! Koopa IR generator ([`Generator`]), name manager ([`NameManager`]) and
+//! Koopa IR visitor trait ([`Visitor`]) related implementations.
+//! 
+//! The Koopa IR generator converts in-memory Koopa IR programs into
+//! other forms by using IR visitors. IR visitors can use name manager
+//! to generate function/basic block/value names when visiting IR programs.
+
 use crate::ir::entities::{BasicBlockData, FunctionData, Program, ValueData};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};

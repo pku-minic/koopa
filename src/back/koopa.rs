@@ -1,3 +1,5 @@
+//! Implementations of the visitor for the text form Koopa IR generator.
+
 use crate::back::{self, NameManager};
 use crate::ir::entities::{FunctionData, ValueData};
 use crate::ir::layout::BasicBlockNode;
@@ -5,7 +7,8 @@ use crate::ir::values::*;
 use crate::ir::{BasicBlock, Program, Type, TypeKind, Value, ValueKind};
 use std::io::{Result, Write};
 
-/// Visitor for generating Koopa IR structures into text formatted Koopa IR.
+/// Visitor for generating the in-memeory form Koopa IR program into
+/// the text form.
 #[derive(Default)]
 pub struct Visitor;
 
