@@ -2,11 +2,15 @@
 
 All notable changes to the Koopa will be documented in this file.
 
-## Unreleased
+## 0.0.3 - 2022-01-05
 
 ### Changed
 
-* Brand new design with a lot of changes.
+Brand new design with a lot of changes!
+
+* Replaced `phi` function with basic block parameters.
+* Using `DataFlowGraph` and `Layout` to manage values and basic blocks.
+* `opt`, `front`, `back` modules and all examples were updated.
 
 ## 0.0.2 - 2021-12-24
 
