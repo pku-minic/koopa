@@ -311,17 +311,42 @@ impl Binary {
 }
 
 /// Supported binary operators.
-#[rustfmt::skip]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum BinaryOp {
-  // comparison
-  NotEq, Eq, Gt, Lt, Ge, Le,
-  // arithmetic
-  Add, Sub, Mul, Div, Mod,
-  // bitwise operations
-  And, Or, Xor,
-  // shifting
-  Shl, Shr, Sar,
+  /// Not equal to.
+  NotEq,
+  /// Equal to.
+  Eq,
+  /// Greater than.
+  Gt,
+  /// Less than.
+  Lt,
+  /// Greater than or equal to.
+  Ge,
+  /// Less than or equal to.
+  Le,
+  /// Addition.
+  Add,
+  /// Subtraction.
+  Sub,
+  /// Multiplication.
+  Mul,
+  /// Division.
+  Div,
+  /// Modulo.
+  Mod,
+  /// Bitwise AND.
+  And,
+  /// Bitwise OR.
+  Or,
+  /// Bitwise XOR.
+  Xor,
+  /// Shift left logical.
+  Shl,
+  /// Shift right logical.
+  Shr,
+  /// Shift right arithmetic.
+  Sar,
 }
 
 impl fmt::Display for BinaryOp {
