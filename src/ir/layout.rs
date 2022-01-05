@@ -1,3 +1,6 @@
+//! Layout ([`Layout`]), basic blocklist and instruction list
+//! related implementations.
+
 use crate::ir::entities::{BasicBlock, Value};
 use key_node_list::{impl_node, KeyNodeList, Map};
 use std::borrow::Borrow;
