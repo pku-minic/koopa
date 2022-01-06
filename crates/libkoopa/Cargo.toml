@@ -1,0 +1,17 @@
+[package]
+name = "libkoopa"
+version = "0.0.3"
+authors = ["MaxXing <x@MaxXSoft.net>"]
+edition = "2021"
+description = "C library of the Koopa IR framework."
+readme = "README.md"
+repository = "https://github.com/pku-minic/koopa"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "koopa"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+koopa = { path = "../.." }
