@@ -13,5 +13,11 @@ publish = false
 name = "koopa"
 crate-type = ["staticlib", "cdylib"]
 
+[profile.dev]
+panic = 'abort'
+
+[profile.release]
+panic = 'abort'
+
 [dependencies]
 koopa = { path = "../.." }
