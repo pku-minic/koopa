@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build_test:
     name: Build and Test
     runs-on: ubuntu-latest
     if: "!contains(github.event.head_commit.message, 'skip-ci')"
@@ -24,3 +24,24 @@ jobs:
 
     - name: Test
       run: cargo test --all-features
+
+  build_examples:
+    name: Build Examples
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'skip-ci')"
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        example-name: ['opt', 'brainfuck', 'interpreter']
+
+    steps:
+    - name: Checkout Koopa
+      uses: actions/checkout@v2
+
+    - name: Build
+      working-directory: examples/${{matrix.example-name}}
+      run: cargo check
+
+    - name: Clippy
+      working-directory: examples/${{matrix.example-name}}
+      run: cargo clippy --all-targets --all-features -- -D warnings
