@@ -1,5 +1,5 @@
 use crate::errors::{unwrap_or_return, ErrorCode};
-use crate::utils::{ffi, new_pointer};
+use crate::utils::{drop_pointer, ffi, new_pointer};
 use koopa::front::Driver;
 use koopa::ir::Program;
 use std::ffi::CStr;
@@ -40,5 +40,10 @@ ffi! {
     let prog = unwrap_or_return!(driver.generate_program(), InvalidKoopaProgram);
     *program = new_pointer(prog);
     ErrorCode::Success
+  }
+
+  /// Deletes the given program.
+  fn koopa_delete_program(program: *mut Program) {
+    drop_pointer(program);
   }
 }
