@@ -1,10 +1,13 @@
 /// C-compatible error code.
 #[repr(i32)]
 pub enum ErrorCode {
-  Success,
+  Success = 0,
   InvalidUtf8String,
   InvalidFile,
   InvalidKoopaProgram,
+  IoError,
+  NullByteError,
+  InsufficientBufferLength,
 }
 
 /// Unwraps a [`Result`], or returns the given error code on error.
