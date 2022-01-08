@@ -1,10 +1,10 @@
 /// Creates a new object `t` and returns its pointer.
-pub fn new_pointer<T>(t: T) -> *mut T {
+pub(crate) fn new_pointer<T>(t: T) -> *mut T {
   Box::into_raw(Box::new(t))
 }
 
 /// Drops the given pointer that created by [`new_pointer`].
-pub fn drop_pointer<T>(ptr: *mut T) {
+pub(crate) fn drop_pointer<T>(ptr: *mut T) {
   unsafe { Box::from_raw(ptr) };
 }
 
