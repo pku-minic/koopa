@@ -1,12 +1,19 @@
 /// C-compatible error code.
 #[repr(i32)]
 pub enum ErrorCode {
+  /// No errors occurred.
   Success = 0,
+  /// UTF-8 string conversion error.
   InvalidUtf8String,
+  /// File operation error.
   InvalidFile,
+  /// Koopa IR program parsing error.
   InvalidKoopaProgram,
+  /// IO operation error.
   IoError,
+  /// Byte array to C string conversion error.
   NullByteError,
+  /// Insufficient buffer length.
   InsufficientBufferLength,
 }
 
