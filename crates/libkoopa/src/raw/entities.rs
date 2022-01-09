@@ -81,6 +81,8 @@ pub struct RawBasicBlockData {
   pub params: RawSlice,
   /// Values that this basic block is used by.
   pub used_by: RawSlice,
+  /// Instructions in this basic block.
+  pub insts: RawSlice,
 }
 
 /// A raw Koopa value.
