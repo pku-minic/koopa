@@ -1,7 +1,7 @@
 use super::entities::*;
 use crate::utils::new_uninit_box;
 use koopa::ir::entities::{BasicBlockData, ValueData};
-use koopa::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind, Value};
+use koopa::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind, Value, ValueKind};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
@@ -34,6 +34,7 @@ impl RawProgramBuilder {
 struct ProgramInfo<'a> {
   program: &'a Program,
   cur_func: Option<&'a FunctionData>,
+  cur_bb: Option<BasicBlock>,
 }
 
 impl<'a> ProgramInfo<'a> {
@@ -41,6 +42,7 @@ impl<'a> ProgramInfo<'a> {
     Self {
       program,
       cur_func: None,
+      cur_bb: None,
     }
   }
 
@@ -106,6 +108,21 @@ impl BuildRaw for str {
   }
 }
 
+impl BuildRaw for String {
+  type Raw = *const c_char;
+
+  fn build(&self, builder: &mut RawProgramBuilder, _: &mut ProgramInfo) -> Self::Raw {
+    if let Some(s) = builder.strs.get(self) {
+      s.as_ptr()
+    } else {
+      let s = CString::new(self.as_str()).expect("invalid string");
+      let raw = s.as_ptr();
+      builder.strs.insert(self.into(), s);
+      raw
+    }
+  }
+}
+
 impl<T, R> BuildRaw for Option<T>
 where
   T: BuildRaw<Raw = R>,
@@ -138,18 +155,26 @@ impl BuildRaw for Type {
     if let Some(t) = builder.tys.get(&self) {
       t.as_ref()
     } else {
-      let kind = Box::new(match self.kind() {
-        TypeKind::Int32 => RawTypeKind::Int32,
-        TypeKind::Unit => RawTypeKind::Unit,
-        TypeKind::Array(base, len) => RawTypeKind::Array(base.build(builder, info), *len),
-        TypeKind::Pointer(base) => RawTypeKind::Pointer(base.build(builder, info)),
-        TypeKind::Function(params, ret) => {
-          RawTypeKind::Function(params.build(builder, info), ret.build(builder, info))
-        }
-      });
+      let kind = Box::new(self.kind().build(builder, info));
       let raw = kind.as_ref() as RawType;
       builder.tys.insert(self.clone(), kind);
       raw
+    }
+  }
+}
+
+impl BuildRaw for TypeKind {
+  type Raw = RawTypeKind;
+
+  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+    match self {
+      TypeKind::Int32 => RawTypeKind::Int32,
+      TypeKind::Unit => RawTypeKind::Unit,
+      TypeKind::Array(base, len) => RawTypeKind::Array(base.build(builder, info), *len),
+      TypeKind::Pointer(base) => RawTypeKind::Pointer(base.build(builder, info)),
+      TypeKind::Function(params, ret) => {
+        RawTypeKind::Function(params.build(builder, info), ret.build(builder, info))
+      }
     }
   }
 }
@@ -204,7 +229,9 @@ impl BuildRaw for BasicBlock {
       b.as_ref()
     } else {
       builder.bbs.insert(*self, unsafe { new_uninit_box() });
+      let last_bb = info.cur_bb.replace(*self);
       let b = info.cur_func.unwrap().dfg().bb(*self).build(builder, info);
+      info.cur_bb = last_bb;
       let bb = builder.bbs.get_mut(self).unwrap();
       **bb = b;
       bb.as_ref()
@@ -216,7 +243,22 @@ impl BuildRaw for BasicBlockData {
   type Raw = RawBasicBlockData;
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
-    todo!()
+    RawBasicBlockData {
+      name: self.name().build(builder, info),
+      params: self.params().build(builder, info),
+      used_by: self
+        .used_by()
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>()
+        .build(builder, info),
+      insts: info.cur_func.unwrap().layout().bbs()[&info.cur_bb.unwrap()]
+        .insts()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>()
+        .build(builder, info),
+    }
   }
 }
 
@@ -241,6 +283,24 @@ impl BuildRaw for Value {
 
 impl BuildRaw for ValueData {
   type Raw = RawValueData;
+
+  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+    RawValueData {
+      ty: self.ty().build(builder, info),
+      name: self.name().build(builder, info),
+      used_by: self
+        .used_by()
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>()
+        .build(builder, info),
+      kind: self.kind().build(builder, info),
+    }
+  }
+}
+
+impl BuildRaw for ValueKind {
+  type Raw = RawValueKind;
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     todo!()
