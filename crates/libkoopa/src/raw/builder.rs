@@ -114,15 +114,8 @@ impl BuildRaw for str {
 impl BuildRaw for String {
   type Raw = *const c_char;
 
-  fn build(&self, builder: &mut RawProgramBuilder, _: &mut ProgramInfo) -> Self::Raw {
-    if let Some(s) = builder.strs.get(self) {
-      s.as_ptr()
-    } else {
-      let s = CString::new(self.as_str()).expect("invalid string");
-      let raw = s.as_ptr();
-      builder.strs.insert(self.into(), s);
-      raw
-    }
+  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+    self.as_str().build(builder, info)
   }
 }
 
