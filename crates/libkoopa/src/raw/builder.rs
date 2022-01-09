@@ -10,7 +10,7 @@ use std::ptr::null;
 /// Raw builder can build raw programs from Koopa IR programs.
 #[derive(Default)]
 pub(crate) struct RawProgramBuilder {
-  slices: HashMap<*const (), Vec<*const ()>>,
+  slices: Vec<Vec<*const ()>>,
   strs: HashMap<String, CString>,
   tys: HashMap<Type, Box<RawTypeKind>>,
   funcs: HashMap<Function, Box<RawFunctionData>>,
@@ -51,6 +51,39 @@ impl<'a> ProgramInfo<'a> {
   }
 }
 
+/// A general iterator for building [`RawSlice`]s.
+struct Iter<'a, I: Iterator<Item = &'a T>, T: 'a>(I);
+
+impl<'a, I, T> Iter<'a, I, T>
+where
+  I: Iterator<Item = &'a T>,
+{
+  fn new(iter: I) -> Self {
+    Self(iter)
+  }
+}
+
+impl<'a, I, T, R> Iter<'a, I, T>
+where
+  I: Iterator<Item = &'a T>,
+  T: BuildRaw<Raw = R>,
+  R: Pointer,
+{
+  fn into_raw(self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> RawSlice {
+    let v: Vec<_> = self
+      .0
+      .map(|i| i.build(builder, info).as_any_ptr())
+      .collect();
+    let raw = RawSlice {
+      buffer: v.as_ptr() as *const c_void,
+      len: v.len() as u32,
+      kind: T::KIND,
+    };
+    builder.slices.push(v);
+    raw
+  }
+}
+
 /// Trait for building raw structures from Koopa IR entities.
 trait BuildRaw {
   /// The type of builded raw structure.
@@ -61,36 +94,6 @@ trait BuildRaw {
 
   /// Builds a new raw structure.
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw;
-}
-
-impl<T, R> BuildRaw for [T]
-where
-  T: BuildRaw<Raw = R>,
-  R: Pointer,
-{
-  type Raw = RawSlice;
-
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
-    if let Some(v) = builder.slices.get(&(self.as_ptr() as *const ())) {
-      RawSlice {
-        buffer: v.as_ptr() as *const c_void,
-        len: v.len() as u32,
-        kind: T::KIND,
-      }
-    } else {
-      let v: Vec<_> = self
-        .iter()
-        .map(|i| i.build(builder, info).as_any_ptr())
-        .collect();
-      let raw = RawSlice {
-        buffer: v.as_ptr() as *const c_void,
-        len: v.len() as u32,
-        kind: T::KIND,
-      };
-      builder.slices.insert(self.as_ptr() as *const (), v);
-      raw
-    }
-  }
 }
 
 impl BuildRaw for str {
@@ -140,8 +143,8 @@ impl<'a> BuildRaw for &'a Program {
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     RawProgram {
-      values: self.inst_layout().build(builder, info),
-      funcs: self.func_layout().build(builder, info),
+      values: Iter::new(self.inst_layout().iter()).into_raw(builder, info),
+      funcs: Iter::new(self.func_layout().iter()).into_raw(builder, info),
     }
   }
 }
@@ -172,9 +175,10 @@ impl BuildRaw for TypeKind {
       TypeKind::Unit => RawTypeKind::Unit,
       TypeKind::Array(base, len) => RawTypeKind::Array(base.build(builder, info), *len),
       TypeKind::Pointer(base) => RawTypeKind::Pointer(base.build(builder, info)),
-      TypeKind::Function(params, ret) => {
-        RawTypeKind::Function(params.build(builder, info), ret.build(builder, info))
-      }
+      TypeKind::Function(params, ret) => RawTypeKind::Function(
+        Iter::new(params.iter()).into_raw(builder, info),
+        ret.build(builder, info),
+      ),
     }
   }
 }
@@ -207,14 +211,8 @@ impl BuildRaw for FunctionData {
     RawFunctionData {
       ty: self.ty().build(builder, info),
       name: self.name().build(builder, info),
-      params: self.params().build(builder, info),
-      bbs: self
-        .layout()
-        .bbs()
-        .keys()
-        .cloned()
-        .collect::<Vec<_>>()
-        .build(builder, info),
+      params: Iter::new(self.params().iter()).into_raw(builder, info),
+      bbs: Iter::new(self.layout().bbs().keys()).into_raw(builder, info),
     }
   }
 }
@@ -245,19 +243,14 @@ impl BuildRaw for BasicBlockData {
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     RawBasicBlockData {
       name: self.name().build(builder, info),
-      params: self.params().build(builder, info),
-      used_by: self
-        .used_by()
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>()
-        .build(builder, info),
-      insts: info.cur_func.unwrap().layout().bbs()[&info.cur_bb.unwrap()]
-        .insts()
-        .keys()
-        .cloned()
-        .collect::<Vec<_>>()
-        .build(builder, info),
+      params: Iter::new(self.params().iter()).into_raw(builder, info),
+      used_by: Iter::new(self.used_by().iter()).into_raw(builder, info),
+      insts: Iter::new(
+        info.cur_func.unwrap().layout().bbs()[&info.cur_bb.unwrap()]
+          .insts()
+          .keys(),
+      )
+      .into_raw(builder, info),
     }
   }
 }
@@ -288,12 +281,7 @@ impl BuildRaw for ValueData {
     RawValueData {
       ty: self.ty().build(builder, info),
       name: self.name().build(builder, info),
-      used_by: self
-        .used_by()
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>()
-        .build(builder, info),
+      used_by: Iter::new(self.used_by().iter()).into_raw(builder, info),
       kind: self.kind().build(builder, info),
     }
   }
