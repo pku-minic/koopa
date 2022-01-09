@@ -45,10 +45,6 @@ impl<'a> ProgramInfo<'a> {
       cur_bb: None,
     }
   }
-
-  fn enter_func(&mut self, func: Function) {
-    self.cur_func = Some(self.program.func(func));
-  }
 }
 
 /// A general iterator for building [`RawSlice`]s.
@@ -238,12 +234,10 @@ impl BuildRaw for BasicBlockData {
       name: self.name().build(builder, info),
       params: Iter::new(self.params().iter()).into_raw(builder, info),
       used_by: Iter::new(self.used_by().iter()).into_raw(builder, info),
-      insts: Iter::new(
-        info.cur_func.unwrap().layout().bbs()[&info.cur_bb.unwrap()]
-          .insts()
-          .keys(),
-      )
-      .into_raw(builder, info),
+      insts: {
+        let node = &info.cur_func.unwrap().layout().bbs()[&info.cur_bb.unwrap()];
+        Iter::new(node.insts().keys()).into_raw(builder, info)
+      },
     }
   }
 }
