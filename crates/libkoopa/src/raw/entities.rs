@@ -37,7 +37,7 @@ pub enum RawTypeKind {
   /// Unit (void).
   Unit,
   /// Array (with base type and length).
-  Array(RawSlice),
+  Array(RawType, usize),
   /// Pointer (with base type).
   Pointer(RawType),
   /// Function (with parameter types and return type).
