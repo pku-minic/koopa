@@ -15,6 +15,7 @@ macro_rules! ffi {
     fn $name:ident($($arg:ident : $ty:ty),* $(,)?) $(-> $ret:ty)? $body:block)*
   } => {
     $($(#[$attr])*
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     #[no_mangle]
     pub extern "C" fn $name($($arg: $ty),*) $(-> $ret)? $body)*
   };
