@@ -2,6 +2,12 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## Unreleased
+
+### Added
+
+* Library crate `libkoopa` for C/C++ programs that require the Koopa IR framework.
+
 ## 0.0.3 - 2022-01-05
 
 ### Changed
