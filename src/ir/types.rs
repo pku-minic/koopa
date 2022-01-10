@@ -1,5 +1,5 @@
 //! Types of Koopa IR values.
-//! 
+//!
 //! Each Koopa IR value and function should have a type. A type can be
 //! a 32-bit integer type, a unit type, an array type, a pointer type,
 //! or a function type.
