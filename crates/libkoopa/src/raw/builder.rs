@@ -60,7 +60,7 @@ where
   T: 'a + BuildRaw<Raw = R>,
   R: Pointer,
 {
-  let v: Vec<_> = iter.map(|i| i.build(builder, info).as_any_ptr()).collect();
+  let v: Vec<_> = iter.map(|i| i.build(builder, info).into_any()).collect();
   let raw = RawSlice {
     buffer: v.as_ptr() as *const c_void,
     len: v.len() as u32,
@@ -134,7 +134,7 @@ impl BuildRaw for Type {
   const KIND: RawSliceItemKind = RawSliceItemKind::Type;
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
-    if let Some(t) = builder.tys.get(&self) {
+    if let Some(t) = builder.tys.get(self) {
       t.as_ref()
     } else {
       let kind = Box::new(self.kind().build(builder, info));
@@ -465,7 +465,7 @@ pub(crate) trait Pointer {
   const NULL: Self;
 
   /// Converts the current pointer to `*const ()`.
-  fn as_any_ptr(self) -> *const ();
+  fn into_any(self) -> *const ();
 
   /// Converts the given pointer to the current pointer.
   fn from_ptr<T>(ptr: *const T) -> Self;
@@ -477,7 +477,7 @@ macro_rules! impl_pointer {
     impl Pointer for $ty {
       const NULL: Self = null();
 
-      fn as_any_ptr(self) -> *const () {
+      fn into_any(self) -> *const () {
         self as *const ()
       }
 
