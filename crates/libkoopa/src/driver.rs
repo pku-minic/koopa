@@ -9,7 +9,7 @@ use std::os::raw::c_char;
 
 ffi! {
   /// Parses text-form Koopa IR program from the given file.
-  /// Updates the `program` if no error occurred.
+  /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
   fn koopa_parse_from_file(path: *mut c_char, program: &mut *mut Program) -> ErrorCode {
@@ -21,7 +21,7 @@ ffi! {
   }
 
   /// Parses text-form Koopa IR program from the given string.
-  /// Updates the `program` if no error occurred.
+  /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
   fn koopa_parse_from_string(s: *mut c_char, program: &mut *mut Program) -> ErrorCode {
@@ -33,7 +33,7 @@ ffi! {
   }
 
   /// Parses text-form Koopa IR program from the standard input.
-  /// Updates the `program` if no error occurred.
+  /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
   fn koopa_parse_from_stdin(program: &mut *mut Program) -> ErrorCode {
@@ -45,7 +45,7 @@ ffi! {
 
   /// Parses text-form Koopa IR program from the given
   /// file descriptor (UNIX) or handle (Windows).
-  /// Updates the `program` if no error occurred.
+  /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
   fn koopa_parse_from_raw(file: RawFile, program: &mut *mut Program) -> ErrorCode {
