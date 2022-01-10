@@ -58,6 +58,6 @@ ffi! {
 
   /// Deletes the given program.
   fn koopa_delete_program(program: *mut Program) {
-    drop_pointer(program);
+    unsafe { drop_pointer(program) };
   }
 }

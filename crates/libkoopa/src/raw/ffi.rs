@@ -10,7 +10,7 @@ ffi! {
 
   /// Frees allocated memory of the given raw program builder.
   fn koopa_delete_raw_program_builder(builder: *mut RawProgramBuilder) {
-    drop_pointer(builder)
+    unsafe { drop_pointer(builder) };
   }
 
   /// Builds a raw program of the given Koopa IR program
