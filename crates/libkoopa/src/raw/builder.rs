@@ -76,7 +76,7 @@ trait BuildRaw {
   type Raw;
 
   /// Kind of the builded raw item.
-  const KIND: ItemKind = ItemKind::Unknown;
+  const KIND: RawSliceItemKind = RawSliceItemKind::Unknown;
 
   /// Builds a new raw structure.
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw;
@@ -131,7 +131,7 @@ impl<'a> BuildRaw for &'a Program {
 impl BuildRaw for Type {
   type Raw = RawType;
 
-  const KIND: ItemKind = ItemKind::Type;
+  const KIND: RawSliceItemKind = RawSliceItemKind::Type;
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(t) = builder.tys.get(&self) {
@@ -165,7 +165,7 @@ impl BuildRaw for TypeKind {
 impl BuildRaw for Function {
   type Raw = RawFunction;
 
-  const KIND: ItemKind = ItemKind::Function;
+  const KIND: RawSliceItemKind = RawSliceItemKind::Function;
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(f) = builder.funcs.get(self) {
@@ -199,7 +199,7 @@ impl BuildRaw for FunctionData {
 impl BuildRaw for BasicBlock {
   type Raw = RawBasicBlock;
 
-  const KIND: ItemKind = ItemKind::BasicBlock;
+  const KIND: RawSliceItemKind = RawSliceItemKind::BasicBlock;
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(b) = builder.bbs.get(self) {
@@ -235,7 +235,7 @@ impl BuildRaw for BasicBlockData {
 impl BuildRaw for Value {
   type Raw = RawValue;
 
-  const KIND: ItemKind = ItemKind::Value;
+  const KIND: RawSliceItemKind = RawSliceItemKind::Value;
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(v) = builder.values.get(self) {

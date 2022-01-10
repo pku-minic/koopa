@@ -8,12 +8,12 @@ pub struct RawSlice {
   /// Length of slice.
   pub len: u32,
   /// Kind of slice items.
-  pub kind: ItemKind,
+  pub kind: RawSliceItemKind,
 }
 
 /// Kind of slice item.
 #[repr(u32)]
-pub enum ItemKind {
+pub enum RawSliceItemKind {
   /// Unknown.
   Unknown = 0,
   /// Type.
