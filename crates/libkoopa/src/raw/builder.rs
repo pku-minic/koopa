@@ -460,12 +460,15 @@ impl BuildRaw for Return {
 }
 
 /// Trait for pointer types.
-trait Pointer {
+pub(crate) trait Pointer {
   /// Null pointer of the current pointer.
   const NULL: Self;
 
   /// Converts the current pointer to `*const ()`.
   fn as_any_ptr(self) -> *const ();
+
+  /// Converts the given pointer to the current pointer.
+  fn from_ptr<T>(ptr: *const T) -> Self;
 }
 
 /// Implements [`Pointer`] trait for the given pointer type.
@@ -476,6 +479,10 @@ macro_rules! impl_pointer {
 
       fn as_any_ptr(self) -> *const () {
         self as *const ()
+      }
+
+      fn from_ptr<T>(ptr: *const T) -> Self {
+        ptr as Self
       }
     }
   };
