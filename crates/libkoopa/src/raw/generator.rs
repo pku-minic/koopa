@@ -1,25 +1,31 @@
 use super::entities::*;
+use crate::errors::ErrorCode;
 use koopa::ir::Program;
 
-/// Raw progarm generator that generates raw programs to Koopa IR programs.
-#[derive(Default)]
-pub struct RawProgramGenerator {
-  program: Program,
+/// Result returned by raw program generator functions.
+pub(crate) type Result<T> = std::result::Result<T, ErrorCode>;
+
+/// Generates the given raw program to Koopa IR program.
+pub(crate) fn generate_program(raw: &RawProgram) -> Result<Program> {
+  let mut program = Program::new();
+  raw.generate(&mut program)?;
+  Ok(program)
 }
 
-impl RawProgramGenerator {
-  /// Creates a new raw program generator.
-  pub fn new() -> Self {
-    Self::default()
-  }
+/// Trait for generating on raw structures.
+trait GenerateOnRaw {
+  /// The type of generated entity.
+  type Entity;
 
-  /// Consumes this generator and returns the generated Koopa IR program.
-  pub fn program(self) -> Program {
-    self.program
-  }
+  /// Generates a new entity.
+  fn generate(&self, program: &mut Program) -> Result<Self::Entity>;
+}
 
-  /// Generates on the given raw program.
-  pub fn generate_on(&mut self, raw: &RawProgram) {
-    todo!()
+impl GenerateOnRaw for RawProgram {
+  type Entity = ();
+
+  fn generate(&self, program: &mut Program) -> Result<Self::Entity> {
+    //
+    Ok(())
   }
 }
