@@ -17,6 +17,12 @@ pub enum ErrorCode {
   InsufficientBufferLength,
   /// Mismatch of item kind in raw slice.
   RawSliceItemKindMismatch,
+  /// Passing null pointers to `libkoopa`.
+  NullPointerError,
+  /// Mismatch of type.
+  TypeMismatch,
+  /// Mismatch of function parameter number.
+  FuncParamNumMismatch,
 }
 
 /// Unwraps a [`Result`], or returns the given error code on error.
