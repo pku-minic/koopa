@@ -1,4 +1,5 @@
-use crate::raw::{RawProgram, RawProgramBuilder};
+use crate::errors::ErrorCode;
+use crate::raw::{generate_program, RawProgram, RawProgramBuilder};
 use crate::utils::{drop_pointer, ffi, new_pointer};
 use koopa::ir::Program;
 
@@ -17,5 +18,19 @@ ffi! {
   /// using the given raw program builder.
   fn koopa_build_raw_program(builder: &mut RawProgramBuilder, program: &Program) -> RawProgram {
     builder.build_on(program)
+  }
+
+  /// Generates the given raw program to the Koopa IR program.
+  /// Updates the `program` if no errors occurred.
+  ///
+  /// Returns the error code.
+  fn koopa_generate_raw_to_koopa(raw: &RawProgram, program: &mut *mut Program) -> ErrorCode {
+    match generate_program(raw) {
+      Ok(p) => {
+        *program = new_pointer(p);
+        ErrorCode::Success
+      }
+      Err(e) => e,
+    }
   }
 }
