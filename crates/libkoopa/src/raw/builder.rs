@@ -7,9 +7,9 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::ptr::null;
 
-/// Raw builder can build raw programs from Koopa IR programs.
+/// Raw builder that builds raw programs from Koopa IR programs.
 #[derive(Default)]
-pub(crate) struct RawProgramBuilder {
+pub struct RawProgramBuilder {
   slices: Vec<Vec<*const ()>>,
   strs: HashMap<String, CString>,
   tys: HashMap<Type, Box<RawTypeKind>>,
