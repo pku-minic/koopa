@@ -15,6 +15,8 @@ pub enum ErrorCode {
   NullByteError,
   /// Insufficient buffer length.
   InsufficientBufferLength,
+  /// Mismatch of item kind in raw slice.
+  RawSliceItemKindMismatch,
 }
 
 /// Unwraps a [`Result`], or returns the given error code on error.
