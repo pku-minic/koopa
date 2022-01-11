@@ -63,7 +63,7 @@ fun @main(): i32 {
 }
 "#;
 
-  fn build_raw(builder: &mut RawProgramBuilder, program: &str) -> RawProgram {
+  fn build_raw<'rpb>(builder: &'rpb mut RawProgramBuilder, program: &str) -> RawProgram<'rpb> {
     let program = Driver::from(program).generate_program().unwrap();
     builder.build_on(&program)
   }
