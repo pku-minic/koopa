@@ -28,7 +28,7 @@ where
 /// the length of the generated string (with out the null-terminator).
 ///
 /// Returns the error code.
-fn dump_to_string<V>(program: &Program, buffer: *const c_char, len: &mut usize) -> ErrorCode
+fn dump_to_string<V>(program: &Program, buffer: *mut c_char, len: &mut usize) -> ErrorCode
 where
   V: Visitor<Vec<u8>> + Default,
 {
@@ -85,7 +85,7 @@ ffi! {
   /// to the length of the generated string (with out the null-terminator).
   ///
   /// Returns the error code.
-  fn koopa_dump_to_string(program: &Program, buffer: *const c_char, len: &mut usize) -> ErrorCode {
+  fn koopa_dump_to_string(program: &Program, buffer: *mut c_char, len: &mut usize) -> ErrorCode {
     dump_to_string::<KoopaVisitor>(program, buffer, len)
   }
 
@@ -116,7 +116,7 @@ ffi! {
   /// the generated string (with out the null-terminator).
   ///
   /// Returns the error code.
-  fn koopa_dump_llvm_to_string(program: &Program, buffer: *const c_char, len: &mut usize) -> ErrorCode {
+  fn koopa_dump_llvm_to_string(program: &Program, buffer: *mut c_char, len: &mut usize) -> ErrorCode {
     dump_to_string::<LlvmVisitor>(program, buffer, len)
   }
 
