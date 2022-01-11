@@ -115,7 +115,7 @@ impl<'a, T: Pointer> Iterator for RawSliceIter<'a, T> {
   fn next(&mut self) -> Option<Self::Item> {
     (self.index < self.slice.len).then(|| {
       let buffer = self.slice.buffer as *const *const ();
-      let ptr = unsafe { buffer.add(self.index as usize) };
+      let ptr = unsafe { *buffer.add(self.index as usize) };
       self.index += 1;
       T::from_ptr(ptr)
     })
@@ -312,7 +312,10 @@ impl GenerateOnRaw for RawBasicBlock {
       });
       // generate instructions
       for inst in raw.insts.values()? {
-        inst.generate(program, info)?;
+        let inst = inst.generate(program, info)?;
+        // insert to the current basic block
+        let layout = program.func_mut(info.cur_func_info().func).layout_mut();
+        layout.bb_mut(bb).insts_mut().push_key_back(inst).unwrap();
       }
       Ok(bb)
     }
@@ -324,11 +327,13 @@ impl GenerateOnRaw for RawValue {
 
   fn generate(&self, program: &mut Program, info: &mut ProgramInfo) -> Result<Self::Entity> {
     // try to find value in cache
-    let value = if info.cur_func.is_null() {
-      info.values.get(self)
-    } else {
-      info.cur_func_info().values.get(self)
-    };
+    let value = info.values.get(self).or_else(|| {
+      if info.cur_func.is_null() {
+        None
+      } else {
+        info.cur_func_info().values.get(self)
+      }
+    });
     if let Some(v) = value {
       Ok(*v)
     } else {
@@ -359,8 +364,17 @@ impl GenerateOnRaw for RawValue {
           }
         }
       };
-      // insert value
-      info.cur_func_info_mut().values.insert(*self, value);
+      // set value name & insert value
+      let name = raw.name.generate(program, info)?;
+      if info.cur_func.is_null() {
+        program.set_value_name(value, name);
+        info.values.insert(*self, value);
+      } else {
+        let func_info = info.cur_func_info_mut();
+        let func = program.func_mut(func_info.func);
+        func.dfg_mut().set_value_name(value, name);
+        func_info.values.insert(*self, value);
+      }
       Ok(value)
     }
   }
