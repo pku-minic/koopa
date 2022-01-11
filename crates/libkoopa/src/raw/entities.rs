@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
 
 /// A raw slice that can store any kind of items.
@@ -46,11 +47,13 @@ pub enum RawTypeKind {
 
 /// A raw Koopa program.
 #[repr(C)]
-pub struct RawProgram {
+pub struct RawProgram<'rpb> {
   /// Global values (global allocations only).
   pub values: RawSlice,
   /// Function definitions.
   pub funcs: RawSlice,
+  /// Binding with [`RawProgramBuilder`].
+  pub(crate) rpb: PhantomData<&'rpb ()>,
 }
 
 /// A raw Koopa function.
