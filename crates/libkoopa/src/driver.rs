@@ -57,6 +57,9 @@ ffi! {
   }
 
   /// Deletes the given program.
+  ///
+  /// All programs returned by Koopa IR library functions
+  /// should be deleted manually.
   fn koopa_delete_program(program: *mut Program) {
     unsafe { drop_pointer(program) };
   }
