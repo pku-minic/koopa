@@ -28,12 +28,13 @@ pub(crate) unsafe fn new_uninit_box<T>() -> Box<T> {
 macro_rules! ffi {
   {
     $($(#[$attr:meta])*
-    fn $name:ident($($arg:ident : $ty:ty),* $(,)?) $(-> $ret:ty)? $body:block)*
+    fn $name:ident$(<$($lt:lifetime)+>)?
+    ($($arg:ident : $ty:ty),* $(,)?) $(-> $ret:ty)? $body:block)*
   } => {
     $($(#[$attr])*
     #[allow(clippy::not_unsafe_ptr_arg_deref)]
     #[no_mangle]
-    pub extern "C" fn $name($($arg: $ty),*) $(-> $ret)? $body)*
+    pub extern "C" fn $name$(<$($lt)+>)?($($arg: $ty),*) $(-> $ret)? $body)*
   };
 }
 pub(crate) use ffi;
