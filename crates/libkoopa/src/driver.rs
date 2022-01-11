@@ -12,7 +12,7 @@ ffi! {
   /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
-  fn koopa_parse_from_file(path: *mut c_char, program: &mut *mut Program) -> ErrorCode {
+  fn koopa_parse_from_file(path: *const c_char, program: &mut *mut Program) -> ErrorCode {
     let path = unwrap_or_return!(unsafe { CStr::from_ptr(path) }.to_str(), InvalidUtf8String);
     let driver = unwrap_or_return!(Driver::from_path(path), InvalidFile);
     let prog = unwrap_or_return!(driver.generate_program(), InvalidKoopaProgram);
@@ -24,7 +24,7 @@ ffi! {
   /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
-  fn koopa_parse_from_string(s: *mut c_char, program: &mut *mut Program) -> ErrorCode {
+  fn koopa_parse_from_string(s: *const c_char, program: &mut *mut Program) -> ErrorCode {
     let s = unwrap_or_return!(unsafe { CStr::from_ptr(s) }.to_str(), InvalidUtf8String);
     let driver = Driver::from(s);
     let prog = unwrap_or_return!(driver.generate_program(), InvalidKoopaProgram);

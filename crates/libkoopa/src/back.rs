@@ -13,7 +13,7 @@ use std::slice::from_raw_parts_mut;
 /// Generates the given program to the given file.
 ///
 /// Returns the error code.
-fn dump_to_file<V>(program: &Program, path: *mut c_char) -> ErrorCode
+fn dump_to_file<V>(program: &Program, path: *const c_char) -> ErrorCode
 where
   V: Visitor<File> + Default,
 {
@@ -28,7 +28,7 @@ where
 /// the length of the generated string (with out the null-terminator).
 ///
 /// Returns the error code.
-fn dump_to_string<V>(program: &Program, buffer: *mut c_char, len: &mut usize) -> ErrorCode
+fn dump_to_string<V>(program: &Program, buffer: *const c_char, len: &mut usize) -> ErrorCode
 where
   V: Visitor<Vec<u8>> + Default,
 {
@@ -76,7 +76,7 @@ ffi! {
   /// Generates text-form Koopa IR program to the given file.
   ///
   /// Returns the error code.
-  fn koopa_dump_to_file(program: &Program, path: *mut c_char) -> ErrorCode {
+  fn koopa_dump_to_file(program: &Program, path: *const c_char) -> ErrorCode {
     dump_to_file::<KoopaVisitor>(program, path)
   }
 
@@ -85,7 +85,7 @@ ffi! {
   /// to the length of the generated string (with out the null-terminator).
   ///
   /// Returns the error code.
-  fn koopa_dump_to_string(program: &Program, buffer: *mut c_char, len: &mut usize) -> ErrorCode {
+  fn koopa_dump_to_string(program: &Program, buffer: *const c_char, len: &mut usize) -> ErrorCode {
     dump_to_string::<KoopaVisitor>(program, buffer, len)
   }
 
@@ -107,7 +107,7 @@ ffi! {
   /// Generates LLVM IR to the given file.
   ///
   /// Returns the error code.
-  fn koopa_dump_llvm_to_file(program: &Program, path: *mut c_char) -> ErrorCode {
+  fn koopa_dump_llvm_to_file(program: &Program, path: *const c_char) -> ErrorCode {
     dump_to_file::<LlvmVisitor>(program, path)
   }
 
@@ -116,7 +116,7 @@ ffi! {
   /// the generated string (with out the null-terminator).
   ///
   /// Returns the error code.
-  fn koopa_dump_llvm_to_string(program: &Program, buffer: *mut c_char, len: &mut usize) -> ErrorCode {
+  fn koopa_dump_llvm_to_string(program: &Program, buffer: *const c_char, len: &mut usize) -> ErrorCode {
     dump_to_string::<LlvmVisitor>(program, buffer, len)
   }
 
