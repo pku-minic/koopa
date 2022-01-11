@@ -28,7 +28,30 @@ impl RawProgramBuilder {
 
   /// Builds on the given Koopa IR program.
   pub fn build_on(&mut self, program: &Program) -> RawProgram {
-    program.build(self, &mut ProgramInfo::new(program))
+    let mut info = ProgramInfo::new(program);
+    let raw = program.build(self, &mut info);
+    // fill `used_by` fields of all values
+    let slices: Vec<_> = self
+      .values
+      .keys()
+      .map(|value| {
+        let v: Vec<_> = info.value_used_by[value]
+          .iter()
+          .map(|v| self.values[v].as_ref() as RawValue as *const ())
+          .collect();
+        let slice = RawSlice {
+          buffer: v.as_ptr() as *const c_void,
+          len: v.len() as u32,
+          kind: RawSliceItemKind::Value,
+        };
+        self.slices.push(v);
+        slice
+      })
+      .collect();
+    for (data, slice) in self.values.values_mut().zip(slices.into_iter()) {
+      data.used_by = slice;
+    }
+    raw
   }
 }
 
@@ -37,6 +60,7 @@ struct ProgramInfo<'a> {
   program: &'a Program,
   cur_func: Option<&'a FunctionData>,
   cur_bb: Option<BasicBlock>,
+  value_used_by: HashMap<Value, Vec<Value>>,
 }
 
 impl<'a> ProgramInfo<'a> {
@@ -45,6 +69,17 @@ impl<'a> ProgramInfo<'a> {
       program,
       cur_func: None,
       cur_bb: None,
+      value_used_by: HashMap::new(),
+    }
+  }
+}
+
+impl Default for RawSlice {
+  fn default() -> Self {
+    Self {
+      buffer: null(),
+      len: 0,
+      kind: RawSliceItemKind::Unknown,
     }
   }
 }
@@ -242,8 +277,25 @@ impl BuildRaw for Value {
       v.as_ref()
     } else {
       builder.values.insert(*self, unsafe { new_uninit_box() });
-      let func = info.cur_func.unwrap();
-      let v = func.dfg().value(*self).build(builder, info);
+      let (v, used_by) = if self.is_global() {
+        // get global value
+        let value = info.program.borrow_value(*self);
+        // get `used_by` list
+        let used_by = value.used_by().iter().copied().collect();
+        // build value
+        (value.build(builder, info), used_by)
+      } else {
+        // get local value
+        let func = info.cur_func.unwrap();
+        let value = func.dfg().value(*self);
+        // get `used_by` list
+        let used_by = value.used_by().iter().copied().collect();
+        // build value
+        (value.build(builder, info), used_by)
+      };
+      // insert `used_by` list to info
+      info.value_used_by.insert(*self, used_by);
+      // store raw value data
       let vb = builder.values.get_mut(self).unwrap();
       **vb = v;
       vb.as_ref()
@@ -258,7 +310,7 @@ impl BuildRaw for ValueData {
     RawValueData {
       ty: self.ty().build(builder, info),
       name: self.name().build(builder, info),
-      used_by: iter_into_raw(self.used_by().iter(), builder, info),
+      used_by: RawSlice::default(),
       kind: self.kind().build(builder, info),
     }
   }
