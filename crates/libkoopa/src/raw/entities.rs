@@ -12,7 +12,7 @@ pub struct RawSlice {
   pub kind: RawSliceItemKind,
 }
 
-/// Kind of slice item.
+/// Kind of raw slice item.
 #[repr(u32)]
 pub enum RawSliceItemKind {
   /// Unknown.

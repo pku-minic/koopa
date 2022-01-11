@@ -16,6 +16,9 @@ ffi! {
 
   /// Builds a raw program of the given Koopa IR program
   /// using the given raw program builder.
+  ///
+  /// The generated raw program is valid iff the raw program builder
+  /// is still alive (not deleted).
   fn koopa_build_raw_program<'rpb>(
     builder: &'rpb mut RawProgramBuilder,
     program: &Program,
