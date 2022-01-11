@@ -16,7 +16,10 @@ ffi! {
 
   /// Builds a raw program of the given Koopa IR program
   /// using the given raw program builder.
-  fn koopa_build_raw_program(builder: &mut RawProgramBuilder, program: &Program) -> RawProgram {
+  fn koopa_build_raw_program<'rpb>(
+    builder: &'rpb mut RawProgramBuilder,
+    program: &Program,
+  ) -> RawProgram<'rpb> {
     builder.build_on(program)
   }
 
