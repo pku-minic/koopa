@@ -6,6 +6,7 @@ use koopa::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind};
 use koopa::ir::{BinaryOp, Value, ValueKind};
 use std::collections::HashMap;
 use std::ffi::CString;
+use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
 use std::ptr::null;
 
@@ -29,7 +30,11 @@ impl RawProgramBuilder {
   /// Builds on the given Koopa IR program.
   pub fn build_on(&mut self, program: &Program) -> RawProgram {
     let mut info = ProgramInfo::new(program);
-    let raw = program.build(self, &mut info);
+    let raw = RawProgram {
+      values: iter_into_raw(program.inst_layout().iter(), self, &mut info),
+      funcs: iter_into_raw(program.func_layout().iter(), self, &mut info),
+      rpb: PhantomData,
+    };
     // fill `used_by` fields of all values
     let slices: Vec<_> = self
       .values
@@ -149,17 +154,6 @@ where
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     self.as_ref().map_or(R::NULL, |s| s.build(builder, info))
-  }
-}
-
-impl<'a> BuildRaw for &'a Program {
-  type Raw = RawProgram;
-
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
-    RawProgram {
-      values: iter_into_raw(self.inst_layout().iter(), builder, info),
-      funcs: iter_into_raw(self.func_layout().iter(), builder, info),
-    }
   }
 }
 

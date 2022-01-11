@@ -196,7 +196,7 @@ impl GenerateOnRaw for *const c_char {
   }
 }
 
-impl GenerateOnRaw for RawProgram {
+impl<'rpb> GenerateOnRaw for RawProgram<'rpb> {
   type Entity = ();
 
   fn generate(&self, program: &mut Program, info: &mut ProgramInfo) -> Result<Self::Entity> {
