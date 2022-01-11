@@ -45,3 +45,25 @@ jobs:
     - name: Clippy
       working-directory: examples/${{matrix.example-name}}
       run: cargo clippy --all-targets --all-features -- -D warnings
+
+  build_libkoopa:
+    name: Build and Test Koopa C Library
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, 'skip-ci')"
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout Koopa
+      uses: actions/checkout@v2
+
+    - name: Build
+      working-directory: crates/libkoopa
+      run: cargo check
+
+    - name: Clippy
+      working-directory: crates/libkoopa
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Test
+      working-directory: crates/libkoopa
+      run: cargo test --all-features
