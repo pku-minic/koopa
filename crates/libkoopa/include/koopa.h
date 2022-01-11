@@ -120,10 +120,6 @@ typedef struct koopa_raw_type_kind {
   koopa_raw_type_tag_t tag;
   union {
     struct {
-    } int32;
-    struct {
-    } unit;
-    struct {
       const struct koopa_raw_type_kind *base;
       size_t len;
     } array;
@@ -426,15 +422,9 @@ typedef struct {
   koopa_raw_value_tag_t tag;
   union {
     koopa_raw_integer_t integer;
-    struct {
-    } zero_init;
-    struct {
-    } undef;
     koopa_raw_aggregate_t aggregate;
     koopa_raw_func_arg_ref_t func_arg_ref;
     koopa_raw_block_arg_ref_t block_arg_ref;
-    struct {
-    } alloc;
     koopa_raw_global_alloc_t global_alloc;
     koopa_raw_load_t load;
     koopa_raw_store_t store;
