@@ -69,13 +69,13 @@ macro_rules! match_token {
 
 impl<T: Read> Parser<T> {
   /// Creates a new parser from the given [`Lexer`].
-  pub fn new(lexer: Lexer<T>) -> Self {
+  pub fn new(lexer: Lexer<T>) -> std::result::Result<Self, Error> {
     let mut parser = Self {
       lexer,
       cur_token: Token::default(),
     };
-    parser.next_token().unwrap();
-    parser
+    parser.next_token()?;
+    Ok(parser)
   }
 
   /// Parses the next AST and returns the box of paarsed AST.
@@ -635,7 +635,8 @@ mod test {
         ret %3
       }
       "#,
-    )));
+    )))
+    .unwrap();
     let ast = parser.parse_next().unwrap();
     let expected = new_ast!(GlobalDef {
       name: "@x".into(),
@@ -731,7 +732,8 @@ mod test {
         ret %3
       }
       "#,
-    )));
+    )))
+    .unwrap();
     assert_eq!(parser.parse_next().unwrap(), new_ast!(Error));
     let ast = parser.parse_next().unwrap();
     let expected = new_ast!(FunDef {
