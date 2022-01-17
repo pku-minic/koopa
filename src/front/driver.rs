@@ -15,7 +15,7 @@ use std::path::Path;
 ///
 /// See the [module-level documentation](crate::front) for more examples.
 pub struct Driver<T: Read> {
-  parser: Parser<T>,
+  parser: Result<Parser<T>, Error>,
   builder: Builder,
 }
 
@@ -35,9 +35,10 @@ impl<T: Read> Driver<T> {
   /// Consumes the current driver and generates Koopa IR program
   /// from the reader.
   pub fn generate_program(mut self) -> Result<Program, Error> {
+    let mut parser = self.parser?;
     loop {
       // parse & get the next AST
-      let ast = self.parser.parse_next()?;
+      let ast = parser.parse_next()?;
       // check if is end of file
       if matches!(ast.kind, AstKind::End(_)) {
         break;
