@@ -8,6 +8,10 @@ All notable changes to the Koopa will be documented in this file.
 
 * Library crate `libkoopa` for C/C++ programs that require the Koopa IR framework.
 
+### Fixed
+
+* Fault about creating/initializing `Parser` when error occurrs in `Lexer`.
+
 ## 0.0.3 - 2022-01-05
 
 ### Changed
