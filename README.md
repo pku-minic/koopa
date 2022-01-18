@@ -78,4 +78,4 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Copyright (C) 2010-2021 MaxXing. License GPLv3.
+Copyright (C) 2010-2022 MaxXing. License GPLv3.
