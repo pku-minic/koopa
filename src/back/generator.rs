@@ -1,6 +1,6 @@
 //! Koopa IR generator ([`Generator`]), name manager ([`NameManager`]) and
 //! Koopa IR visitor trait ([`Visitor`]) related implementations.
-//! 
+//!
 //! The Koopa IR generator converts in-memory Koopa IR programs into
 //! other forms by using IR visitors. IR visitors can use name manager
 //! to generate function/basic block/value names when visiting IR programs.
@@ -10,6 +10,7 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{Result, Write};
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -198,7 +199,16 @@ pub enum Prefix {
   /// Custom prefix,
   /// named variables start with `named` and
   /// temporary variables start with `temp`.
-  Custom { named: String, temp: String },
+  Custom {
+    /// Named variable prefix.
+    named: String,
+    /// Temporary variable prefix.
+    temp: String,
+    /// Maximum length of named variable.
+    /// Truncates the variable name if its length is too long.
+    /// `None` if no limit.
+    max_len: Option<NonZeroUsize>,
+  },
 }
 
 impl Prefix {
@@ -206,12 +216,20 @@ impl Prefix {
   fn name(&self, name: &str) -> String {
     match self {
       Prefix::Default => name.into(),
-      Prefix::Custom { named, temp } => {
-        if let Some(name) = name.strip_prefix('@') {
+      Prefix::Custom {
+        named,
+        temp,
+        max_len,
+      } => {
+        let mut name = if let Some(name) = name.strip_prefix('@') {
           format!("{}{}", named, name)
         } else {
           format!("{}{}", temp, &name[1..])
+        };
+        if let Some(max_len) = max_len {
+          name.truncate(max_len.get());
         }
+        name
       }
     }
   }
