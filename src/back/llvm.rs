@@ -6,6 +6,7 @@ use crate::ir::layout::BasicBlockNode;
 use crate::ir::values::*;
 use crate::ir::{BasicBlock, Program, Type, TypeKind, Value, ValueKind};
 use std::io::{Result, Write};
+use std::num::NonZeroUsize;
 
 /// Visitor for generating the in-memory form Koopa IR program into
 /// the text form LLVM IR program.
@@ -60,12 +61,16 @@ macro_rules! value_ty {
 }
 
 impl<'a, W: Write> VisitorImpl<'a, W> {
+  /// Maximum length of LLVM IR identifier.
+  const MAX_ID_LEN: usize = 512;
+
   /// Visits the program.
   fn visit(&mut self) -> Result<()> {
     // global values
     self.nm.set_prefix(Prefix::Custom {
       named: "@".into(),
       temp: "@_".into(),
+      max_len: Some(unsafe { NonZeroUsize::new_unchecked(Self::MAX_ID_LEN + 1) }),
     });
     for inst in self.program.inst_layout() {
       self.visit_global_inst(&self.program.borrow_value(*inst))?;
@@ -110,6 +115,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     self.nm.set_prefix(Prefix::Custom {
       named: "%".into(),
       temp: "%_".into(),
+      max_len: Some(unsafe { NonZeroUsize::new_unchecked(Self::MAX_ID_LEN + 1) }),
     });
     // parameters
     if is_decl {
@@ -147,6 +153,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     self.nm.set_prefix(Prefix::Custom {
       named: "@".into(),
       temp: "@_".into(),
+      max_len: Some(unsafe { NonZeroUsize::new_unchecked(Self::MAX_ID_LEN + 1) }),
     });
     Ok(())
   }
