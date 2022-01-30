@@ -1,5 +1,5 @@
-#ifndef KOOPA_KOOPA_H_
-#define KOOPA_KOOPA_H_
+#ifndef LIBKOOPA_KOOPA_H_
+#define LIBKOOPA_KOOPA_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -377,7 +377,9 @@ typedef struct {
   koopa_raw_value_t value;
 } koopa_raw_return_t;
 
+///
 /// Tag of raw Koopa value.
+///
 typedef enum {
   /// Integer constant.
   KOOPA_RVT_INTEGER,
@@ -576,7 +578,8 @@ void koopa_delete_raw_program_builder(koopa_raw_program_builder_t builder);
 /// using the given raw program builder.
 ///
 /// The generated raw program is valid iff the raw program builder
-/// is still alive (not deleted).
+/// is still alive (not deleted). The generated raw program should
+/// not be modified manually.
 ///
 koopa_raw_program_t koopa_build_raw_program(
     koopa_raw_program_builder_t builder, koopa_program_t program);
@@ -594,4 +597,4 @@ koopa_error_code_t koopa_generate_raw_to_koopa(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // KOOPA_KOOPA_H_
+#endif  // LIBKOOPA_KOOPA_H_
