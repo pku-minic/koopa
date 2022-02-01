@@ -63,6 +63,12 @@
 //! * [`interpreter`](https://github.com/pku-minic/koopa/tree/master/examples/interpreter):
 //!   a simple Koopa IR interpreter.
 //!
+//! And there are some more complex examples:
+//!
+//! * [`kira-rs`](https://github.com/pku-minic/kira-rs): The Kira compiler (Rust version),
+//!   which compiles SysY language into Koopa IR and RISC-V assembly.
+//! * [`kira-cpp`](https://github.com/pku-minic/kira-cpp): The Kira compiler (C++ version).
+//!
 //! # References
 //!
 //! Koopa IR library is heavily influenced by [LLVM](https://llvm.org/)
