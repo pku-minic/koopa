@@ -90,7 +90,7 @@ typedef uint32_t koopa_raw_slice_item_kind_t;
 ///
 typedef struct {
   /// Buffer of slice items.
-  const void *buffer;
+  const void **buffer;
   /// Length of slice.
   uint32_t len;
   /// Kind of slice items.
