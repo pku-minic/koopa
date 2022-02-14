@@ -48,7 +48,7 @@
 //! machine instructions, or some advanced optimizations of it.
 //!
 //! For more details, see
-//! [the document of Koopa IR](https://github.com/pku-minic/next-gen-ir-proposal/blob/master/ir/llvm-like/README.md)
+//! [the document of Koopa IR](https://pku-minic.github.io/online-doc/#/misc-app-ref/koopa)
 //! (Chinese).
 //!
 //! # Examples
