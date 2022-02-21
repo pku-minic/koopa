@@ -13,7 +13,7 @@ Koopa IR is the next generation of education-oriented intermediate representatio
 
 ```toml
 [dependencies]
-koopa = "0.0.3"
+koopa = "0.0.4"
 ```
 
 ## Koopa IR
