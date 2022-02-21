@@ -10,7 +10,7 @@ All notable changes to the Koopa will be documented in this file.
 
 ### Changed
 
-* Supported setting maximum variable name in `NameManager`.
+* Supported setting maximum variable name length in `NameManager`.
 
 ### Fixed
 
