@@ -2,7 +2,7 @@
 
 All notable changes to the Koopa will be documented in this file.
 
-## Unreleased
+## 0.0.4 - 2022-02-21
 
 ### Added
 
