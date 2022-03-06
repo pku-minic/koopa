@@ -2,6 +2,13 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## Unreleased
+
+### Fixed
+
+* Fault about duplicate parameter names.
+* Fault about local symbol redefinition.
+
 ## 0.0.4 - 2022-02-21
 
 ### Added
