@@ -213,4 +213,33 @@ mod test {
     let _ = driver.generate_program().unwrap();
     assert_eq!(Span::error_num() + Span::warning_num(), 0);
   }
+
+  #[test]
+  fn generate_duplicate_symbol() {
+    let driver: Driver<_> = r#"
+      decl @putch(i32)
+
+      fun @putstr(@arr: *i32, @arr: *i32) {
+      %entry:
+        jump %loop_entry
+      
+      %loop_entry:
+        %cur = load @arr
+        br %cur, %loop_body, %end
+      
+      %loop_body:
+        call @putch(%cur)
+        @arr = getptr @arr, 1
+        jump %loop_entry
+      
+      %end:
+        ret
+      }
+    "#
+    .into();
+    let result = driver.generate_program();
+    assert!(result.is_err());
+    assert_eq!(Span::warning_num(), 0);
+    assert_ne!(Span::error_num(), 0);
+  }
 }
