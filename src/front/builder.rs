@@ -185,12 +185,12 @@ impl Builder {
       ret_ty.clone(),
     );
     // create argument map
-    let args = ast
-      .params
-      .iter()
-      .map(|(n, _)| n.clone())
-      .zip(def.params().iter().copied())
-      .collect();
+    let mut args = HashMap::new();
+    for ((n, a), p) in ast.params.iter().zip(def.params()) {
+      if args.insert(n.clone(), *p).is_some() {
+        log_error!(a.span, "duplicate parameter name '{}'", n);
+      }
+    }
     // add to program
     let func = self.program.new_func(def);
     // add to global function map
@@ -339,6 +339,8 @@ impl Builder {
       // insert block info to local basic block map
       self.local_bbs.insert(block.name.clone(), info);
     }
+    // add argument references local symbols
+    self.local_symbols.extend(args.keys().cloned());
     // add argument references to the entry basic block
     let entry_bb_name = &bbs[0].name;
     let entry_info = &mut self.local_bbs.get_mut(entry_bb_name).unwrap();
