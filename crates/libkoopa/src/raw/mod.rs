@@ -63,6 +63,16 @@ fun @main(): i32 {
 }
 "#;
 
+  const ALLOC_PROGRAM: &str = r#"fun @main(): i32 {
+%entry:
+  %0 = alloc [i32, 10]
+  store {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, %0
+  %1 = getelemptr %0, 0
+  %2 = load %1
+  ret %2
+}
+"#;
+
   fn build_raw<'rpb>(builder: &'rpb mut RawProgramBuilder, program: &str) -> RawProgram<'rpb> {
     let program = Driver::from(program).generate_program().unwrap();
     builder.build_on(&program)
@@ -109,6 +119,19 @@ fun @main(): i32 {
   }
 
   #[test]
+  fn test_raw_builder_alloc() {
+    let mut builder = RawProgramBuilder::new();
+    let raw = build_raw(&mut builder, ALLOC_PROGRAM);
+    assert_eq!(raw.values.len, 0);
+    assert_eq!(raw.funcs.len, 1);
+    assert!(matches!(raw.funcs.kind, RawSliceItemKind::Function));
+    let func = unsafe { &**(raw.funcs.buffer as *const RawFunction) };
+    assert_name(func.name, Some("@main"));
+    assert_eq!(func.params.len, 0);
+    assert_eq!(func.bbs.len, 1);
+  }
+
+  #[test]
   fn test_raw_generator_loop() {
     let program = build_and_generate(LOOP_PROGRAM);
     let mut gen = KoopaGenerator::new(Vec::new());
@@ -124,6 +147,17 @@ fun @main(): i32 {
     assert_eq!(
       std::str::from_utf8(&gen.writer()).unwrap(),
       RECURSIVE_PROGRAM
+    );
+  }
+
+  #[test]
+  fn test_raw_generator_alloc() {
+    let program = build_and_generate(ALLOC_PROGRAM);
+    let mut gen = KoopaGenerator::new(Vec::new());
+    gen.generate_on(&program).unwrap();
+    assert_eq!(
+      std::str::from_utf8(&gen.writer()).unwrap(),
+      ALLOC_PROGRAM
     );
   }
 }
