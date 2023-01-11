@@ -7,6 +7,7 @@ All notable changes to the Koopa will be documented in this file.
 ### Fixed
 
 * Fault about generating allocations from raw programs in `libkoopa`.
+* Some deprecated and non-recommended uses in the source code.
 
 ## 0.0.5 - 2022-03-09
 
