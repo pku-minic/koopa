@@ -33,7 +33,7 @@ impl Default for Token {
 }
 
 /// Kind of token.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TokenKind {
   /// Integer literal.
   Int(i64),
@@ -63,7 +63,7 @@ impl fmt::Display for TokenKind {
 }
 
 /// Keywords of Koopa IR.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Keyword {
   /// Keyword `i32`.
   I32,

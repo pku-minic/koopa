@@ -92,7 +92,7 @@ pub enum AstKind {
 }
 
 /// 32-bit integer type.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct IntType;
 
 impl IntType {
@@ -144,7 +144,7 @@ impl FunType {
 }
 
 /// Symbol refernce.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SymbolRef {
   pub symbol: String,
 }
@@ -157,7 +157,7 @@ impl SymbolRef {
 }
 
 /// Integer literal.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct IntVal {
   pub value: i32,
 }
@@ -170,7 +170,7 @@ impl IntVal {
 }
 
 /// Undefined value.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct UndefVal;
 
 impl UndefVal {
@@ -194,7 +194,7 @@ impl Aggregate {
 }
 
 /// Zero initializer.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ZeroInit;
 
 impl ZeroInit {
@@ -260,7 +260,7 @@ impl GlobalDecl {
 }
 
 /// Load.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Load {
   pub symbol: String,
 }
@@ -476,7 +476,7 @@ impl FunDecl {
 }
 
 /// End of file.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct End;
 
 impl End {
@@ -487,7 +487,7 @@ impl End {
 }
 
 /// Error.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Error;
 
 impl Error {
