@@ -4,8 +4,10 @@ A simple Koopa IR interpreter (just for example).
 
 ## Usage
 
+Run in the repository root:
+
 ```sh
-cargo run -- ir/42.koopa; echo $?
+cargo run --example interpreter -- examples/interpreter/ir/42.koopa; echo $?
 ```
 
 You will see:
@@ -20,7 +22,8 @@ Or you can run Koopa IR programs with `libc` loaded:
 
 ```sh
 # for macOS
-cargo run -- ir/hello.koopa -l /usr/lib/libSystem.B.dylib
+cargo run --example interpreter -- \
+    examples/interpreter/ir/hello.koopa -l /usr/lib/libSystem.B.dylib
 ```
 
 You will see:
