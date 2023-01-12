@@ -81,9 +81,9 @@ impl DeadCodeElimination {
           .params()
           .iter()
           .enumerate()
-          .filter_map(|(i, p)| data.dfg().value(*p).used_by().is_empty().then(|| (i, *p)))
+          .filter_map(|(i, p)| data.dfg().value(*p).used_by().is_empty().then_some((i, *p)))
           .collect();
-        (!unused.is_empty()).then(|| (*b, unused))
+        (!unused.is_empty()).then_some((*b, unused))
       })
       .collect();
     let changed = !bbs.is_empty();
