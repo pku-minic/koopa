@@ -4,11 +4,13 @@ A brainfuck to Koopa IR compiler.
 
 ## Usage
 
+Run in the repository root:
+
 ```sh
 echo "++++++++[->++++++++<]>++++++++.<+++++[->+++++<]>++++.+++++++" \
      "..+++.<++++++++[->--------<]>---------------.<++++++[->+++++" \
      "+<]>+++++++.<++++++[->++++++<]>..+.<+++[->---<]>------.<++++" \
-     "++++[->--------<]>.<" | cargo run -- -o output.koopa
+     "++++[->--------<]>.<" | cargo run --example brainfuck -- -o output.koopa
 ```
 
 You will see the generated Koopa IR in file `output.koopa`.
@@ -19,7 +21,7 @@ Or you can convert the generated Koopa IR to LLVM IR:
 echo "++++++++[->++++++++<]>++++++++.<+++++[->+++++<]>++++.+++++++" \
      "..+++.<++++++++[->--------<]>---------------.<++++++[->+++++" \
      "+<]>+++++++.<++++++[->++++++<]>..+.<+++[->---<]>------.<++++" \
-     "++++[->--------<]>.<" | cargo run -- -ll | opt -O3 -S | lli
+     "++++[->--------<]>.<" | cargo run --example brainfuck -- -ll | opt -O3 -S | lli
 ```
 
 You will see:
@@ -33,5 +35,5 @@ Hello Koopa!
 Alternatively, you can read the input brainfuck program from file:
 
 ```sh
-cargo run -- -i pi.bf -ll | opt -O3 -S | lli
+cargo run --example brainfuck -- -i examples/brainfuck/pi.bf -ll | opt -O3 -S | lli
 ```
