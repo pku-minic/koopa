@@ -19,8 +19,14 @@ no-front-logger = []
 key-node-list = "0.0.4"
 colored = "2"
 
+[dev-dependencies]
+libloading = "0.7"
+
 [[example]]
 name = "opt"
 
 [[example]]
 name = "brainfuck"
+
+[[example]]
+name = "interpreter"
