@@ -11,7 +11,7 @@ pub(crate) fn new_pointer<T>(t: T) -> *mut T {
 ///
 /// Safe if `ptr` is returned by [`new_pointer`].
 pub(crate) unsafe fn drop_pointer<T>(ptr: *mut T) {
-  Box::from_raw(ptr);
+  drop(Box::from_raw(ptr));
 }
 
 /// Returns a new uninitialized box.
