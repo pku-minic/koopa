@@ -148,7 +148,7 @@ impl Builder {
   fn build_on_global_def(&mut self, span: &Span, ast: &ast::GlobalDef) {
     // create global allocation
     let decl = unwrap_ast!(ast.value, GlobalDecl);
-    if let Ok(init) = self.generate_global_init(&self.generate_type(&decl.ty), &decl.init) {
+    if let Ok(init) = self.generate_global_init(&Self::generate_type(&decl.ty), &decl.init) {
       let alloc = self.program.new_value().global_alloc(init);
       // set name for the created value
       if !ast.name.is_temp() {
@@ -173,14 +173,14 @@ impl Builder {
     let ret_ty = ast
       .ret
       .as_ref()
-      .map_or_else(Type::get_unit, |a| self.generate_type(a));
+      .map_or_else(Type::get_unit, Self::generate_type);
     // create function definition
     let def = FunctionData::with_param_names(
       ast.name.clone(),
       ast
         .params
         .iter()
-        .map(|(n, a)| ((!n.is_temp()).then(|| n.clone()), self.generate_type(a)))
+        .map(|(n, a)| ((!n.is_temp()).then(|| n.clone()), Self::generate_type(a)))
         .collect(),
       ret_ty.clone(),
     );
@@ -220,11 +220,11 @@ impl Builder {
     // create function declaration
     let decl = FunctionData::new_decl(
       ast.name.clone(),
-      ast.params.iter().map(|a| self.generate_type(a)).collect(),
+      ast.params.iter().map(Self::generate_type).collect(),
       ast
         .ret
         .as_ref()
-        .map_or_else(Type::get_unit, |a| self.generate_type(a)),
+        .map_or_else(Type::get_unit, Self::generate_type),
     );
     // add to program
     let func = self.program.new_func(decl);
@@ -309,7 +309,7 @@ impl Builder {
       let params = block
         .params
         .iter()
-        .map(|(n, a)| ((!n.is_temp()).then(|| n.clone()), self.generate_type(a)))
+        .map(|(n, a)| ((!n.is_temp()).then(|| n.clone()), Self::generate_type(a)))
         .collect();
       // create the current basic block
       let bb = self
@@ -387,17 +387,17 @@ impl Builder {
   }
 
   /// Generates the type by the given AST.
-  fn generate_type(&self, ast: &AstBox) -> Type {
+  fn generate_type(ast: &AstBox) -> Type {
     match &ast.kind {
       AstKind::IntType(_) => Type::get_i32(),
-      AstKind::ArrayType(ast) => Type::get_array(self.generate_type(&ast.base), ast.len),
-      AstKind::PointerType(ast) => Type::get_pointer(self.generate_type(&ast.base)),
+      AstKind::ArrayType(ast) => Type::get_array(Self::generate_type(&ast.base), ast.len),
+      AstKind::PointerType(ast) => Type::get_pointer(Self::generate_type(&ast.base)),
       AstKind::FunType(ast) => Type::get_function(
-        ast.params.iter().map(|a| self.generate_type(a)).collect(),
+        ast.params.iter().map(Self::generate_type).collect(),
         ast
           .ret
           .as_ref()
-          .map_or(Type::get_unit(), |a| self.generate_type(a)),
+          .map_or(Type::get_unit(), Self::generate_type),
       ),
       _ => panic!("invalid type AST"),
     }
@@ -592,7 +592,7 @@ impl Builder {
 
   /// Generates memory declarations.
   fn generate_mem_decl(&mut self, func: Function, ast: &ast::MemDecl) -> ValueResult {
-    let ty = self.generate_type(&ast.ty);
+    let ty = Self::generate_type(&ast.ty);
     Ok(self.dfg_mut(func).new_value().alloc(ty))
   }
 
