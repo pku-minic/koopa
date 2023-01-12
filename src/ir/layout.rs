@@ -5,7 +5,7 @@ use crate::ir::entities::{BasicBlock, Value};
 use key_node_list::{impl_node, KeyNodeList, Map};
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::hash::Hash;
 use std::rc::{Rc, Weak};
 
@@ -122,17 +122,16 @@ impl Map<BasicBlock, BasicBlockNode> for BasicBlockMap {
     self.map.get_mut(k)
   }
 
-  #[allow(clippy::map_entry)]
   fn insert<T>(&mut self, k: BasicBlock, v: T) -> Result<(), (BasicBlock, T)>
   where
     T: Into<BasicBlockNode>,
   {
-    if self.map.contains_key(&k) {
-      Err((k, v))
-    } else {
+    if let Entry::Vacant(e) = self.map.entry(k) {
       let node = BasicBlockNode::new(k, self.inst_bb.clone());
-      self.map.insert(k, node);
+      e.insert(node);
       Ok(())
+    } else {
+      Err((k, v))
     }
   }
 
