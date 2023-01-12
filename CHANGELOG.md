@@ -4,6 +4,10 @@ All notable changes to the Koopa will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+* Added all subprojects in the `examples` directory as Cargo examples.
+
 ### Fixed
 
 * Fault about generating allocations from raw programs in `libkoopa`.
