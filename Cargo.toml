@@ -1,6 +1,6 @@
 [package]
 name = "koopa"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["MaxXing <x@MaxXSoft.net>"]
 edition = "2021"
 description = "Library for generating/parsing/optimizing Koopa IR."
@@ -9,14 +9,14 @@ repository = "https://github.com/pku-minic/koopa"
 documentation = "https://docs.rs/koopa"
 license = "GPL-3.0"
 keywords = ["compiler", "ir"]
-exclude = ["/.github", "/crates", "/examples"]
+exclude = ["/.github", "/crates"]
 
 [features]
 # disables the front-end logger, returns error messages as strings
 no-front-logger = []
 
 [dependencies]
-key-node-list = "0.0.4"
+key-node-list = "0.0.5"
 colored = "2"
 
 [dev-dependencies]
