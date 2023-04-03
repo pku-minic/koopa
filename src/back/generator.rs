@@ -191,10 +191,12 @@ impl Default for ScopeKind {
 }
 
 /// Prefix of name.
+#[derive(Default)]
 pub enum Prefix {
   /// Default prefix,
   /// named variables start with '@' and
   /// temporary variables start with '%'.
+  #[default]
   Default,
   /// Custom prefix,
   /// named variables start with `named` and
@@ -240,12 +242,6 @@ impl Prefix {
       Prefix::Default => format!("%{}", id),
       Prefix::Custom { temp, .. } => format!("{}{}", temp, id),
     }
-  }
-}
-
-impl Default for Prefix {
-  fn default() -> Self {
-    Prefix::Default
   }
 }
 
