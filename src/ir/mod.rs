@@ -64,7 +64,7 @@
 //! // instructions in `then` basic block
 //! let one = fib_data.dfg_mut().new_value().integer(1);
 //! let ret = fib_data.dfg_mut().new_value().ret(Some(one));
-//! fib_data.layout_mut().bb_mut(entry).insts_mut().push_key_back(ret);
+//! fib_data.layout_mut().bb_mut(then).insts_mut().push_key_back(ret);
 //!
 //! // instructions in `else` basic block
 //! let sub1 = fib_data.dfg_mut().new_value().binary(BinaryOp::Sub, n, one);
@@ -73,7 +73,7 @@
 //! let call2 = fib_data.dfg_mut().new_value().call(fib, vec![sub2]);
 //! let ans = fib_data.dfg_mut().new_value().binary(BinaryOp::Add, call1, call2);
 //! let ret = fib_data.dfg_mut().new_value().ret(Some(ans));
-//! fib_data.layout_mut().bb_mut(entry).insts_mut().extend([sub1, call1, sub2, call2, ans, ret]);
+//! fib_data.layout_mut().bb_mut(else_bb).insts_mut().extend([sub1, call1, sub2, call2, ans, ret]);
 //! ```
 
 pub mod builder;
