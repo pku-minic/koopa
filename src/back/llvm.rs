@@ -69,7 +69,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     // global values
     self.nm.set_prefix(Prefix::Custom {
       named: "@".into(),
-      temp: "@_".into(),
+      temp: "@$".into(),
       max_len: Some(unsafe { NonZeroUsize::new_unchecked(Self::MAX_ID_LEN + 1) }),
     });
     for inst in self.program.inst_layout() {
@@ -114,7 +114,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     // change prefix
     self.nm.set_prefix(Prefix::Custom {
       named: "%".into(),
-      temp: "%_".into(),
+      temp: "%$".into(),
       max_len: Some(unsafe { NonZeroUsize::new_unchecked(Self::MAX_ID_LEN + 1) }),
     });
     // parameters
@@ -152,7 +152,7 @@ impl<'a, W: Write> VisitorImpl<'a, W> {
     // restore prefix
     self.nm.set_prefix(Prefix::Custom {
       named: "@".into(),
-      temp: "@_".into(),
+      temp: "@$".into(),
       max_len: Some(unsafe { NonZeroUsize::new_unchecked(Self::MAX_ID_LEN + 1) }),
     });
     Ok(())
