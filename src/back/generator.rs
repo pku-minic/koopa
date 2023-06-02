@@ -178,16 +178,11 @@ impl NameManager {
 }
 
 /// Kind of scope.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 enum ScopeKind {
+  #[default]
   Global,
   Function,
-}
-
-impl Default for ScopeKind {
-  fn default() -> Self {
-    Self::Global
-  }
 }
 
 /// Prefix of name.
