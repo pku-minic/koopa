@@ -699,4 +699,53 @@ $while_end_5:
 "#
     );
   }
+
+  #[test]
+  fn dump_underlined_symbols() {
+    let driver: Driver<_> = r#"
+      global @_0 = alloc i32, 0
+      global %_0 = alloc i32, 1
+      global %0 = alloc i32, 2
+
+      fun @test(@_2: i32): i32 {
+      %entry:
+        @_1 = getptr @_0, 0
+        %_1 = getptr %_0, 0
+        %1 = getptr %0, 0
+        %2 = load @_1
+        %3 = load %_1
+        %4 = add %2, %3
+        %5 = load %1
+        %6 = add %4, %5
+        store %6, @_1
+        ret %6
+      }
+    "#
+    .into();
+    let mut gen = LlvmGenerator::new(Vec::new());
+    gen
+      .generate_on(&driver.generate_program().unwrap())
+      .unwrap();
+    assert_eq!(
+      str::from_utf8(&gen.writer()).unwrap(),
+      r#"@_0 = global i32 0
+@$_0 = global i32 1
+@$0 = global i32 2
+
+define i32 @test(i32 %_2) {
+$entry:
+  %_1 = getelementptr inbounds i32, i32* @_0, i32 0
+  %$_1 = getelementptr inbounds i32, i32* @$_0, i32 0
+  %$1 = getelementptr inbounds i32, i32* @$0, i32 0
+  %$2 = load i32, i32* %_1
+  %$3 = load i32, i32* %$_1
+  %$4 = add i32 %$2, %$3
+  %$5 = load i32, i32* %$1
+  %$6 = add i32 %$4, %$5
+  store i32 %$6, i32* %_1
+  ret i32 %$6
+}
+"#
+    );
+  }
 }
