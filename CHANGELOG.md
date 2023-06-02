@@ -2,6 +2,13 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## 0.0.7 - 2023-06-02
+
+### Fixed
+
+* Some typos in the documentation.
+* [Issue #3](https://github.com/pku-minic/koopa/issues/3): A naming issue in Koopa to LLVM IR generator.
+
 ## 0.0.6 - 2023-01-12
 
 ### Changed
