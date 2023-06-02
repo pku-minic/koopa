@@ -155,9 +155,6 @@ fun @main(): i32 {
     let program = build_and_generate(ALLOC_PROGRAM);
     let mut gen = KoopaGenerator::new(Vec::new());
     gen.generate_on(&program).unwrap();
-    assert_eq!(
-      std::str::from_utf8(&gen.writer()).unwrap(),
-      ALLOC_PROGRAM
-    );
+    assert_eq!(std::str::from_utf8(&gen.writer()).unwrap(), ALLOC_PROGRAM);
   }
 }
