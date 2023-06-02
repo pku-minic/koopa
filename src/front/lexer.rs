@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::io::Read;
 
 /// A lexer for lexing text form Koopa IR.
-/// 
+///
 /// `Lexer` scans the input text form Koopa IR, and produces
 /// token stream for the [`Parser`](crate::front::parser::Parser).
 pub struct Lexer<T: Read> {

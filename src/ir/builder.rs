@@ -479,7 +479,7 @@ impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
 
 /// An value builder that builds a new local value and inserts it
 /// to the data flow graph.
-/// 
+///
 /// Returned by method [`DataFlowGraph::new_value`].
 pub struct LocalBuilder<'a> {
   pub(in crate::ir) dfg: &'a mut DataFlowGraph,
@@ -502,7 +502,7 @@ impl<'a> LocalInstBuilder for LocalBuilder<'a> {}
 
 /// An basic block builder that builds a new basic block and inserts it
 /// to the data flow graph.
-/// 
+///
 /// Returned by method [`DataFlowGraph::new_bb`].
 pub struct BlockBuilder<'a> {
   pub(in crate::ir) dfg: &'a mut DataFlowGraph,
@@ -522,7 +522,7 @@ impl<'a> BasicBlockBuilder for BlockBuilder<'a> {
 
 /// An value builder that replaces an existing local value.
 /// The inserted new value will have the same value handle as the old one.
-/// 
+///
 /// Returned by method [`DataFlowGraph::replace_value_with`].
 pub struct ReplaceBuilder<'a> {
   pub(in crate::ir) dfg: &'a mut DataFlowGraph,
@@ -547,7 +547,7 @@ impl<'a> LocalInstBuilder for ReplaceBuilder<'a> {}
 
 /// An value builder that builds a new global value and inserts it
 /// to the program.
-/// 
+///
 /// Returned by method [`Program::new_value`].
 pub struct GlobalBuilder<'a> {
   pub(in crate::ir) program: &'a mut Program,
