@@ -97,7 +97,7 @@ impl DataFlowGraph {
   /// # Panics
   ///
   /// Panics if the given value does not exist.
-  pub(in crate::ir) fn replace_value_with_data(&mut self, value: Value, data: ValueData) {
+  pub(in crate::ir) fn replace_value_with_data(&mut self, value: Value, mut data: ValueData) {
     let old = self.values.remove(&value).unwrap();
     for v in old.kind().value_uses() {
       data_mut!(self, v).used_by.remove(&value);
@@ -111,6 +111,7 @@ impl DataFlowGraph {
     for bb in data.kind().bb_uses() {
       self.bb_mut(bb).used_by.insert(value);
     }
+    data.used_by = old.used_by;
     self.values.insert(value, data);
   }
 
