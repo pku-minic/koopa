@@ -2,6 +2,12 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## Unreleased
+
+### Fixed
+
+* [Issue #4](https://github.com/pku-minic/koopa/issues/4): `replace_value_with` malfunctions in version 0.0.7.
+
 ## 0.0.7 - 2023-06-02
 
 ### Fixed
