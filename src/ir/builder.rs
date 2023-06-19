@@ -52,6 +52,10 @@ pub trait ValueInserter {
 /// A builder trait that provides method for building value data.
 pub trait ValueBuilder: Sized + EntityInfoQuerier + ValueInserter {
   /// Create a new value by the given value data.
+  ///
+  /// The created [`ValueData`] does not inherit the `used_by` set of
+  /// the provided data. See
+  /// [`ValueData::clone`](ValueData#impl-Clone-for-ValueData).
   fn raw(mut self, data: ValueData) -> Value {
     self.insert_value(data)
   }
