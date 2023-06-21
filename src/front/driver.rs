@@ -242,4 +242,22 @@ mod test {
     assert_eq!(Span::warning_num(), 0);
     assert_ne!(Span::error_num(), 0);
   }
+
+  #[test]
+  fn generate_br_with_same_bbs_and_args() {
+    let driver: Driver<_> = r#"
+      fun @foo() {
+      %entry:
+        br 0, %end(1), %end(2)
+      
+      %end(%r: i32):
+        ret %r
+      }      
+    "#
+    .into();
+    let result = driver.generate_program();
+    assert!(result.is_err());
+    assert_eq!(Span::warning_num(), 0);
+    assert_ne!(Span::error_num(), 0);
+  }
 }
