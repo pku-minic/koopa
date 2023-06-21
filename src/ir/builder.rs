@@ -252,8 +252,9 @@ pub trait LocalInstBuilder: ValueBuilder {
   ///
   /// # Panics
   ///
-  /// Panics if the condition type is not an integer type, or the argument
-  /// types of the true/false basic block do not match.
+  /// Panics if the condition type is not an integer type, or the true and
+  /// false basic blocks are same but they have one or more parameters, or
+  /// the argument types of the true/false basic block do not match.
   fn branch_with_args(
     mut self,
     cond: Value,
@@ -263,6 +264,10 @@ pub trait LocalInstBuilder: ValueBuilder {
     false_args: Vec<Value>,
   ) -> Value {
     assert!(self.value_type(cond).is_i32(), "`cond` must be integer");
+    assert!(
+      true_bb != false_bb || (true_args.is_empty() && false_args.is_empty()),
+      "branches with same targets and one or more arguments are illegal"
+    );
     check_bb_arg_types(&self, self.bb_params(true_bb), &true_args);
     check_bb_arg_types(&self, self.bb_params(false_bb), &false_args);
     self.insert_value(Branch::with_args(

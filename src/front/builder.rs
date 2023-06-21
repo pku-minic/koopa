@@ -705,12 +705,20 @@ impl Builder {
     let fbb = self.generate_bb(span, &ast.fbb)?;
     let fbb_ty = self.bb_params_ty(func, fbb);
     let fargs = self.generate_args(func, span, bb_name, &ast.fargs, &fbb_ty)?;
-    Ok(
-      self
-        .dfg_mut(func)
-        .new_value()
-        .branch_with_args(cond, tbb, fbb, targs, fargs),
-    )
+    // check branch targets and arguments
+    if tbb == fbb && (!targs.is_empty() || !fargs.is_empty()) {
+      return_error!(
+        span,
+        "branches with same targets and one or more arguments are illegal"
+      )
+    } else {
+      Ok(
+        self
+          .dfg_mut(func)
+          .new_value()
+          .branch_with_args(cond, tbb, fbb, targs, fargs),
+      )
+    }
   }
 
   /// Generates jumps.
