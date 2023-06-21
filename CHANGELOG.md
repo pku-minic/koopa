@@ -7,6 +7,7 @@ All notable changes to the Koopa will be documented in this file.
 ### Fixed
 
 * [Issue #4](https://github.com/pku-minic/koopa/issues/4): `replace_value_with` malfunctions in version 0.0.7.
+* [Issue #5](https://github.com/pku-minic/koopa/issues/5): branch with a single target and different arguments.
 
 ## 0.0.7 - 2023-06-02
 
