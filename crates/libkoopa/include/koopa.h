@@ -43,7 +43,7 @@ enum koopa_error_code {
 ///
 /// Type of error code.
 ///
-typedef koopa_error_code koopa_error_code_t;
+typedef enum koopa_error_code koopa_error_code_t;
 
 ///
 /// Raw file (file descriptor or handle).
@@ -83,7 +83,7 @@ enum koopa_raw_slice_item_kind {
 ///
 /// Type of raw slice item kind.
 ///
-typedef koopa_raw_slice_item_kind koopa_raw_slice_item_kind_t;
+typedef enum koopa_raw_slice_item_kind koopa_raw_slice_item_kind_t;
 
 ///
 /// A raw slice that can store any kind of items.
@@ -319,7 +319,7 @@ enum koopa_raw_binary_op {
 ///
 /// Type of raw binary operator.
 ///
-typedef koopa_raw_binary_op koopa_raw_binary_op_t;
+typedef enum koopa_raw_binary_op koopa_raw_binary_op_t;
 
 ///
 /// Raw binary operation.
