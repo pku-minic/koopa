@@ -189,7 +189,7 @@ impl<'a> InterpreterImpl<'a> {
           .params()
           .iter()
           .map(|p| func.dfg().value(*p) as *const ValueData)
-          .zip(args.into_iter())
+          .zip(args)
           .collect(),
       ));
       // evaluate the entry basic block
