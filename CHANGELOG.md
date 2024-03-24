@@ -8,6 +8,7 @@ All notable changes to the Koopa will be documented in this file.
 
 * [Issue #4](https://github.com/pku-minic/koopa/issues/4): `replace_value_with` malfunctions in version 0.0.7.
 * [Issue #5](https://github.com/pku-minic/koopa/issues/5): branch with a single target and different arguments.
+* [PR #6](https://github.com/pku-minic/koopa/pull/6): update typedef of enums.
 
 ## 0.0.7 - 2023-06-02
 
