@@ -111,6 +111,7 @@ impl Span {
   const TAB_WIDTH: usize = 2;
 
   thread_local! {
+    #[allow(clippy::missing_const_for_thread_local)]
     static STATE: RefCell<GlobalState> = RefCell::new(GlobalState {
       file: FileType::Buffer,
       err_num: 0,

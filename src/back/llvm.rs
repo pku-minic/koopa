@@ -60,7 +60,7 @@ macro_rules! value_ty {
   };
 }
 
-impl<'a, W: Write> VisitorImpl<'a, W> {
+impl<W: Write> VisitorImpl<'_, W> {
   /// Maximum length of LLVM IR identifier.
   const MAX_ID_LEN: usize = 512;
 

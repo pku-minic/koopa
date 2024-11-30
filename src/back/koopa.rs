@@ -48,7 +48,7 @@ macro_rules! value {
   };
 }
 
-impl<'a, W: Write> VisitorImpl<'a, W> {
+impl<W: Write> VisitorImpl<'_, W> {
   /// Visits the program.
   fn visit(&mut self) -> Result<()> {
     for inst in self.program.inst_layout() {

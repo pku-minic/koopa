@@ -494,20 +494,20 @@ pub struct LocalBuilder<'a> {
   pub(in crate::ir) dfg: &'a mut DataFlowGraph,
 }
 
-impl<'a> DfgBasedInfoQuerier for LocalBuilder<'a> {
+impl DfgBasedInfoQuerier for LocalBuilder<'_> {
   fn dfg(&self) -> &DataFlowGraph {
     self.dfg
   }
 }
 
-impl<'a> ValueInserter for LocalBuilder<'a> {
+impl ValueInserter for LocalBuilder<'_> {
   fn insert_value(&mut self, data: ValueData) -> Value {
     self.dfg.new_value_data(data)
   }
 }
 
-impl<'a> ValueBuilder for LocalBuilder<'a> {}
-impl<'a> LocalInstBuilder for LocalBuilder<'a> {}
+impl ValueBuilder for LocalBuilder<'_> {}
+impl LocalInstBuilder for LocalBuilder<'_> {}
 
 /// An basic block builder that builds a new basic block and inserts it
 /// to the data flow graph.
@@ -517,13 +517,13 @@ pub struct BlockBuilder<'a> {
   pub(in crate::ir) dfg: &'a mut DataFlowGraph,
 }
 
-impl<'a> ValueInserter for BlockBuilder<'a> {
+impl ValueInserter for BlockBuilder<'_> {
   fn insert_value(&mut self, data: ValueData) -> Value {
     self.dfg.new_value_data(data)
   }
 }
 
-impl<'a> BasicBlockBuilder for BlockBuilder<'a> {
+impl BasicBlockBuilder for BlockBuilder<'_> {
   fn insert_bb(&mut self, data: BasicBlockData) -> BasicBlock {
     self.dfg.new_bb_data(data)
   }
@@ -538,21 +538,21 @@ pub struct ReplaceBuilder<'a> {
   pub(in crate::ir) value: Value,
 }
 
-impl<'a> DfgBasedInfoQuerier for ReplaceBuilder<'a> {
+impl DfgBasedInfoQuerier for ReplaceBuilder<'_> {
   fn dfg(&self) -> &DataFlowGraph {
     self.dfg
   }
 }
 
-impl<'a> ValueInserter for ReplaceBuilder<'a> {
+impl ValueInserter for ReplaceBuilder<'_> {
   fn insert_value(&mut self, data: ValueData) -> Value {
     self.dfg.replace_value_with_data(self.value, data);
     self.value
   }
 }
 
-impl<'a> ValueBuilder for ReplaceBuilder<'a> {}
-impl<'a> LocalInstBuilder for ReplaceBuilder<'a> {}
+impl ValueBuilder for ReplaceBuilder<'_> {}
+impl LocalInstBuilder for ReplaceBuilder<'_> {}
 
 /// An value builder that builds a new global value and inserts it
 /// to the program.
@@ -562,7 +562,7 @@ pub struct GlobalBuilder<'a> {
   pub(in crate::ir) program: &'a mut Program,
 }
 
-impl<'a> EntityInfoQuerier for GlobalBuilder<'a> {
+impl EntityInfoQuerier for GlobalBuilder<'_> {
   fn value_type(&self, value: Value) -> Type {
     self
       .program
@@ -594,7 +594,7 @@ impl<'a> EntityInfoQuerier for GlobalBuilder<'a> {
   }
 }
 
-impl<'a> ValueInserter for GlobalBuilder<'a> {
+impl ValueInserter for GlobalBuilder<'_> {
   fn insert_value(&mut self, data: ValueData) -> Value {
     let is_inst = data.kind().is_global_alloc();
     let value = self.program.new_value_data(data);
@@ -605,5 +605,5 @@ impl<'a> ValueInserter for GlobalBuilder<'a> {
   }
 }
 
-impl<'a> ValueBuilder for GlobalBuilder<'a> {}
-impl<'a> GlobalInstBuilder for GlobalBuilder<'a> {}
+impl ValueBuilder for GlobalBuilder<'_> {}
+impl GlobalInstBuilder for GlobalBuilder<'_> {}

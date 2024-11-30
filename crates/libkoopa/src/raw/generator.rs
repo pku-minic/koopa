@@ -96,7 +96,7 @@ struct RawSliceIter<'a, T: Pointer> {
   phantom: PhantomData<T>,
 }
 
-impl<'a, T, E> RawSliceIter<'a, T>
+impl<T, E> RawSliceIter<'_, T>
 where
   T: Pointer + GenerateOnRaw<Entity = E>,
 {
@@ -109,7 +109,7 @@ where
   }
 }
 
-impl<'a, T: Pointer> Iterator for RawSliceIter<'a, T> {
+impl<T: Pointer> Iterator for RawSliceIter<'_, T> {
   type Item = T;
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -196,7 +196,7 @@ impl GenerateOnRaw for *const c_char {
   }
 }
 
-impl<'rpb> GenerateOnRaw for RawProgram<'rpb> {
+impl GenerateOnRaw for RawProgram<'_> {
   type Entity = ();
 
   fn generate(&self, program: &mut Program, info: &mut ProgramInfo) -> Result<Self::Entity> {

@@ -15,7 +15,7 @@ pub(in crate::ir) type ValueId = NonZeroU32;
 /// memory layout optimization.
 const GLOBAL_VALUE_ID_STARTS_FROM: ValueId = unsafe { NonZeroU32::new_unchecked(1) };
 
-/// The value of `ValueId` (local value) should start from 1,
+/// The value of `ValueId` (local value) should start from 0x40000000,
 /// because we want to use `NonZeroU32` to enable some
 /// memory layout optimization.
 const LOCAL_VALUE_ID_STARTS_FROM: ValueId = unsafe { NonZeroU32::new_unchecked(0x40000000) };
@@ -42,12 +42,16 @@ const FUNC_ID_STARTS_FROM: FunctionId = unsafe { NonZeroU32::new_unchecked(1) };
 
 thread_local! {
   /// The next global value ID.
+  #[allow(clippy::missing_const_for_thread_local)]
   static NEXT_GLOBAL_VALUE_ID: Cell<ValueId> = Cell::new(GLOBAL_VALUE_ID_STARTS_FROM);
   /// The next local value ID.
+  #[allow(clippy::missing_const_for_thread_local)]
   static NEXT_LOCAL_VALUE_ID: Cell<ValueId> = Cell::new(LOCAL_VALUE_ID_STARTS_FROM);
   /// The next basic block ID.
+  #[allow(clippy::missing_const_for_thread_local)]
   static NEXT_BB_ID: Cell<BasicBlockId> = Cell::new(BB_ID_STARTS_FROM);
   /// The next function ID.
+  #[allow(clippy::missing_const_for_thread_local)]
   static NEXT_FUNC_ID: Cell<FunctionId> = Cell::new(FUNC_ID_STARTS_FROM);
 }
 

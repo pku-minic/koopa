@@ -106,18 +106,18 @@ impl Map<BasicBlock, BasicBlockNode> for BasicBlockMap {
     self.map.clear()
   }
 
-  fn get<Q: ?Sized>(&self, k: &Q) -> Option<&BasicBlockNode>
+  fn get<Q>(&self, k: &Q) -> Option<&BasicBlockNode>
   where
     BasicBlock: Borrow<Q>,
-    Q: Hash + Eq,
+    Q: ?Sized + Hash + Eq,
   {
     self.map.get(k)
   }
 
-  fn get_mut<Q: ?Sized>(&mut self, k: &Q) -> Option<&mut BasicBlockNode>
+  fn get_mut<Q>(&mut self, k: &Q) -> Option<&mut BasicBlockNode>
   where
     BasicBlock: Borrow<Q>,
-    Q: Hash + Eq,
+    Q: ?Sized + Hash + Eq,
   {
     self.map.get_mut(k)
   }
@@ -135,10 +135,10 @@ impl Map<BasicBlock, BasicBlockNode> for BasicBlockMap {
     }
   }
 
-  fn remove_entry<Q: ?Sized>(&mut self, k: &Q) -> Option<(BasicBlock, BasicBlockNode)>
+  fn remove_entry<Q>(&mut self, k: &Q) -> Option<(BasicBlock, BasicBlockNode)>
   where
     BasicBlock: Borrow<Q>,
-    Q: Hash + Eq,
+    Q: ?Sized + Hash + Eq,
   {
     self.map.remove_entry(k)
   }
@@ -225,18 +225,18 @@ impl Map<Value, InstNode> for InstMap {
     self.map.clear()
   }
 
-  fn get<Q: ?Sized>(&self, k: &Q) -> Option<&InstNode>
+  fn get<Q>(&self, k: &Q) -> Option<&InstNode>
   where
     Value: Borrow<Q>,
-    Q: Hash + Eq,
+    Q: ?Sized + Hash + Eq,
   {
     self.map.get(k)
   }
 
-  fn get_mut<Q: ?Sized>(&mut self, k: &Q) -> Option<&mut InstNode>
+  fn get_mut<Q>(&mut self, k: &Q) -> Option<&mut InstNode>
   where
     Value: Borrow<Q>,
-    Q: Hash + Eq,
+    Q: ?Sized + Hash + Eq,
   {
     self.map.get_mut(k)
   }
@@ -260,10 +260,10 @@ impl Map<Value, InstNode> for InstMap {
     }
   }
 
-  fn remove_entry<Q: ?Sized>(&mut self, k: &Q) -> Option<(Value, InstNode)>
+  fn remove_entry<Q>(&mut self, k: &Q) -> Option<(Value, InstNode)>
   where
     Value: Borrow<Q>,
-    Q: Hash + Eq,
+    Q: ?Sized + Hash + Eq,
   {
     let kv = self.map.remove_entry(k);
     if kv.is_some() {

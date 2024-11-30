@@ -61,6 +61,7 @@ impl Type {
     static POOL: RefCell<HashMap<TypeKind, Type>> = RefCell::new(HashMap::new());
 
     /// Size of pointers.
+    #[allow(clippy::missing_const_for_thread_local)]
     static PTR_SIZE: Cell<usize> = Cell::new(mem::size_of::<*const ()>());
   }
 

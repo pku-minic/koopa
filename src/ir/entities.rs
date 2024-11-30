@@ -591,7 +591,7 @@ pub struct ValueUses<'a> {
   index: usize,
 }
 
-impl<'a> Iterator for ValueUses<'a> {
+impl Iterator for ValueUses<'_> {
   type Item = Value;
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -658,7 +658,7 @@ pub struct BasicBlockUses<'a> {
   index: usize,
 }
 
-impl<'a> Iterator for BasicBlockUses<'a> {
+impl Iterator for BasicBlockUses<'_> {
   type Item = BasicBlock;
 
   fn next(&mut self) -> Option<Self::Item> {
