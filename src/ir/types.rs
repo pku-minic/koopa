@@ -4,9 +4,10 @@
 //! a 32-bit integer type, a unit type, an array type, a pointer type,
 //! or a function type.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{cmp, fmt, hash, mem};
 
 /// Kind of type.
@@ -55,14 +56,13 @@ impl fmt::Display for TypeKind {
 #[derive(Clone, Eq)]
 pub struct Type(Rc<TypeKind>);
 
+/// Size of pointers on the target machine.
+static PTR_SIZE: AtomicUsize = AtomicUsize::new(mem::size_of::<*const ()>());
+
 impl Type {
   thread_local! {
     /// Pool of all created types.
     static POOL: RefCell<HashMap<TypeKind, Type>> = RefCell::new(HashMap::new());
-
-    /// Size of pointers.
-    #[allow(clippy::missing_const_for_thread_local)]
-    static PTR_SIZE: Cell<usize> = Cell::new(mem::size_of::<*const ()>());
   }
 
   /// Returns a type by the given [`TypeKind`].
@@ -103,9 +103,9 @@ impl Type {
     Type::get(TypeKind::Function(params, ret))
   }
 
-  /// Sets the size of pointers.
+  /// Sets the size of pointers on the target machine.
   pub fn set_ptr_size(size: usize) {
-    Self::PTR_SIZE.with(|ptr_size| ptr_size.set(size));
+    PTR_SIZE.store(size, Ordering::Relaxed);
   }
 
   /// Returns a reference to the kind of the current type.
@@ -129,7 +129,7 @@ impl Type {
       TypeKind::Int32 => 4,
       TypeKind::Unit => 0,
       TypeKind::Array(ty, len) => ty.size() * len,
-      TypeKind::Pointer(..) | TypeKind::Function(..) => Self::PTR_SIZE.with(|s| s.get()),
+      TypeKind::Pointer(..) | TypeKind::Function(..) => PTR_SIZE.load(Ordering::Relaxed),
     }
   }
 }

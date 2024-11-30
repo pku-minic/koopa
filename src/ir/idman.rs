@@ -1,7 +1,7 @@
 //! Value/basic block/function ID manager.
 
-use std::cell::Cell;
 use std::num::NonZeroU32;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// Type of `Value` identifier.
 ///
@@ -40,31 +40,18 @@ pub(in crate::ir) type FunctionId = NonZeroU32;
 /// memory layout optimization.
 const FUNC_ID_STARTS_FROM: FunctionId = unsafe { NonZeroU32::new_unchecked(1) };
 
-thread_local! {
-  /// The next global value ID.
-  #[allow(clippy::missing_const_for_thread_local)]
-  static NEXT_GLOBAL_VALUE_ID: Cell<ValueId> = Cell::new(GLOBAL_VALUE_ID_STARTS_FROM);
-  /// The next local value ID.
-  #[allow(clippy::missing_const_for_thread_local)]
-  static NEXT_LOCAL_VALUE_ID: Cell<ValueId> = Cell::new(LOCAL_VALUE_ID_STARTS_FROM);
-  /// The next basic block ID.
-  #[allow(clippy::missing_const_for_thread_local)]
-  static NEXT_BB_ID: Cell<BasicBlockId> = Cell::new(BB_ID_STARTS_FROM);
-  /// The next function ID.
-  #[allow(clippy::missing_const_for_thread_local)]
-  static NEXT_FUNC_ID: Cell<FunctionId> = Cell::new(FUNC_ID_STARTS_FROM);
-}
-
 /// Returns the next global value ID.
 pub(in crate::ir) fn next_global_value_id() -> ValueId {
-  NEXT_GLOBAL_VALUE_ID
-    .with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
+  static NEXT_GLOBAL_VALUE_ID: AtomicU32 = AtomicU32::new(GLOBAL_VALUE_ID_STARTS_FROM.get());
+  let id = NEXT_GLOBAL_VALUE_ID.fetch_add(1, Ordering::Relaxed);
+  unsafe { NonZeroU32::new_unchecked(id) }
 }
 
 /// Returns the next local value ID.
 pub(in crate::ir) fn next_local_value_id() -> ValueId {
-  NEXT_LOCAL_VALUE_ID
-    .with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
+  static NEXT_LOCAL_VALUE_ID: AtomicU32 = AtomicU32::new(LOCAL_VALUE_ID_STARTS_FROM.get());
+  let id = NEXT_LOCAL_VALUE_ID.fetch_add(1, Ordering::Relaxed);
+  unsafe { NonZeroU32::new_unchecked(id) }
 }
 
 /// Returns `true` if the given value ID is a global value ID.
@@ -74,10 +61,14 @@ pub(in crate::ir) fn is_global_id(value: ValueId) -> bool {
 
 /// Returns the next basic block ID.
 pub(in crate::ir) fn next_bb_id() -> BasicBlockId {
-  NEXT_BB_ID.with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
+  static NEXT_BB_ID: AtomicU32 = AtomicU32::new(BB_ID_STARTS_FROM.get());
+  let id = NEXT_BB_ID.fetch_add(1, Ordering::Relaxed);
+  unsafe { NonZeroU32::new_unchecked(id) }
 }
 
 /// Returns the next function ID.
 pub(in crate::ir) fn next_func_id() -> FunctionId {
-  NEXT_FUNC_ID.with(|id| id.replace(unsafe { NonZeroU32::new_unchecked(id.get().get() + 1) }))
+  static NEXT_FUNC_ID: AtomicU32 = AtomicU32::new(FUNC_ID_STARTS_FROM.get());
+  let id = NEXT_FUNC_ID.fetch_add(1, Ordering::Relaxed);
+  unsafe { NonZeroU32::new_unchecked(id) }
 }
