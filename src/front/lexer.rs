@@ -4,7 +4,6 @@ use crate::front::span::{Error, Pos, Span};
 use crate::front::token::{Keyword, Token, TokenKind};
 use crate::ir::BinaryOp;
 use crate::{log_raw_fatal_error, return_error};
-use std::collections::HashMap;
 use std::io::Read;
 
 /// A lexer for lexing text form Koopa IR.
@@ -158,9 +157,9 @@ impl<T: Read> Lexer<T> {
       self.next_char()?;
     }
     // check the string
-    if let Some(keyword) = KEYWORDS.with(|m| m.get(keyword.as_str()).copied()) {
+    if let Some(keyword) = KEYWORDS.get(keyword.as_str()).copied() {
       Ok(Token::new(span, TokenKind::Keyword(keyword)))
-    } else if let Some(op) = BINARY_OPS.with(|m| m.get(keyword.as_str()).copied()) {
+    } else if let Some(op) = BINARY_OPS.get(keyword.as_str()).copied() {
       Ok(Token::new(span, TokenKind::BinaryOp(op)))
     } else {
       self.log_err_and_skip(span, &format!("invalid keyword/operator '{}'", keyword))
@@ -218,55 +217,45 @@ impl<T: Read> Lexer<T> {
   }
 }
 
-macro_rules! hash_map {
-  ($($k:expr => $v:expr),* $(,)?) => {{
-    let mut map = HashMap::new();
-    $(map.insert($k, $v);)*
-    map
-  }};
-}
+/// All supported keywords.
+static KEYWORDS: phf::Map<&'static str, Keyword> = phf::phf_map! {
+  "i32" => Keyword::I32,
+  "undef" => Keyword::Undef,
+  "zeroinit" => Keyword::ZeroInit,
+  "global" => Keyword::Global,
+  "alloc" => Keyword::Alloc,
+  "load" => Keyword::Load,
+  "store" => Keyword::Store,
+  "getptr" => Keyword::GetPtr,
+  "getelemptr" => Keyword::GetElemPtr,
+  "br" => Keyword::Br,
+  "jump" => Keyword::Jump,
+  "call" => Keyword::Call,
+  "ret" => Keyword::Ret,
+  "fun" => Keyword::Fun,
+  "decl" => Keyword::Decl,
+};
 
-thread_local! {
-  /// All supported keywords.
-  static KEYWORDS: HashMap<&'static str, Keyword> = hash_map! {
-    "i32" => Keyword::I32,
-    "undef" => Keyword::Undef,
-    "zeroinit" => Keyword::ZeroInit,
-    "global" => Keyword::Global,
-    "alloc" => Keyword::Alloc,
-    "load" => Keyword::Load,
-    "store" => Keyword::Store,
-    "getptr" => Keyword::GetPtr,
-    "getelemptr" => Keyword::GetElemPtr,
-    "br" => Keyword::Br,
-    "jump" => Keyword::Jump,
-    "call" => Keyword::Call,
-    "ret" => Keyword::Ret,
-    "fun" => Keyword::Fun,
-    "decl" => Keyword::Decl,
-  };
-
-  /// All supported binary operators.
-  static BINARY_OPS: HashMap<&'static str, BinaryOp> = hash_map! {
-    "ne" => BinaryOp::NotEq,
-    "eq" => BinaryOp::Eq,
-    "gt" => BinaryOp::Gt,
-    "lt" => BinaryOp::Lt,
-    "ge" => BinaryOp::Ge,
-    "le" => BinaryOp::Le,
-    "add" => BinaryOp::Add,
-    "sub" => BinaryOp::Sub,
-    "mul" => BinaryOp::Mul,
-    "div" => BinaryOp::Div,
-    "mod" => BinaryOp::Mod,
-    "and" => BinaryOp::And,
-    "or" => BinaryOp::Or,
-    "xor" => BinaryOp::Xor,
-    "shl" => BinaryOp::Shl,
-    "shr" => BinaryOp::Shr,
-    "sar" => BinaryOp::Sar,
-  };
-}
+/// All supported binary operators.
+static BINARY_OPS: phf::Map<&'static str, BinaryOp> = phf::phf_map! {
+  "ne" => BinaryOp::NotEq,
+  "eq" => BinaryOp::Eq,
+  "gt" => BinaryOp::Gt,
+  "lt" => BinaryOp::Lt,
+  "ge" => BinaryOp::Ge,
+  "le" => BinaryOp::Le,
+  "add" => BinaryOp::Add,
+  "sub" => BinaryOp::Sub,
+  "mul" => BinaryOp::Mul,
+  "div" => BinaryOp::Div,
+  "mod" => BinaryOp::Mod,
+  "and" => BinaryOp::And,
+  "or" => BinaryOp::Or,
+  "xor" => BinaryOp::Xor,
+  "shl" => BinaryOp::Shl,
+  "shr" => BinaryOp::Shr,
+  "sar" => BinaryOp::Sar,
+};
 
 #[cfg(test)]
 mod test {
