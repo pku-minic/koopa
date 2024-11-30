@@ -2,6 +2,13 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+* Used `phf::Map` instead of `HashMap` in lexer to reduce usage of TLS.
+* Replaced all `Cell`ed-integers with atomic integers.
+
 ## 0.0.8 - 2024-11-30
 
 ### Changed
