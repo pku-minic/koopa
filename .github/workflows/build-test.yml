@@ -17,13 +17,13 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Build
-      run: cargo check && cargo check --features no-front-logger
+      run: cargo check && cargo check --all-features
 
     - name: Clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --all-features -- -D warnings
 
     - name: Test
-      run: cargo test --all-features
+      run: cargo test && cargo test --all-features
 
   build_examples:
     name: Build Examples
@@ -40,11 +40,11 @@ jobs:
 
     - name: Build
       working-directory: examples/${{matrix.example-name}}
-      run: cargo check
+      run: cargo check && cargo check --all-features
 
     - name: Clippy
       working-directory: examples/${{matrix.example-name}}
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --all-features -- -D warnings
 
   build_libkoopa:
     name: Build and Test Koopa C Library
@@ -58,12 +58,12 @@ jobs:
 
     - name: Build
       working-directory: crates/libkoopa
-      run: cargo check
+      run: cargo check && cargo check --all-features
 
     - name: Clippy
       working-directory: crates/libkoopa
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --all-features -- -D warnings
 
     - name: Test
       working-directory: crates/libkoopa
-      run: cargo test --all-features
+      run: cargo test && cargo test --all-features
