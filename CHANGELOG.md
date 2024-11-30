@@ -2,7 +2,11 @@
 
 All notable changes to the Koopa will be documented in this file.
 
-## Unreleased
+## 0.0.8 - 2024-11-30
+
+### Changed
+
+* Minor changes for making Clippy happy.
 
 ### Fixed
 
