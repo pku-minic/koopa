@@ -12,8 +12,13 @@ ffi! {
   /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
-  fn koopa_parse_from_file(path: *const c_char, program: &mut *mut Program) -> ErrorCode {
-    let path = unwrap_or_return!(unsafe { CStr::from_ptr(path) }.to_str(), InvalidUtf8String);
+  ///
+  /// # Safety
+  ///
+  /// The memory pointed to by `path` must contain a valid
+  /// null terminator at the end of the string.
+  unsafe fn koopa_parse_from_file(path: *const c_char, program: &mut *mut Program) -> ErrorCode {
+    let path = unwrap_or_return!(CStr::from_ptr(path).to_str(), InvalidUtf8String);
     let driver = unwrap_or_return!(Driver::from_path(path), InvalidFile);
     let prog = unwrap_or_return!(driver.generate_program(), InvalidKoopaProgram);
     *program = new_pointer(prog);
@@ -24,8 +29,13 @@ ffi! {
   /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
-  fn koopa_parse_from_string(s: *const c_char, program: &mut *mut Program) -> ErrorCode {
-    let s = unwrap_or_return!(unsafe { CStr::from_ptr(s) }.to_str(), InvalidUtf8String);
+  ///
+  /// # Safety
+  ///
+  /// The memory pointed to by `s` must contain a valid
+  /// null terminator at the end of the string.
+  unsafe fn koopa_parse_from_string(s: *const c_char, program: &mut *mut Program) -> ErrorCode {
+    let s = unwrap_or_return!(CStr::from_ptr(s).to_str(), InvalidUtf8String);
     let driver = Driver::from(s);
     let prog = unwrap_or_return!(driver.generate_program(), InvalidKoopaProgram);
     *program = new_pointer(prog);
@@ -60,7 +70,12 @@ ffi! {
   ///
   /// All programs returned by Koopa IR library functions
   /// should be deleted manually.
-  fn koopa_delete_program(program: *mut Program) {
-    unsafe { drop_pointer(program) };
+  ///
+  /// # Safety
+  ///
+  /// The `program` must be a valid program pointer returned by
+  /// Koopa IR library functions.
+  unsafe fn koopa_delete_program(program: *mut Program) {
+    drop_pointer(program);
   }
 }

@@ -27,14 +27,27 @@ pub(crate) unsafe fn new_uninit_box<T>() -> Box<T> {
 /// Defines FFI functions.
 macro_rules! ffi {
   {
-    $($(#[$attr:meta])*
+    $(#[$attr:meta])*
     fn $name:ident$(<$($lt:lifetime)+>)?
-    ($($arg:ident : $ty:ty),* $(,)?) $(-> $ret:ty)? $body:block)*
-  } => {
-    $($(#[$attr])*
-    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    ($($arg:ident : $ty:ty),* $(,)?) $(-> $ret:ty)? $body:block
+    $($rest:tt)*
+   } => {
+    $(#[$attr])*
     #[no_mangle]
-    pub extern "C" fn $name$(<$($lt)+>)?($($arg: $ty),*) $(-> $ret)? $body)*
+    pub extern "C" fn $name$(<$($lt)+>)? ($($arg: $ty),*) $(-> $ret)? $body
+    $crate::utils::ffi!($($rest)*);
   };
+  {
+    $(#[$attr:meta])*
+    unsafe fn $name:ident$(<$($lt:lifetime)+>)?
+    ($($arg:ident : $ty:ty),* $(,)?) $(-> $ret:ty)? $body:block
+    $($rest:tt)*
+   } => {
+    $(#[$attr])*
+    #[no_mangle]
+    pub unsafe extern "C" fn $name$(<$($lt)+>)? ($($arg: $ty),*) $(-> $ret)? $body
+    $crate::utils::ffi!($($rest)*);
+  };
+  () => {};
 }
 pub(crate) use ffi;

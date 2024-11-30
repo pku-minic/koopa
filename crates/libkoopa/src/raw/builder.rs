@@ -28,7 +28,6 @@ impl RawProgramBuilder {
   }
 
   /// Builds on the given Koopa IR program.
-  #[allow(clippy::needless_collect)]
   pub fn build_on(&mut self, program: &Program) -> RawProgram {
     let mut info = ProgramInfo::new(program);
     let raw = RawProgram {
