@@ -3,6 +3,7 @@ use koopa::ir::builder_traits::*;
 use koopa::ir::{BasicBlock, BinaryOp, Function, FunctionData, Program, Type, Value};
 use std::env::args;
 use std::fs::File;
+use std::io::{Read, Write};
 use std::{fmt, io, process};
 
 fn main() {
@@ -85,7 +86,7 @@ fn parse_cmd_args() -> Result<CommandLineArgs, Error> {
   Ok(cmd_args)
 }
 
-fn build_program(input: impl io::Read) -> Result<Program, Error> {
+fn build_program<T: Read>(input: T) -> Result<Program, Error> {
   let mut program = Program::new();
   // create data array
   let zero = program
@@ -113,7 +114,7 @@ fn build_program(input: impl io::Read) -> Result<Program, Error> {
   Ok(program)
 }
 
-fn emit_ir(program: &Program, output: impl io::Write, emit_llvm: bool) -> Result<(), Error> {
+fn emit_ir<T: Write>(program: &Program, output: T, emit_llvm: bool) -> Result<(), Error> {
   if emit_llvm {
     LlvmGenerator::new(output).generate_on(program)
   } else {
@@ -162,7 +163,7 @@ macro_rules! add_inst {
   };
 }
 
-fn generate_main(input: impl io::Read, mut env: Environment) -> Result<(), Error> {
+fn generate_main<T: Read>(input: T, mut env: Environment) -> Result<(), Error> {
   // generate entry basic block
   let main = &mut env.main;
   let entry = new_bb!(main).basic_block(Some("%entry".into()));
@@ -189,11 +190,12 @@ fn generate_main(input: impl io::Read, mut env: Environment) -> Result<(), Error
   Ok(())
 }
 
-fn generate_bbs(
-  input: impl io::Read,
+fn generate_bbs<T: Read>(
+  input: T,
   env: &mut Environment,
   entry: BasicBlock,
 ) -> Result<BasicBlock, Error> {
+  let input = io::BufReader::new(input);
   let mut bb = new_bb!(env.main).basic_block(None);
   add_bb!(env.main, bb);
   let jump = new_value!(env.main).jump(bb);
