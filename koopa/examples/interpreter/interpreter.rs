@@ -1,8 +1,3 @@
-// Use `Vec<Box<T>>` to prevent reallocation.
-#![allow(clippy::vec_box)]
-// For convenience.
-#![allow(clippy::borrowed_box)]
-
 use super::ext_funcs::ExternFuncs;
 use koopa::back::{NameManager, Visitor};
 use koopa::ir::entities::ValueData;
@@ -11,6 +6,7 @@ use koopa::ir::values::*;
 use koopa::ir::{BasicBlock, BinaryOp, FunctionData, Program, Type, TypeKind, Value, ValueKind};
 use std::collections::HashMap;
 use std::io::{Error, Result, Write};
+use std::pin::Pin;
 use std::ptr::{NonNull, null};
 
 pub fn new_error(message: &str) -> Error {
@@ -40,7 +36,7 @@ impl<W: Write> Visitor<W> for Interpreter {
 
 struct InterpreterImpl<'a> {
   program: &'a Program,
-  global_allocs: Vec<Box<Val>>,
+  global_allocs: Vec<Pin<Box<Val>>>,
   vars: HashMap<*const ValueData, Val>,
   envs: Vec<Environment<'a>>,
   ext_funcs: ExternFuncs,
@@ -82,10 +78,10 @@ impl<'a> InterpreterImpl<'a> {
       match value.kind() {
         ValueKind::GlobalAlloc(ga) => {
           let val = self.eval_global_const(&self.program.borrow_value(ga.init()));
-          self.global_allocs.push(Box::new(val));
+          self.global_allocs.push(Pin::new(Box::new(val)));
           self.vars.insert(
             &value as &ValueData,
-            Val::new_val_pointer(self.global_allocs.last()),
+            Val::new_val_pointer(self.global_allocs.last().map(|v| &**v)),
           );
         }
         _ => panic!("invalid global variable"),
@@ -229,10 +225,12 @@ impl<'a> InterpreterImpl<'a> {
       _ => panic!("invalid pointer type"),
     };
     let env = self.envs.last_mut().unwrap();
-    env.allocs.push(Box::new(Self::new_zeroinit(base)));
+    env
+      .allocs
+      .push(Pin::new(Box::new(Self::new_zeroinit(base))));
     env
       .vals
-      .insert(inst, Val::new_val_pointer(env.allocs.last()));
+      .insert(inst, Val::new_val_pointer(env.allocs.last().map(|v| &**v)));
   }
 
   fn eval_load(&mut self, inst: &ValueData, load: &Load) -> Result<()> {
@@ -398,7 +396,7 @@ impl<'a> InterpreterImpl<'a> {
 
 struct Environment<'a> {
   func: &'a FunctionData,
-  allocs: Vec<Box<Val>>,
+  allocs: Vec<Pin<Box<Val>>>,
   vals: HashMap<*const ValueData, Val>,
 }
 
@@ -429,15 +427,15 @@ pub enum Val {
 }
 
 impl Val {
-  fn new_val_pointer(parent: Option<&Box<Val>>) -> Self {
+  fn new_val_pointer(parent: Option<&Val>) -> Self {
     Self::Pointer {
-      ptr: parent.map(|p| unsafe { NonNull::new_unchecked(p.as_ref() as *const Val as *mut Val) }),
+      ptr: parent.map(|p| unsafe { NonNull::new_unchecked(p as *const Val as *mut Val) }),
       index: 0,
       len: 0,
     }
   }
 
-  fn new_array_pointer(arr: &Box<[Val]>) -> Self {
+  fn new_array_pointer(arr: &[Val]) -> Self {
     Self::Pointer {
       ptr: Some(unsafe { NonNull::new_unchecked(arr.as_ptr() as *mut Val) }),
       index: 0,
