@@ -460,8 +460,9 @@ impl ValueData {
   /// Panics if the given name (if exists) not starts with `%` or `@`.
   pub(in crate::ir) fn set_name(&mut self, name: Option<String>) {
     assert!(
-      name.as_ref().map_or(true, |n| n.len() > 1
-        && (n.starts_with('%') || n.starts_with('@'))),
+      name
+        .as_ref()
+        .is_none_or(|n| n.len() > 1 && (n.starts_with('%') || n.starts_with('@'))),
       "invalid value name"
     );
     self.name = name;

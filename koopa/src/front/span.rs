@@ -111,12 +111,13 @@ impl Span {
   const TAB_WIDTH: usize = 2;
 
   thread_local! {
-    #[allow(clippy::missing_const_for_thread_local)]
-    static STATE: RefCell<GlobalState> = RefCell::new(GlobalState {
-      file: FileType::Buffer,
-      err_num: 0,
-      warn_num: 0,
-    });
+    static STATE: RefCell<GlobalState> = const {
+      RefCell::new(GlobalState {
+        file: FileType::Buffer,
+        err_num: 0,
+        warn_num: 0,
+      })
+    };
   }
 
   /// Creates a new span from [`Pos`].
@@ -323,15 +324,16 @@ impl Span {
   #[cfg(not(feature = "no-front-logger"))]
   fn print_file_info(&self, file: &FileType, color: Color) {
     eprintln!("  {} {}:{}", "at".blue(), file, self.start);
-    if self.start.col > 0 && self.end.col > 0 {
-      if let FileType::File(path) = file {
-        // open file and get lines
-        let mut lines = BufReader::new(File::open(path).unwrap()).lines();
-        if self.start.line == self.end.line {
-          self.print_single_line_info(&mut lines, color);
-        } else {
-          self.print_multi_line_info(&mut lines, color);
-        }
+    if self.start.col > 0
+      && self.end.col > 0
+      && let FileType::File(path) = file
+    {
+      // open file and get lines
+      let mut lines = BufReader::new(File::open(path).unwrap()).lines();
+      if self.start.line == self.end.line {
+        self.print_single_line_info(&mut lines, color);
+      } else {
+        self.print_multi_line_info(&mut lines, color);
       }
     }
     eprintln!();

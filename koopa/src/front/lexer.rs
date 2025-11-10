@@ -33,7 +33,7 @@ impl<T: Read> Lexer<T> {
   /// Returns the next token from file, or a lexer error.
   pub fn next_token(&mut self) -> Result {
     // skip spaces
-    while self.last_char.map_or(false, |c| c.is_whitespace()) {
+    while self.last_char.is_some_and(|c| c.is_whitespace()) {
       self.next_char()?;
     }
     // check the last character
@@ -88,7 +88,7 @@ impl<T: Read> Lexer<T> {
     // read to string
     let mut num = String::from(self.last_char.unwrap());
     self.next_char()?;
-    while self.last_char.map_or(false, |c| c.is_numeric()) {
+    while self.last_char.is_some_and(|c| c.is_numeric()) {
       num.push(self.last_char.unwrap());
       span.update(self.pos);
       self.next_char()?;
@@ -109,7 +109,7 @@ impl<T: Read> Lexer<T> {
     let mut symbol = String::from(tag);
     self.next_char()?;
     // check if number
-    if self.last_char.map_or(false, |c| c.is_numeric()) {
+    if self.last_char.is_some_and(|c| c.is_numeric()) {
       // check if is named symbol
       if tag == '@' {
         return self.log_err_and_skip(span, "invalid named symbol");
@@ -121,7 +121,7 @@ impl<T: Read> Lexer<T> {
       self.next_char()?;
       if digit != '0' {
         // read the rest numbers to string
-        while self.last_char.map_or(false, |c| c.is_numeric()) {
+        while self.last_char.is_some_and(|c| c.is_numeric()) {
           symbol.push(self.last_char.unwrap());
           span.update(self.pos);
           self.next_char()?;
@@ -131,7 +131,7 @@ impl<T: Read> Lexer<T> {
       // read letters, numbers or underscores
       while self
         .last_char
-        .map_or(false, |c| c.is_alphanumeric() || c == '_')
+        .is_some_and(|c| c.is_alphanumeric() || c == '_')
       {
         symbol.push(self.last_char.unwrap());
         span.update(self.pos);
@@ -151,7 +151,7 @@ impl<T: Read> Lexer<T> {
     let mut span = Span::new(self.pos);
     // read to string
     let mut keyword = String::new();
-    while self.last_char.map_or(false, |c| c.is_alphanumeric()) {
+    while self.last_char.is_some_and(|c| c.is_alphanumeric()) {
       keyword.push(self.last_char.unwrap());
       span.update(self.pos);
       self.next_char()?;
@@ -176,7 +176,7 @@ impl<T: Read> Lexer<T> {
       self.handle_block_comment(span)
     } else if self.last_char == Some('/') {
       // skip the current line
-      while self.last_char.map_or(false, |c| c != '\r' && c != '\n') {
+      while self.last_char.is_some_and(|c| c != '\r' && c != '\n') {
         self.next_char()?;
       }
       // return the next token
@@ -210,7 +210,7 @@ impl<T: Read> Lexer<T> {
   ///
   /// For error recovery support.
   fn log_err_and_skip(&mut self, span: Span, message: &str) -> Result {
-    while self.last_char.map_or(false, |c| !c.is_whitespace()) {
+    while self.last_char.is_some_and(|c| !c.is_whitespace()) {
       self.next_char()?;
     }
     return_error!(span, "{}", message)
