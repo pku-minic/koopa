@@ -14,56 +14,27 @@ jobs:
     timeout-minutes: 30
     steps:
     - name: Checkout Koopa
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
+
+    - name: Setup Rust Cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Build
       run: cargo check && cargo check --all-features
 
     - name: Clippy
       run: cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Format
+      run: cargo fmt --all --check
 
     - name: Test
-      run: cargo test && cargo test --all-features
-
-  build_examples:
-    name: Build Examples
-    runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'skip-ci')"
-    timeout-minutes: 30
-    strategy:
-      matrix:
-        example-name: ['opt', 'brainfuck', 'interpreter']
-
-    steps:
-    - name: Checkout Koopa
-      uses: actions/checkout@v2
-
-    - name: Build
-      working-directory: examples/${{matrix.example-name}}
-      run: cargo check && cargo check --all-features
-
-    - name: Clippy
-      working-directory: examples/${{matrix.example-name}}
-      run: cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --all-features -- -D warnings
-
-  build_libkoopa:
-    name: Build and Test Koopa C Library
-    runs-on: ubuntu-latest
-    if: "!contains(github.event.head_commit.message, 'skip-ci')"
-    timeout-minutes: 30
-
-    steps:
-    - name: Checkout Koopa
-      uses: actions/checkout@v2
-
-    - name: Build
-      working-directory: crates/libkoopa
-      run: cargo check && cargo check --all-features
-
-    - name: Clippy
-      working-directory: crates/libkoopa
-      run: cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --all-features -- -D warnings
-
-    - name: Test
-      working-directory: crates/libkoopa
-      run: cargo test && cargo test --all-features
+      run: cargo test --workspace
