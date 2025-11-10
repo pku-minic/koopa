@@ -20,4 +20,4 @@ panic = 'abort'
 panic = 'abort'
 
 [dependencies]
-koopa = { path = "../.." }
+koopa = { path = "../koopa" }

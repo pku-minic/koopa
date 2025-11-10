@@ -1,33 +1,3 @@
-[package]
-name = "koopa"
-version = "0.0.8"
-authors = ["MaxXing <x@MaxXSoft.net>"]
-edition = "2024"
-description = "Library for generating/parsing/optimizing Koopa IR."
-readme = "README.md"
-repository = "https://github.com/pku-minic/koopa"
-documentation = "https://docs.rs/koopa"
-license = "GPL-3.0"
-keywords = ["compiler", "ir"]
-exclude = ["/.github", "/crates"]
-
-[features]
-# disables the front-end logger, returns error messages as strings
-no-front-logger = []
-
-[dependencies]
-key-node-list = "0.0.6"
-colored = "3"
-phf = { version = "0.13.1", features = ["macros"] }
-
-[dev-dependencies]
-libloading = "0.9"
-
-[[example]]
-name = "opt"
-
-[[example]]
-name = "brainfuck"
-
-[[example]]
-name = "interpreter"
+[workspace]
+resolver = "2"
+members = ["koopa", "libkoopa"]
