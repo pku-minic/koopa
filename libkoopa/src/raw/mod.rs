@@ -134,27 +134,24 @@ fun @main(): i32 {
   #[test]
   fn test_raw_generator_loop() {
     let program = build_and_generate(LOOP_PROGRAM);
-    let mut gen = KoopaGenerator::new(Vec::new());
-    gen.generate_on(&program).unwrap();
-    assert_eq!(std::str::from_utf8(&gen.writer()).unwrap(), LOOP_PROGRAM);
+    let mut g = KoopaGenerator::new(Vec::new());
+    g.generate_on(&program).unwrap();
+    assert_eq!(std::str::from_utf8(&g.writer()).unwrap(), LOOP_PROGRAM);
   }
 
   #[test]
   fn test_raw_generator_recursive() {
     let program = build_and_generate(RECURSIVE_PROGRAM);
-    let mut gen = KoopaGenerator::new(Vec::new());
-    gen.generate_on(&program).unwrap();
-    assert_eq!(
-      std::str::from_utf8(&gen.writer()).unwrap(),
-      RECURSIVE_PROGRAM
-    );
+    let mut g = KoopaGenerator::new(Vec::new());
+    g.generate_on(&program).unwrap();
+    assert_eq!(std::str::from_utf8(&g.writer()).unwrap(), RECURSIVE_PROGRAM);
   }
 
   #[test]
   fn test_raw_generator_alloc() {
     let program = build_and_generate(ALLOC_PROGRAM);
-    let mut gen = KoopaGenerator::new(Vec::new());
-    gen.generate_on(&program).unwrap();
-    assert_eq!(std::str::from_utf8(&gen.writer()).unwrap(), ALLOC_PROGRAM);
+    let mut g = KoopaGenerator::new(Vec::new());
+    g.generate_on(&program).unwrap();
+    assert_eq!(std::str::from_utf8(&g.writer()).unwrap(), ALLOC_PROGRAM);
   }
 }
