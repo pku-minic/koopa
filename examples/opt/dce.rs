@@ -1,4 +1,4 @@
-use koopa::ir::{builder_traits::*, Function, FunctionData, Value, ValueKind};
+use koopa::ir::{Function, FunctionData, Value, ValueKind, builder_traits::*};
 use koopa::opt::FunctionPass;
 use std::collections::{HashMap, HashSet};
 

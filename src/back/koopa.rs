@@ -372,11 +372,9 @@ fun @test(@i: i32): i32 {
 }
 "#;
     let driver: Driver<_> = src.into();
-    let mut gen = KoopaGenerator::new(Vec::new());
-    gen
-      .generate_on(&driver.generate_program().unwrap())
-      .unwrap();
-    assert_eq!(str::from_utf8(&gen.writer()).unwrap(), src);
+    let mut g = KoopaGenerator::new(Vec::new());
+    g.generate_on(&driver.generate_program().unwrap()).unwrap();
+    assert_eq!(str::from_utf8(&g.writer()).unwrap(), src);
   }
 
   #[test]
@@ -402,11 +400,9 @@ fun @main(): i32 {
 }
 "#;
     let driver: Driver<_> = src.into();
-    let mut gen = KoopaGenerator::new(Vec::new());
-    gen
-      .generate_on(&driver.generate_program().unwrap())
-      .unwrap();
-    assert_eq!(str::from_utf8(&gen.writer()).unwrap(), src);
+    let mut g = KoopaGenerator::new(Vec::new());
+    g.generate_on(&driver.generate_program().unwrap()).unwrap();
+    assert_eq!(str::from_utf8(&g.writer()).unwrap(), src);
   }
 
   #[test]
@@ -445,10 +441,8 @@ fun @main(): i32 {
 }
 "#;
     let driver: Driver<_> = src.into();
-    let mut gen = KoopaGenerator::new(Vec::new());
-    gen
-      .generate_on(&driver.generate_program().unwrap())
-      .unwrap();
-    assert_eq!(str::from_utf8(&gen.writer()).unwrap(), src);
+    let mut g = KoopaGenerator::new(Vec::new());
+    g.generate_on(&driver.generate_program().unwrap()).unwrap();
+    assert_eq!(str::from_utf8(&g.writer()).unwrap(), src);
   }
 }

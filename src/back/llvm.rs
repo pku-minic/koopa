@@ -532,12 +532,10 @@ mod test {
       }
     "#
     .into();
-    let mut gen = LlvmGenerator::new(Vec::new());
-    gen
-      .generate_on(&driver.generate_program().unwrap())
-      .unwrap();
+    let mut g = LlvmGenerator::new(Vec::new());
+    g.generate_on(&driver.generate_program().unwrap()).unwrap();
     assert_eq!(
-      str::from_utf8(&gen.writer()).unwrap(),
+      str::from_utf8(&g.writer()).unwrap(),
       r#"@x = global [10 x i32] zeroinitializer
 
 define i32 @test(i32 %i) {
@@ -577,11 +575,9 @@ $entry:
       }
     "#
     .into();
-    let mut gen = LlvmGenerator::new(Vec::new());
-    gen
-      .generate_on(&driver.generate_program().unwrap())
-      .unwrap();
-    let ans = str::from_utf8(&gen.writer()).unwrap().to_string();
+    let mut g = LlvmGenerator::new(Vec::new());
+    g.generate_on(&driver.generate_program().unwrap()).unwrap();
+    let ans = str::from_utf8(&g.writer()).unwrap().to_string();
     println!("{}", ans);
     assert_eq!(
       remove_phi(ans),
@@ -648,11 +644,9 @@ fun @main(): i32 {
 }
 "#;
     let driver: Driver<_> = src.into();
-    let mut gen = LlvmGenerator::new(Vec::new());
-    gen
-      .generate_on(&driver.generate_program().unwrap())
-      .unwrap();
-    let ans = str::from_utf8(&gen.writer()).unwrap().to_string();
+    let mut g = LlvmGenerator::new(Vec::new());
+    g.generate_on(&driver.generate_program().unwrap()).unwrap();
+    let ans = str::from_utf8(&g.writer()).unwrap().to_string();
     println!("{}", ans);
     assert_eq!(
       remove_phi(ans),
@@ -722,12 +716,10 @@ $while_end_5:
       }
     "#
     .into();
-    let mut gen = LlvmGenerator::new(Vec::new());
-    gen
-      .generate_on(&driver.generate_program().unwrap())
-      .unwrap();
+    let mut g = LlvmGenerator::new(Vec::new());
+    g.generate_on(&driver.generate_program().unwrap()).unwrap();
     assert_eq!(
-      str::from_utf8(&gen.writer()).unwrap(),
+      str::from_utf8(&g.writer()).unwrap(),
       r#"@_0 = global i32 0
 @$_0 = global i32 1
 @$0 = global i32 2

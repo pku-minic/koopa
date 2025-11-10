@@ -1,4 +1,4 @@
-use koopa::ir::{builder_traits::*, BinaryOp, Function, FunctionData, Type, ValueKind};
+use koopa::ir::{BinaryOp, Function, FunctionData, Type, ValueKind, builder_traits::*};
 use koopa::opt::FunctionPass;
 
 /// Performs constant folding.

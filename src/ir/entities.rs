@@ -4,8 +4,8 @@
 
 use crate::ir::builder::GlobalBuilder;
 use crate::ir::dfg::DataFlowGraph;
-use crate::ir::idman::{is_global_id, next_func_id, next_global_value_id};
 use crate::ir::idman::{BasicBlockId, FunctionId, ValueId};
+use crate::ir::idman::{is_global_id, next_func_id, next_global_value_id};
 use crate::ir::layout::Layout;
 use crate::ir::types::Type;
 use crate::ir::values;
@@ -45,7 +45,7 @@ impl Program {
 
   /// Creates a new global value in the current program.
   /// Returns a [`GlobalBuilder`] for building the new global value.
-  pub fn new_value(&mut self) -> GlobalBuilder {
+  pub fn new_value(&mut self) -> GlobalBuilder<'_> {
     GlobalBuilder { program: self }
   }
 
@@ -105,7 +105,7 @@ impl Program {
   }
 
   /// Immutably borrows the global value map.
-  pub fn borrow_values(&self) -> Ref<HashMap<Value, ValueData>> {
+  pub fn borrow_values(&self) -> Ref<'_, HashMap<Value, ValueData>> {
     self.values.borrow()
   }
 
@@ -119,7 +119,7 @@ impl Program {
   /// # Panics
   ///
   /// Panics if the given value does not exist.
-  pub fn borrow_value(&self, value: Value) -> Ref<ValueData> {
+  pub fn borrow_value(&self, value: Value) -> Ref<'_, ValueData> {
     Ref::map(self.values.borrow(), |m| {
       m.get(&value).expect("`value` does not exist")
     })
@@ -536,7 +536,7 @@ pub enum ValueKind {
 
 impl ValueKind {
   /// Returns an iterator of all values that used by the `ValueKind`.
-  pub fn value_uses(&self) -> ValueUses {
+  pub fn value_uses(&self) -> ValueUses<'_> {
     ValueUses {
       kind: self,
       index: 0,
@@ -544,7 +544,7 @@ impl ValueKind {
   }
 
   /// Returns an iterator of all basic blocks that used by the `ValueKind`.
-  pub fn bb_uses(&self) -> BasicBlockUses {
+  pub fn bb_uses(&self) -> BasicBlockUses<'_> {
     BasicBlockUses {
       kind: self,
       index: 0,

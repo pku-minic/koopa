@@ -2,10 +2,10 @@
 //! related implementations.
 
 use crate::ir::entities::{BasicBlock, Value};
-use key_node_list::{impl_node, KeyNodeList, Map};
+use key_node_list::{KeyNodeList, Map, impl_node};
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 use std::hash::Hash;
 use std::rc::{Rc, Weak};
 
