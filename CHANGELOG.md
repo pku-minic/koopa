@@ -8,6 +8,8 @@ All notable changes to the Koopa will be documented in this file.
 
 * Used `phf::Map` instead of `HashMap` in lexer to reduce usage of TLS.
 * Replaced all `Cell`ed-integers with atomic integers.
+* Bumped to Rust 2024 edition.
+* Updated dependencies.
 
 ## 0.0.8 - 2024-11-30
 
