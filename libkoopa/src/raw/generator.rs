@@ -124,7 +124,7 @@ impl<T: Pointer> Iterator for RawSliceIter<'_, T> {
 
 impl RawSlice {
   /// Returns an type iterator of this slice.
-  fn types(&self) -> Result<RawSliceIter<RawType>> {
+  fn types(&self) -> Result<RawSliceIter<'_, RawType>> {
     match self.kind {
       RawSliceItemKind::Type => Ok(RawSliceIter::<RawType> {
         slice: self,
@@ -136,7 +136,7 @@ impl RawSlice {
   }
 
   /// Returns an function iterator of this slice.
-  fn funcs(&self) -> Result<RawSliceIter<RawFunction>> {
+  fn funcs(&self) -> Result<RawSliceIter<'_, RawFunction>> {
     match self.kind {
       RawSliceItemKind::Function => Ok(RawSliceIter::<RawFunction> {
         slice: self,
@@ -148,7 +148,7 @@ impl RawSlice {
   }
 
   /// Returns an basic block iterator of this slice.
-  fn bbs(&self) -> Result<RawSliceIter<RawBasicBlock>> {
+  fn bbs(&self) -> Result<RawSliceIter<'_, RawBasicBlock>> {
     match self.kind {
       RawSliceItemKind::BasicBlock => Ok(RawSliceIter::<RawBasicBlock> {
         slice: self,
@@ -160,7 +160,7 @@ impl RawSlice {
   }
 
   /// Returns an value iterator of this slice.
-  fn values(&self) -> Result<RawSliceIter<RawValue>> {
+  fn values(&self) -> Result<RawSliceIter<'_, RawValue>> {
     match self.kind {
       RawSliceItemKind::Value => Ok(RawSliceIter::<RawValue> {
         slice: self,

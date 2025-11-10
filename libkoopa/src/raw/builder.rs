@@ -28,7 +28,7 @@ impl RawProgramBuilder {
   }
 
   /// Builds on the given Koopa IR program.
-  pub fn build_on(&mut self, program: &Program) -> RawProgram {
+  pub fn build_on(&mut self, program: &Program) -> RawProgram<'_> {
     let mut info = ProgramInfo::new(program);
     let raw = RawProgram {
       values: iter_into_raw(program.inst_layout().iter(), self, &mut info),

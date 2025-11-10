@@ -1,5 +1,5 @@
 use crate::errors::ErrorCode;
-use crate::raw::{generate_program, RawProgram, RawProgramBuilder};
+use crate::raw::{RawProgram, RawProgramBuilder, generate_program};
 use crate::utils::{drop_pointer, ffi, new_pointer};
 use koopa::ir::Program;
 
@@ -16,7 +16,7 @@ ffi! {
   /// The `builder` must be a valid raw program builder returned by
   /// Koopa IR library functions.
   unsafe fn koopa_delete_raw_program_builder(builder: *mut RawProgramBuilder) {
-    drop_pointer(builder);
+    unsafe { drop_pointer(builder) };
   }
 
   /// Builds a raw program of the given Koopa IR program
