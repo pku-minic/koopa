@@ -28,12 +28,12 @@ You will see:
 
 ```
     Finished dev [unoptimized + debuginfo] target(s) in 0.11s
-     Running `target/debug/brainfuck -ll`
+     Running `target/debug/examples/brainfuck -ll`
 Hello Koopa!
 ```
 
 Alternatively, you can read the input brainfuck program from file:
 
 ```sh
-cargo run --example brainfuck -- -i examples/brainfuck/pi.bf -ll | opt -O3 -S | lli
+cargo run --example brainfuck -- -i koopa/examples/brainfuck/pi.bf -ll | opt -O3 -S | lli
 ```
