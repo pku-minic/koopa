@@ -1,7 +1,7 @@
 use super::interpreter::{Val, new_error};
 use koopa::ir::{FunctionData, Type, TypeKind};
 use libloading::{Error, Library, Symbol};
-use std::ffi::{CString, OsStr};
+use std::ffi::CString;
 use std::io::Result as IoResult;
 use std::mem::transmute;
 use std::ptr::NonNull;
@@ -11,7 +11,7 @@ pub struct ExternFuncs {
 }
 
 impl ExternFuncs {
-  pub unsafe fn new<T: AsRef<OsStr>>(lib_files: &[T]) -> Result<Self, Error> {
+  pub unsafe fn new(lib_files: &[String]) -> Result<Self, Error> {
     Ok(Self {
       libs: lib_files
         .iter()
