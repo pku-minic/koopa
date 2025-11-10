@@ -59,7 +59,7 @@ impl DataFlowGraph {
 
   /// Creates a new value in the current data flow graph.
   /// Returns a [`LocalBuilder`] for building the new local value.
-  pub fn new_value(&mut self) -> LocalBuilder {
+  pub fn new_value(&mut self) -> LocalBuilder<'_> {
     LocalBuilder { dfg: self }
   }
 
@@ -87,7 +87,7 @@ impl DataFlowGraph {
   /// # Panics
   ///
   /// Panics if the given value does not exist.
-  pub fn replace_value_with(&mut self, value: Value) -> ReplaceBuilder {
+  pub fn replace_value_with(&mut self, value: Value) -> ReplaceBuilder<'_> {
     ReplaceBuilder { dfg: self, value }
   }
 
@@ -216,7 +216,7 @@ impl DataFlowGraph {
 
   /// Creates a new basic block in the current data flow graph.
   /// Returns a [`BlockBuilder`] for building the new basic block.
-  pub fn new_bb(&mut self) -> BlockBuilder {
+  pub fn new_bb(&mut self) -> BlockBuilder<'_> {
     BlockBuilder { dfg: self }
   }
 

@@ -4,7 +4,7 @@ mod interpreter;
 use interpreter::Interpreter;
 use koopa::back::Generator;
 use koopa::front::Driver;
-use std::io::{sink, stdin, Error};
+use std::io::{Error, sink, stdin};
 use std::{env, fmt, process, result};
 
 fn main() {

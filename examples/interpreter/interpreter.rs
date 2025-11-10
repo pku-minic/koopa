@@ -11,7 +11,7 @@ use koopa::ir::values::*;
 use koopa::ir::{BasicBlock, BinaryOp, FunctionData, Program, Type, TypeKind, Value, ValueKind};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result, Write};
-use std::ptr::{null, NonNull};
+use std::ptr::{NonNull, null};
 
 pub fn new_error(message: &str) -> Error {
   Error::new(ErrorKind::Other, message)

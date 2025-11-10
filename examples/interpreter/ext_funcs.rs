@@ -1,4 +1,4 @@
-use super::interpreter::{new_error, Val};
+use super::interpreter::{Val, new_error};
 use koopa::ir::{FunctionData, Type, TypeKind};
 use libloading::{Error, Library, Symbol};
 use std::ffi::{CString, OsStr};
@@ -15,7 +15,7 @@ impl ExternFuncs {
     Ok(Self {
       libs: lib_files
         .iter()
-        .map(|f| Library::new(f))
+        .map(|f| unsafe { Library::new(f) })
         .collect::<Result<_, _>>()?,
     })
   }
@@ -35,9 +35,9 @@ impl ExternFuncs {
     let sym = self
       .libs
       .iter()
-      .find_map(|l| l.get(sym_name.to_bytes_with_nul()).ok())
+      .find_map(|l| unsafe { l.get(sym_name.to_bytes_with_nul()) }.ok())
       .ok_or_else(|| new_error(&format!("external function '{}' not found", name)))?;
-    Self::call_ext_func(sym, args, ret_ty)
+    unsafe { Self::call_ext_func(sym, args, ret_ty) }
   }
 
   unsafe fn call_ext_func(
@@ -48,7 +48,7 @@ impl ExternFuncs {
     macro_rules! call_func_ptr {
       ($fp:expr, $args:expr, $($ty:ident)*) => {
         call_func_ptr!(@args
-          transmute::<*const (), unsafe extern "C" fn($(call_func_ptr!(@subst $ty)),*) -> usize>($fp),
+          transmute::<_, unsafe extern "C" fn($(call_func_ptr!(@subst $ty)),*) -> usize>($fp),
           $args, 0, () $(,$ty)*
         )
       };
@@ -62,7 +62,7 @@ impl ExternFuncs {
         )
       };
       (@call $func:expr, $($args:tt)*) => {
-        $func($($args)*)
+        unsafe { $func($($args)*) }
       };
     }
     let func_ptr = *sym.clone();
@@ -99,7 +99,7 @@ impl ExternFuncs {
       _ => {
         return Err(new_error(
           "argument number exceeded in external function call",
-        ))
+        ));
       }
     };
     Self::usize_to_val(ret, ret_ty)
