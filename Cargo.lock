@@ -40,6 +40,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "libkoopa"
+version = "0.0.8"
+dependencies = [
+ "koopa",
+]
+
+[[package]]
 name = "libloading"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
