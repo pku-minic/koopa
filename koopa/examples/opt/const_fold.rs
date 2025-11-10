@@ -96,7 +96,7 @@ impl ConstantFolding {
           };
           // check if is constant
           let value = data.dfg().value(value);
-          if !value.kind().is_const() || !ans.map_or(true, |v| data.dfg().data_eq(&v, value)) {
+          if !value.kind().is_const() || !ans.is_none_or(|v| data.dfg().data_eq(&v, value)) {
             continue 'outer;
           }
           ans = Some(value.clone());

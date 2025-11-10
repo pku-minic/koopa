@@ -48,7 +48,7 @@ impl ExternFuncs {
     macro_rules! call_func_ptr {
       ($fp:expr, $args:expr, $($ty:ident)*) => {
         call_func_ptr!(@args
-          transmute::<_, unsafe extern "C" fn($(call_func_ptr!(@subst $ty)),*) -> usize>($fp),
+          transmute::<*const (), unsafe extern "C" fn($(call_func_ptr!(@subst $ty)),*) -> usize>($fp),
           $args, 0, () $(,$ty)*
         )
       };

@@ -327,7 +327,7 @@ pub trait LocalInstBuilder: ValueBuilder {
   /// Panics if the value type (if value is not `None`) is a unit type.
   fn ret(mut self, value: Option<Value>) -> Value {
     assert!(
-      value.map_or(true, |v| !self.value_type(v).is_unit()),
+      value.is_none_or(|v| !self.value_type(v).is_unit()),
       "the type of `value` must not be `unit`"
     );
     self.insert_value(Return::new_data(value))
@@ -424,8 +424,9 @@ fn check_bb_arg_types(querier: &impl EntityInfoQuerier, params: &[Value], args: 
 /// Panics if the given name (if exists) not starts with `%` or `@`.
 fn check_bb_name(name: &Option<String>) {
   assert!(
-    name.as_ref().map_or(true, |n| n.len() > 1
-      && (n.starts_with('%') || n.starts_with('@'))),
+    name
+      .as_ref()
+      .is_none_or(|n| n.len() > 1 && (n.starts_with('%') || n.starts_with('@'))),
     "invalid basic block name"
   );
 }

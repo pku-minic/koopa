@@ -13,12 +13,12 @@ pub(in crate::ir) type ValueId = NonZeroU32;
 /// The value of `ValueId` (global value) should start from 1,
 /// because we want to use `NonZeroU32` to enable some
 /// memory layout optimization.
-const GLOBAL_VALUE_ID_STARTS_FROM: ValueId = unsafe { NonZeroU32::new_unchecked(1) };
+const GLOBAL_VALUE_ID_STARTS_FROM: ValueId = NonZeroU32::new(1).unwrap();
 
 /// The value of `ValueId` (local value) should start from 0x40000000,
 /// because we want to use `NonZeroU32` to enable some
 /// memory layout optimization.
-const LOCAL_VALUE_ID_STARTS_FROM: ValueId = unsafe { NonZeroU32::new_unchecked(0x40000000) };
+const LOCAL_VALUE_ID_STARTS_FROM: ValueId = NonZeroU32::new(0x40000000).unwrap();
 
 /// Type of `BasicBlock` identifier.
 ///
@@ -28,7 +28,7 @@ pub(in crate::ir) type BasicBlockId = NonZeroU32;
 /// The value of `BasicBlockId` should start from 1,
 /// because we want to use `NonZeroU32` to enable some
 /// memory layout optimization.
-const BB_ID_STARTS_FROM: BasicBlockId = unsafe { NonZeroU32::new_unchecked(1) };
+const BB_ID_STARTS_FROM: BasicBlockId = NonZeroU32::new(1).unwrap();
 
 /// Type of `Function` identifier.
 ///
@@ -38,7 +38,7 @@ pub(in crate::ir) type FunctionId = NonZeroU32;
 /// The value of `FunctionId` should start from 1,
 /// because we want to use `NonZeroU32` to enable some
 /// memory layout optimization.
-const FUNC_ID_STARTS_FROM: FunctionId = unsafe { NonZeroU32::new_unchecked(1) };
+const FUNC_ID_STARTS_FROM: FunctionId = NonZeroU32::new(1).unwrap();
 
 /// Returns the next global value ID.
 pub(in crate::ir) fn next_global_value_id() -> ValueId {
