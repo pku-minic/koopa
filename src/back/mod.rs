@@ -32,9 +32,9 @@
 //! main_data.layout_mut().bb_mut(bb).insts_mut().extend([add, ret]);
 //!
 //! // convert to text form
-//! let mut gen = KoopaGenerator::new(Vec::new());
-//! gen.generate_on(&program).unwrap();
-//! let text_form_ir = std::str::from_utf8(&gen.writer()).unwrap().to_string();
+//! let mut g = KoopaGenerator::new(Vec::new());
+//! g.generate_on(&program).unwrap();
+//! let text_form_ir = std::str::from_utf8(&g.writer()).unwrap().to_string();
 //! println!("{}", text_form_ir);
 //! ```
 //!
@@ -46,8 +46,8 @@
 //!
 //! # fn main() -> std::io::Result<()> {
 //! # let program = koopa::ir::Program::new();
-//! let mut gen = LlvmGenerator::from_path("/path/to/the/output/file")?;
-//! gen.generate_on(&program).unwrap();
+//! let mut g = LlvmGenerator::from_path("/path/to/the/output/file")?;
+//! g.generate_on(&program).unwrap();
 //! # Ok(())
 //! # }
 //! ```
