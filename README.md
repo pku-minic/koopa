@@ -61,11 +61,11 @@ For more details, see [the document of Koopa IR](https://pku-minic.github.io/onl
 
 ## Examples
 
-See the [`examples` directory](examples), which contains three examples:
+See the [`examples` directory](koopa/examples), which contains three examples:
 
-* [`opt`](examples/opt): a simple Koopa IR optimizer.
-* [`brainfuck`](examples/brainfuck): a brainfuck to Koopa IR compiler.
-* [`interpreter`](examples/interpreter): a simple Koopa IR interpreter.
+* [`opt`](koopa/examples/opt): a simple Koopa IR optimizer.
+* [`brainfuck`](koopa/examples/brainfuck): a brainfuck to Koopa IR compiler.
+* [`interpreter`](koopa/examples/interpreter): a simple Koopa IR interpreter.
 
 And there are some more complex examples:
 
