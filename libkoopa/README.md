@@ -2,6 +2,8 @@
 
 C library of the Koopa IR framework.
 
+This library is not intended to be used by Rust code.
+
 ## Building
 
 `libkoopa` must be built with `panic = abort` to prevent unwinding across the FFI boundary.
