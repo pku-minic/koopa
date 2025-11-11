@@ -31,7 +31,7 @@ checksum = "b44fd3cac52c8507289d366d162a73aeec88f78f9dbacfb847867b7a2c0edfc0"
 
 [[package]]
 name = "koopa"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "colored",
  "key-node-list",
@@ -41,7 +41,7 @@ dependencies = [
 
 [[package]]
 name = "libkoopa"
-version = "0.0.8"
+version = "0.0.9"
 dependencies = [
  "koopa",
 ]

@@ -1,6 +1,6 @@
 [package]
 name = "koopa"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["MaxXing <x@MaxXSoft.net>"]
 edition = "2024"
 description = "Library for generating/parsing/optimizing Koopa IR."

@@ -1,6 +1,6 @@
 [package]
 name = "libkoopa"
-version = "0.0.8"
+version = "0.0.9"
 authors = ["MaxXing <x@MaxXSoft.net>"]
 edition = "2024"
 description = "C library of the Koopa IR framework."
