@@ -510,8 +510,8 @@ koopa_error_code_t koopa_dump_to_file(koopa_program_t program,
 ///
 /// Returns the error code.
 ///
-koopa_error_code_t koopa_dump_to_string(koopa_program_t program,
-                                        char *buffer, size_t *len);
+koopa_error_code_t koopa_dump_to_string(koopa_program_t program, char *buffer,
+                                        size_t *len);
 
 ///
 /// Generates text-form Koopa IR program to the standard output.
@@ -581,8 +581,8 @@ void koopa_delete_raw_program_builder(koopa_raw_program_builder_t builder);
 /// is still alive (not deleted). The generated raw program should
 /// not be modified manually.
 ///
-koopa_raw_program_t koopa_build_raw_program(
-    koopa_raw_program_builder_t builder, koopa_program_t program);
+koopa_raw_program_t koopa_build_raw_program(koopa_raw_program_builder_t builder,
+                                            koopa_program_t program);
 
 ///
 /// Generates the given raw program to the Koopa IR program.
@@ -590,8 +590,8 @@ koopa_raw_program_t koopa_build_raw_program(
 ///
 /// Returns the error code.
 ///
-koopa_error_code_t koopa_generate_raw_to_koopa(
-    const koopa_raw_program_t *raw, koopa_program_t *program);
+koopa_error_code_t koopa_generate_raw_to_koopa(const koopa_raw_program_t *raw,
+                                               koopa_program_t *program);
 
 #ifdef __cplusplus
 }  // extern "C"

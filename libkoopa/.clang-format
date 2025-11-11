@@ -1,13 +1,6 @@
 # Max's C++ coding style
-# By MaxXing, 2019
+# By MaxXing, 2025
 
 BasedOnStyle: Google
-ColumnLimit: 76
-
-BreakBeforeBraces: Custom
-BraceWrapping:
-  BeforeCatch: true
-  BeforeElse: true
-
 DerivePointerAlignment: false
 PointerAlignment: Right
