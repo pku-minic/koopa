@@ -2,6 +2,12 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## Unreleased
+
+### Fixed
+
+* [Issue #15](https://github.com/pku-minic/koopa/pull/15): Fix example links in documentation.
+
 ## 0.0.9 - 2025-11-11
 
 ### Changed
