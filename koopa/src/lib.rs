@@ -53,14 +53,14 @@
 //!
 //! # Examples
 //!
-//! See the [`examples` directory](https://github.com/pku-minic/koopa/tree/master/examples),
+//! See the [`examples` directory](https://github.com/pku-minic/koopa/tree/master/koopa/examples),
 //! which contains three examples:
 //!
-//! * [`opt`](https://github.com/pku-minic/koopa/tree/master/examples/opt):
+//! * [`opt`](https://github.com/pku-minic/koopa/tree/master/koopa/examples/opt):
 //!   a simple Koopa IR optimizer.
-//! * [`brainfuck`](https://github.com/pku-minic/koopa/tree/master/examples/brainfuck):
+//! * [`brainfuck`](https://github.com/pku-minic/koopa/tree/master/koopa/examples/brainfuck):
 //!   a brainfuck to Koopa IR compiler.
-//! * [`interpreter`](https://github.com/pku-minic/koopa/tree/master/examples/interpreter):
+//! * [`interpreter`](https://github.com/pku-minic/koopa/tree/master/koopa/examples/interpreter):
 //!   a simple Koopa IR interpreter.
 //!
 //! And there are some more complex examples:
