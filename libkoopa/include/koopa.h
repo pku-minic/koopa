@@ -577,7 +577,7 @@ void koopa_delete_raw_program_builder(koopa_raw_program_builder_t builder);
 /// Builds a raw program of the given Koopa IR program
 /// using the given raw program builder.
 ///
-/// The generated raw program is valid iff the raw program builder
+/// The generated raw program is valid if the raw program builder
 /// is still alive (not deleted). The generated raw program should
 /// not be modified manually.
 ///
