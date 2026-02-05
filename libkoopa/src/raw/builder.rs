@@ -4,6 +4,7 @@ use koopa::ir::entities::{BasicBlockData, ValueData};
 use koopa::ir::values::*;
 use koopa::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind};
 use koopa::ir::{BinaryOp, Value, ValueKind};
+use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
@@ -18,7 +19,7 @@ pub struct RawProgramBuilder {
   tys: HashMap<Type, Box<RawTypeKind>>,
   funcs: HashMap<Function, Box<RawFunctionData>>,
   bbs: HashMap<BasicBlock, Box<RawBasicBlockData>>,
-  values: HashMap<Value, Box<RawValueData>>,
+  values: HashMap<Value, Box<UnsafeCell<RawValueData>>>,
 }
 
 impl RawProgramBuilder {
@@ -42,7 +43,7 @@ impl RawProgramBuilder {
       .map(|value| {
         let v: Vec<_> = info.value_used_by[value]
           .iter()
-          .map(|v| self.values[v].as_ref() as RawValue as *const ())
+          .map(|v| self.values[v].get() as *const ())
           .collect();
         let slice = RawSlice {
           buffer: v.as_ptr() as *const c_void,
@@ -54,7 +55,7 @@ impl RawProgramBuilder {
       })
       .collect();
     for (data, slice) in self.values.values_mut().zip(slices.into_iter()) {
-      data.used_by = slice;
+      data.get_mut().used_by = slice;
     }
     raw
   }
@@ -166,9 +167,8 @@ impl BuildRaw for Type {
       t.as_ref()
     } else {
       let kind = Box::new(self.kind().build(builder, info));
-      let raw = kind.as_ref() as RawType;
       builder.tys.insert(self.clone(), kind);
-      raw
+      builder.tys.get(self).unwrap().as_ref()
     }
   }
 }
@@ -267,7 +267,7 @@ impl BuildRaw for Value {
 
   fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(v) = builder.values.get(self) {
-      v.as_ref()
+      v.get() as _
     } else {
       builder.values.insert(*self, unsafe { new_uninit_box() });
       let (v, used_by) = if self.is_global() {
@@ -290,8 +290,8 @@ impl BuildRaw for Value {
       info.value_used_by.insert(*self, used_by);
       // store raw value data
       let vb = builder.values.get_mut(self).unwrap();
-      **vb = v;
-      vb.as_ref()
+      *vb.get_mut() = v;
+      vb.get() as *const RawValueData
     }
   }
 }
