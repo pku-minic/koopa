@@ -130,9 +130,8 @@ impl BuildRaw for str {
       s.as_ptr()
     } else {
       let s = CString::new(self).expect("invalid string");
-      let raw = s.as_ptr();
       builder.strs.insert(self.into(), s);
-      raw
+      builder.strs.get(self).unwrap().as_ptr()
     }
   }
 }
