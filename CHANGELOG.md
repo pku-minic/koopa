@@ -6,7 +6,8 @@ All notable changes to the Koopa will be documented in this file.
 
 ### Fixed
 
-* [Issue #15](https://github.com/pku-minic/koopa/pull/15): Fix example links in documentation.
+* [PR #15](https://github.com/pku-minic/koopa/pull/15): Fix example links in documentation.
+* [PR #18](https://github.com/pku-minic/koopa/pull/18): fix(Miri): get CString pointer after HashMap insert.
 
 ## 0.0.9 - 2025-11-11
 
