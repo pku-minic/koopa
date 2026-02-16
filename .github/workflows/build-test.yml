@@ -13,11 +13,34 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'skip-ci')"
     timeout-minutes: 30
     steps:
-    - name: Checkout Koopa
-      uses: actions/checkout@v4
+    - name: Restore Nightly Toolchain Cache
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          ~/.rustup/toolchains/nightly-*/
+          ~/.rustup/update-hashes/nightly-*/
+        key: ${{ runner.os }}-rust-nightly-
+        restore-keys: ${{ runner.os }}-rust-nightly-
 
-    - name: Setup Rust Cache
-      uses: actions/cache@v3
+    - name: Install Nightly Toolchain and Miri
+      id: rust-nightly
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: miri
+
+    - name: Save Nightly Toolchain Cache
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          ~/.rustup/toolchains/nightly-*/
+          ~/.rustup/update-hashes/nightly-*/
+        key: ${{ runner.os }}-rust-nightly-${{ steps.rust-nightly.outputs.cachekey }}
+
+    - name: Checkout Koopa
+      uses: actions/checkout@v6
+
+    - name: Setup Cargo Cache
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/bin/
@@ -38,3 +61,6 @@ jobs:
 
     - name: Test
       run: cargo test --workspace
+
+    - name: Miri
+      run: cargo +nightly miri test --workspace
