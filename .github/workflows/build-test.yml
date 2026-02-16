@@ -26,7 +26,7 @@ jobs:
       id: rust-nightly
       uses: dtolnay/rust-toolchain@nightly
       with:
-        components: miri
+        components: miri, rust-src
 
     - name: Save Nightly Toolchain Cache
       uses: actions/cache/save@v5
