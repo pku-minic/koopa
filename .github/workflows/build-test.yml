@@ -51,16 +51,16 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Build
-      run: cargo check && cargo check --all-features
+      run: cargo +stable check && cargo +stable check --all-features
 
     - name: Clippy
-      run: cargo clippy --all-targets -- -D warnings && cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo +stable clippy --all-targets -- -D warnings && cargo +stable clippy --all-targets --all-features -- -D warnings
 
     - name: Format
-      run: cargo fmt --all --check
+      run: cargo +stable fmt --all --check
 
     - name: Test
-      run: cargo test --workspace
+      run: cargo +stable test --workspace
 
     - name: Miri
       run: cargo +nightly miri test --workspace
