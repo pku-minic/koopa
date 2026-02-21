@@ -442,7 +442,7 @@ impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
       .dfg()
       .globals
       .upgrade()
-      .unwrap()
+      .expect("`FunctionData` must be added to `Program` before use")
       .borrow()
       .get(&value)
       .or_else(|| self.dfg().values().get(&value))
@@ -456,7 +456,7 @@ impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
       .dfg()
       .globals
       .upgrade()
-      .unwrap()
+      .expect("`FunctionData` must be added to `Program` before use")
       .borrow()
       .get(&value)
       .or_else(|| self.dfg().values().get(&value))
@@ -479,7 +479,7 @@ impl<T: DfgBasedInfoQuerier> EntityInfoQuerier for T {
       .dfg()
       .func_tys
       .upgrade()
-      .unwrap()
+      .expect("`FunctionData` must be added to `Program` before use")
       .borrow()
       .get(&func)
       .expect("function does not exist")
