@@ -82,4 +82,8 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Copyright (C) 2021-2025 MaxXing. Licensed under GPLv3.
+Copyright (C) 2021-2026 MaxXing. Licensed under GPLv3.
+
+## All Thanks To Our Contributors
+
+[![Contributors](https://contrib.rocks/image?repo=pku-minic/koopa)](https://github.com/pku-minic/koopa/graphs/contributors)
