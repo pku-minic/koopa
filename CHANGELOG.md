@@ -8,6 +8,7 @@ All notable changes to the Koopa will be documented in this file.
 
 * [PR #15](https://github.com/pku-minic/koopa/pull/15): Fix example links in documentation.
 * [PR #18](https://github.com/pku-minic/koopa/pull/18): fix(Miri): get CString pointer after HashMap insert.
+* [Issue #16](https://github.com/pku-minic/koopa/issues/16): Confusing panic when using FunctionData without adding to Program first.
 
 ## 0.0.9 - 2025-11-11
 
