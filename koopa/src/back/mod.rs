@@ -17,9 +17,7 @@
 //! use koopa::back::KoopaGenerator;
 //!
 //! let mut program = Program::new();
-//! let main = program.new_func(
-//!   FunctionData::new("@main".into(), Vec::new(), Type::get_i32()),
-//! );
+//! let main = program.new_func_def("@main".into(), Vec::new(), Type::get_i32());
 //! let main_data = program.func_mut(main);
 //!
 //! let bb = main_data.dfg_mut().new_bb().basic_block(None);

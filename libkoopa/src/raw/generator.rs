@@ -2,7 +2,7 @@ use super::builder::Pointer;
 use super::entities::*;
 use crate::errors::ErrorCode;
 use koopa::ir::builder_traits::*;
-use koopa::ir::{BasicBlock, BinaryOp, Function, FunctionData, Program, Type, TypeKind, Value};
+use koopa::ir::{BasicBlock, BinaryOp, Function, Program, Type, TypeKind, Value};
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::marker::PhantomData;
@@ -241,9 +241,9 @@ impl GenerateOnRaw for RawFunction {
         TypeKind::Function(params, ret) => (params.clone(), ret.clone()),
         _ => return Err(ErrorCode::TypeMismatch),
       };
-      // generate function data
-      let data = if raw.bbs.len == 0 {
-        FunctionData::new_decl(name, params, ret)
+      // generate function definition
+      let func = if raw.bbs.len == 0 {
+        program.new_func_decl(name, params, ret)
       } else {
         if raw.params.len as usize != params.len() {
           return Err(ErrorCode::FuncParamNumMismatch);
@@ -253,16 +253,15 @@ impl GenerateOnRaw for RawFunction {
           .zip(raw.params.values()?)
           .map(|(ty, p)| Ok((unsafe { &*p }.name.generate(program, info)?, ty)))
           .collect::<Result<_>>()?;
-        FunctionData::with_param_names(name, params, ret)
+        program.new_func_def_with_param_names(name, params, ret)
       };
       // generate function arguments
       let values = raw
         .params
         .values()?
-        .zip(data.params().iter().copied())
+        .zip(program.func(func).params().iter().copied())
         .collect();
       // insert to function map
-      let func = program.new_func(data);
       info.funcs.insert(*self, FunctionInfo::new(func, values));
       // generate basic blocks
       if raw.bbs.len != 0 {

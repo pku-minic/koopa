@@ -126,6 +126,7 @@ impl Program {
   }
 
   /// Creates a new function in the current program.
+  #[deprecated(since = "0.0.10", note = "call `new_func_def` instead")]
   pub fn new_func(&mut self, mut data: FunctionData) -> Function {
     let func = Function(next_func_id());
     data.dfg.globals = Rc::downgrade(&self.values);
@@ -134,6 +135,45 @@ impl Program {
     self.funcs.insert(func, data);
     self.func_layout.push(func);
     func
+  }
+
+  /// Creates a new function definition in the current program.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name not starts with `%` or `@`, or the given
+  /// type can not construct a valid function type.
+  pub fn new_func_def(&mut self, name: String, params_ty: Vec<Type>, ret_ty: Type) -> Function {
+    #[allow(deprecated)]
+    self.new_func(FunctionData::new(name, params_ty, ret_ty))
+  }
+
+  /// Creates a new function definition with parameter names
+  /// in the current program.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name not starts with `%` or `@`, or the given
+  /// type can not construct a valid function type.
+  pub fn new_func_def_with_param_names(
+    &mut self,
+    name: String,
+    params: Vec<(Option<String>, Type)>,
+    ret_ty: Type,
+  ) -> Function {
+    #[allow(deprecated)]
+    self.new_func(FunctionData::with_param_names(name, params, ret_ty))
+  }
+
+  /// Creates a new function declaration in the current program.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the given name not starts with `%` or `@`, or the given
+  /// type can not construct a valid function type.
+  pub fn new_func_decl(&mut self, name: String, params_ty: Vec<Type>, ret_ty: Type) -> Function {
+    #[allow(deprecated)]
+    self.new_func(FunctionData::new_decl(name, params_ty, ret_ty))
   }
 
   /// Removes the given function by its handle.
@@ -213,10 +253,16 @@ pub struct FunctionData {
 impl FunctionData {
   /// Creates a new function definition.
   ///
+  /// # Note
+  ///
+  /// The returned [`FunctionData`] must be added to a [`Program`] before use,
+  /// so that the data flow graph can be properly initialized.
+  ///
   /// # Panics
   ///
   /// Panics if the given name not starts with `%` or `@`, or the given
   /// type can not construct a valid function type.
+  #[deprecated(since = "0.0.10", note = "call `Program::new_func_def` instead")]
   pub fn new(name: String, params_ty: Vec<Type>, ret_ty: Type) -> Self {
     use crate::ir::values::FuncArgRef;
     Self::check_sanity(&name, params_ty.iter());
@@ -238,10 +284,19 @@ impl FunctionData {
 
   /// Creates a new function definition with parameter names.
   ///
+  /// # Note
+  ///
+  /// The returned [`FunctionData`] must be added to a [`Program`] before use,
+  /// so that the data flow graph can be properly initialized.
+  ///
   /// # Panics
   ///
   /// Panics if the given name not starts with `%` or `@`, or the given
   /// type can not construct a valid function type.
+  #[deprecated(
+    since = "0.0.10",
+    note = "call `Program::new_func_with_param_names` instead"
+  )]
   pub fn with_param_names(name: String, params: Vec<(Option<String>, Type)>, ret_ty: Type) -> Self {
     use crate::ir::values::FuncArgRef;
     Self::check_sanity(&name, params.iter().map(|(_, ty)| ty));
@@ -267,10 +322,16 @@ impl FunctionData {
 
   /// Creates a new function declaration.
   ///
+  /// # Note
+  ///
+  /// The returned [`FunctionData`] must be added to a [`Program`] before use,
+  /// so that the data flow graph can be properly initialized.
+  ///
   /// # Panics
   ///
   /// Panics if the given name not starts with `%` or `@`, or the given
   /// type can not construct a valid function type.
+  #[deprecated(since = "0.0.10", note = "call `Program::new_func_decl` instead")]
   pub fn new_decl(name: String, params_ty: Vec<Type>, ret_ty: Type) -> Self {
     Self::check_sanity(&name, params_ty.iter());
     Self {

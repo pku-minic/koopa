@@ -95,13 +95,10 @@ fn build_program<T: Read>(input: T) -> Result<Program, Error> {
   let ptr = program.new_value().global_alloc(zero);
   program.set_value_name(ptr, Some("@data_arr".into()));
   // create function declarations
-  let putchar = FunctionData::new_decl("@putchar".into(), vec![Type::get_i32()], Type::get_i32());
-  let putchar = program.new_func(putchar);
-  let getchar = FunctionData::new_decl("@getchar".into(), Vec::new(), Type::get_i32());
-  let getchar = program.new_func(getchar);
+  let putchar = program.new_func_decl("@putchar".into(), vec![Type::get_i32()], Type::get_i32());
+  let getchar = program.new_func_decl("@getchar".into(), Vec::new(), Type::get_i32());
   // generate main function
-  let main = FunctionData::new("@main".into(), Vec::new(), Type::get_i32());
-  let main = program.new_func(main);
+  let main = program.new_func_def("@main".into(), Vec::new(), Type::get_i32());
   generate_main(
     input,
     Environment {

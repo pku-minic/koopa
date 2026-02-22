@@ -41,11 +41,11 @@
 //!
 //! // create program and function
 //! let mut program = Program::new();
-//! let fib = program.new_func(FunctionData::with_param_names(
+//! let fib = program.new_func_def_with_param_names(
 //!   "@fib".into(),
 //!   vec![(Some("@n".into()), Type::get_i32())],
 //!   Type::get_i32(),
-//! ));
+//! );
 //! let fib_data = program.func_mut(fib);
 //! let n = fib_data.params()[0];
 //!
@@ -91,12 +91,14 @@ pub mod builder_traits {
   //! # Usage
   //!
   //! ```
-  //! use koopa::ir::{FunctionData, Type};
+  //! use koopa::ir::{Program, FunctionData, Type};
   //! use koopa::ir::builder_traits::*;
   //!
-  //! let mut func = FunctionData::new("@func".into(), Vec::new(), Type::get_unit());
+  //! let mut program = Program::new();
+  //! let func = program.new_func_def("@func".into(), Vec::new(), Type::get_unit());
+  //! let mut func_data = program.func_mut(func);
   //! // builder traits required
-  //! let zero = func.dfg_mut().new_value().integer(0);
+  //! let zero = func_data.dfg_mut().new_value().integer(0);
   //! ```
 
   pub use super::builder::{BasicBlockBuilder, GlobalInstBuilder, LocalInstBuilder, ValueBuilder};

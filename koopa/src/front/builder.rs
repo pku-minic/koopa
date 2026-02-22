@@ -4,7 +4,7 @@ use crate::front::ast::{self, AstBox, AstKind};
 use crate::front::span::{Error, Span};
 use crate::ir::builder_traits::*;
 use crate::ir::dfg::DataFlowGraph;
-use crate::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind, Value};
+use crate::ir::{BasicBlock, Function, Program, Type, TypeKind, Value};
 use crate::{log_error, log_warning, return_error};
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -175,7 +175,7 @@ impl Builder {
       .as_ref()
       .map_or_else(Type::get_unit, Self::generate_type);
     // create function definition
-    let def = FunctionData::with_param_names(
+    let func = self.program.new_func_def_with_param_names(
       ast.name.clone(),
       ast
         .params
@@ -186,13 +186,11 @@ impl Builder {
     );
     // create argument map
     let mut args = HashMap::new();
-    for ((n, a), p) in ast.params.iter().zip(def.params()) {
+    for ((n, a), p) in ast.params.iter().zip(self.program.func(func).params()) {
       if args.insert(n.clone(), *p).is_some() {
         log_error!(a.span, "duplicate parameter name '{}'", n);
       }
     }
-    // add to program
-    let func = self.program.new_func(def);
     // add to global function map
     if self.global_vars.contains_key(&ast.name)
       || self.global_funcs.insert(ast.name.clone(), func).is_some()
@@ -218,7 +216,7 @@ impl Builder {
   /// Builds on function declarations.
   fn build_on_fun_decl(&mut self, span: &Span, ast: &ast::FunDecl) {
     // create function declaration
-    let decl = FunctionData::new_decl(
+    let func = self.program.new_func_decl(
       ast.name.clone(),
       ast.params.iter().map(Self::generate_type).collect(),
       ast
@@ -226,8 +224,6 @@ impl Builder {
         .as_ref()
         .map_or_else(Type::get_unit, Self::generate_type),
     );
-    // add to program
-    let func = self.program.new_func(decl);
     // add to global function map
     if self.global_vars.contains_key(&ast.name)
       || self.global_funcs.insert(ast.name.clone(), func).is_some()

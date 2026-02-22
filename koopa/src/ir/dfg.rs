@@ -287,12 +287,12 @@ impl DataFlowGraph {
 #[cfg(test)]
 mod test {
   use crate::ir::builder_traits::*;
-  use crate::ir::{BinaryOp, FunctionData, Program, Type};
+  use crate::ir::{BinaryOp, Program, Type};
 
   #[test]
   fn value_eq() {
     let mut program = Program::new();
-    let func = program.new_func(FunctionData::new("@test".into(), vec![], Type::get_unit()));
+    let func = program.new_func_def("@test".into(), vec![], Type::get_unit());
     let func = program.func_mut(func);
     // 10 == 10
     let int1 = func.dfg_mut().new_value().integer(10);

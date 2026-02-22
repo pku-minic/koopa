@@ -3,8 +3,8 @@
 //! This module provides pass traits and the pass manager for optimizing
 //! in-memory form Koopa IR programs, including:
 //!
-//! * The module pass trait ([`ModulePass`](pass::ModulePass)) and the
-//!   function pass trait ([`FunctionPass`](pass::FunctionPass)).
+//! * The module pass trait ([`ModulePass`]) and the function pass trait
+//!   ([`FunctionPass`]).
 //! * The pass manager ([`PassManager`]) that holds all registered passes,
 //!   and uses them to optimize the given Koopa IR program.
 //!
