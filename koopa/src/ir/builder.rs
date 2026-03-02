@@ -307,15 +307,24 @@ pub trait LocalInstBuilder: ValueBuilder {
     let ty = match self.func_type(callee).kind() {
       TypeKind::Function(params, ret) => {
         assert!(
-          params
-            .iter()
-            .zip(args.iter())
-            .all(|(ty, a)| ty == &self.value_type(*a)),
-          "argument type mismatch"
+          params.len() == args.len(),
+          "argument count mismatch: expected {} arguments, but got {}",
+          params.len(),
+          args.len()
         );
+        for (i, (expected, arg)) in params.iter().zip(args.iter()).enumerate() {
+          let actual = self.value_type(*arg);
+          assert!(
+            expected == &actual,
+            "argument type mismatch at parameter {}: expected {}, but got {}",
+            i,
+            expected,
+            actual
+          );
+        }
         ret.clone()
       }
-      _ => panic!("expected a function type"),
+      t => panic!("expected a function type, but got {}", t),
     };
     self.insert_value(Call::new_data(callee, args, ty))
   }
@@ -408,13 +417,22 @@ pub trait BasicBlockBuilder: Sized + ValueInserter {
 /// match the given argument types.
 fn check_bb_arg_types(querier: &impl EntityInfoQuerier, params: &[Value], args: &[Value]) {
   assert!(
-    params.len() == args.len()
-      && params
-        .iter()
-        .zip(args.iter())
-        .all(|(p, a)| querier.value_type(*p) == querier.value_type(*a)),
-    "arguments type of basic block mismatch"
+    params.len() == args.len(),
+    "basic block argument count mismatch: expected {} arguments, but got {}",
+    params.len(),
+    args.len()
   );
+  for (i, (param, arg)) in params.iter().zip(args.iter()).enumerate() {
+    let expected = querier.value_type(*param);
+    let actual = querier.value_type(*arg);
+    assert!(
+      expected == actual,
+      "basic block argument type mismatch at parameter {}: expected {}, but got {}",
+      i,
+      expected,
+      actual
+    );
+  }
 }
 
 /// Checks if the given name is a valid basic block name.
@@ -427,7 +445,8 @@ fn check_bb_name(name: &Option<String>) {
     name
       .as_ref()
       .is_none_or(|n| n.len() > 1 && (n.starts_with('%') || n.starts_with('@'))),
-    "invalid basic block name"
+    "invalid basic block name: {}, expected a '%' or '@' prefix followed by at least one character",
+    name.as_deref().unwrap()
   );
 }
 
