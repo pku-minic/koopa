@@ -13,8 +13,8 @@ impl FunctionPass for DeadCodeElimination {
     let mut changed = true;
     while changed {
       self.mark(data);
-      self.sweep(data);
-      changed = self.opt_bb_params(data);
+      changed = self.sweep(data);
+      changed |= self.opt_bb_params(data);
     }
   }
 }
@@ -47,7 +47,7 @@ impl DeadCodeElimination {
     }
   }
 
-  fn sweep(&mut self, data: &mut FunctionData) {
+  fn sweep(&mut self, data: &mut FunctionData) -> bool {
     // remove instructions in layout
     let mut removed = Vec::new();
     let mut bb_cur = data.layout_mut().bbs_mut().cursor_front_mut();
@@ -63,10 +63,22 @@ impl DeadCodeElimination {
       }
       bb_cur.move_next();
     }
-    // remove values in DFG
+
+    let changed = !removed.is_empty();
+
+    // if we have two dead instructions, but some is used by another dead one
+    // then is not ok to remove_value directly
+    // we have to replace with `undef` to cut the connections first.
+    for &v in &removed {
+      let ty = data.dfg().value(v).ty().clone();
+      data.dfg_mut().replace_value_with(v).undef(ty);
+    }
+
     for v in removed {
       data.dfg_mut().remove_value(v);
     }
+
+    changed
   }
 
   fn opt_bb_params(&self, data: &mut FunctionData) -> bool {
