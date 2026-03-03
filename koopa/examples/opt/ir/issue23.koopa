@@ -1,0 +1,6 @@
+fun @foo(): i32 {
+%entry:
+  %0 = add 1, 2 
+  %1 = add %0, 3
+  ret 0
+}
