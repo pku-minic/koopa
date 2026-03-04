@@ -68,7 +68,7 @@ All notable changes to the Koopa will be documented in this file.
 
 ### Fixed
 
-* Fault about creating/initializing `Parser` when error occurrs in `Lexer`.
+* Fault about creating/initializing `Parser` when error occurs in `Lexer`.
 
 ## 0.0.3 - 2022-01-05
 

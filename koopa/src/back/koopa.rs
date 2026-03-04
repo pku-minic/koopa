@@ -7,7 +7,7 @@ use crate::ir::values::*;
 use crate::ir::{BasicBlock, Program, Type, TypeKind, Value, ValueKind};
 use std::io::{Result, Write};
 
-/// Visitor for generating the in-memeory form Koopa IR program into
+/// Visitor for generating the in-memory form Koopa IR program into
 /// the text form.
 #[derive(Default)]
 pub struct Visitor;

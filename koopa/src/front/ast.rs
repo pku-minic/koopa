@@ -143,7 +143,7 @@ impl FunType {
   }
 }
 
-/// Symbol refernce.
+/// Symbol reference.
 #[derive(Debug, PartialEq, Eq)]
 pub struct SymbolRef {
   pub symbol: String,
