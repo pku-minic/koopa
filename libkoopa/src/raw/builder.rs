@@ -113,10 +113,10 @@ where
 
 /// Trait for building raw structures from Koopa IR entities.
 trait BuildRaw {
-  /// The type of builded raw structure.
+  /// The type of built raw structure.
   type Raw;
 
-  /// Kind of the builded raw item.
+  /// Kind of the built raw item.
   const KIND: RawSliceItemKind = RawSliceItemKind::Unknown;
 
   /// Builds a new raw structure.

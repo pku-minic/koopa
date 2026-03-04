@@ -683,7 +683,7 @@ impl Builder {
     Ok(self.dfg_mut(func).new_value().binary(ast.op, lhs, rhs))
   }
 
-  /// Generates branchs.
+  /// Generates branches.
   fn generate_branch(
     &mut self,
     func: Function,

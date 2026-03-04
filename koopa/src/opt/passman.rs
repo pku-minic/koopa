@@ -5,7 +5,7 @@ use crate::opt::pass::Pass;
 
 /// The Koopa IR pass manager.
 ///
-/// Pass manager manages all registed passes, and processes the input
+/// Pass manager manages all registered passes, and processes the input
 /// IR program by using registered passes.
 #[derive(Default)]
 pub struct PassManager {

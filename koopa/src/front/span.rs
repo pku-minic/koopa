@@ -211,7 +211,7 @@ impl Span {
           msg += "s";
         }
       }
-      // seperator
+      // separator
       if gs.err_num != 0 && gs.warn_num != 0 {
         msg += " and ";
       }
