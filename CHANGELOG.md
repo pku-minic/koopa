@@ -4,6 +4,10 @@ All notable changes to the Koopa will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+* `DataFlowGraph::update_value` for updating value data.
+
 ### Changed
 
 * [PR #21](https://github.com/pku-minic/koopa/pull/21): chore: optimize panic msg.
