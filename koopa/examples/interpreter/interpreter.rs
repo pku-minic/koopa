@@ -204,25 +204,36 @@ impl<'a> InterpreterImpl<'a> {
     }
   }
 
-  fn eval_bb(&mut self, bb: &BasicBlockNode) -> Result<Val> {
-    // evaluate on all instructions
-    for inst in bb.insts().keys() {
-      let inst = func!(self).dfg().value(*inst);
-      match inst.kind() {
-        ValueKind::Alloc(_) => self.eval_alloc(inst)?,
-        ValueKind::Load(v) => self.eval_load(inst, v)?,
-        ValueKind::Store(v) => self.eval_store(v)?,
-        ValueKind::GetPtr(v) => self.eval_getptr(inst, v)?,
-        ValueKind::GetElemPtr(v) => self.eval_getelemptr(inst, v)?,
-        ValueKind::Binary(v) => self.eval_binary(inst, v),
-        ValueKind::Call(v) => self.eval_call(inst, v)?,
-        ValueKind::Branch(v) => return self.eval_branch(v),
-        ValueKind::Jump(v) => return self.eval_jump(v),
-        ValueKind::Return(v) => return Ok(self.eval_return(v)),
-        _ => panic!("invalid instruction"),
+  fn eval_bb(&mut self, mut bb: &'a BasicBlockNode) -> Result<Val> {
+    // A control-flow edge stays in the same activation. Do not consume a
+    // Rust stack frame per iteration of an interpreted loop.
+    'blocks: loop {
+      for inst in bb.insts().keys() {
+        let inst = func!(self).dfg().value(*inst);
+        match inst.kind() {
+          ValueKind::Alloc(_) => self.eval_alloc(inst)?,
+          ValueKind::Load(v) => self.eval_load(inst, v)?,
+          ValueKind::Store(v) => self.eval_store(v)?,
+          ValueKind::GetPtr(v) => self.eval_getptr(inst, v)?,
+          ValueKind::GetElemPtr(v) => self.eval_getelemptr(inst, v)?,
+          ValueKind::Binary(v) => self.eval_binary(inst, v),
+          ValueKind::Call(v) => self.eval_call(inst, v)?,
+          ValueKind::Branch(v) => {
+            let target = self.eval_branch(v);
+            bb = bb_node!(self, target);
+            continue 'blocks;
+          }
+          ValueKind::Jump(v) => {
+            self.update_bb_params(v.target(), v.args());
+            bb = bb_node!(self, v.target());
+            continue 'blocks;
+          }
+          ValueKind::Return(v) => return Ok(self.eval_return(v)),
+          _ => panic!("invalid instruction"),
+        }
       }
+      unreachable!()
     }
-    unreachable!()
   }
 
   fn eval_alloc(&mut self, inst: &ValueData) -> Result<()> {
@@ -355,22 +366,14 @@ impl<'a> InterpreterImpl<'a> {
     Ok(())
   }
 
-  fn eval_branch(&mut self, br: &Branch) -> Result<Val> {
-    // evaluate on condition
-    let cond = self.eval_value(br.cond());
-    // perform branching
-    if cond.as_bool() {
-      self.update_bb_params(br.true_bb(), br.true_args());
-      self.eval_bb(bb_node!(self, br.true_bb()))
+  fn eval_branch(&mut self, br: &Branch) -> BasicBlock {
+    let (target, args) = if self.eval_value(br.cond()).as_bool() {
+      (br.true_bb(), br.true_args())
     } else {
-      self.update_bb_params(br.false_bb(), br.false_args());
-      self.eval_bb(bb_node!(self, br.false_bb()))
-    }
-  }
-
-  fn eval_jump(&mut self, jump: &Jump) -> Result<Val> {
-    self.update_bb_params(jump.target(), jump.args());
-    self.eval_bb(bb_node!(self, jump.target()))
+      (br.false_bb(), br.false_args())
+    };
+    self.update_bb_params(target, args);
+    target
   }
 
   fn eval_return(&self, ret: &Return) -> Val {
@@ -449,6 +452,26 @@ mod tests {
       );
       assert_eq!(run(&source).unwrap(), 1);
     }
+  }
+
+  #[test]
+  fn long_loops_do_not_consume_the_host_stack() {
+    let iterations = if cfg!(miri) { 32 } else { 100_000 };
+    let source = format!(
+      "fun @main(): i32 {{
+      %entry:
+        jump %loop(0)
+      %loop(%i: i32):
+        %next = add %i, 1
+        %cond = lt %next, {iterations}
+        br %cond, %body, %exit
+      %body:
+        jump %loop(%next)
+      %exit:
+        ret %next
+      }}"
+    );
+    assert_eq!(run(&source).unwrap(), iterations);
   }
 
   #[test]
