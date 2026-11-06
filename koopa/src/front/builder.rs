@@ -345,12 +345,11 @@ impl Builder {
     for block in bbs {
       let last_inst = block.stmts.last().unwrap();
       let mut add_pred = |bb_name| {
-        self
-          .local_bbs
-          .get_mut(bb_name)
-          .unwrap()
-          .preds
-          .push(block.name.clone());
+        // Invalid targets have already been diagnosed while collecting
+        // reachable blocks. Do not turn that diagnostic into a panic here.
+        if let Some(info) = self.local_bbs.get_mut(bb_name) {
+          info.preds.push(block.name.clone());
+        }
       };
       match &last_inst.kind {
         AstKind::Branch(ast::Branch { tbb, fbb, .. }) => {

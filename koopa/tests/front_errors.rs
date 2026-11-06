@@ -33,3 +33,15 @@ fn accepts_matching_argument_counts() {
   }";
   assert!(Driver::from(source).generate_program().is_ok());
 }
+
+#[test]
+fn rejects_undefined_branch_targets_without_panicking() {
+  for terminator in [
+    "jump %missing",
+    "br 1, %missing, %exit",
+    "br 1, %exit, %missing",
+  ] {
+    let source = format!("fun @main() {{ %entry: {terminator} %exit: ret }}");
+    assert!(Driver::from(source).generate_program().is_err());
+  }
+}
