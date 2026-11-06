@@ -323,7 +323,7 @@ impl Builder {
       let mut info = BasicBlockInfo::new(bb);
       // add basic block parameter to local definitions
       let params = self.program.func(func).dfg().bb(bb).params().to_vec();
-      for ((n, a), p) in block.params.iter().zip(params.into_iter()) {
+      for ((n, a), p) in block.params.iter().zip(params) {
         // check if has already been defined
         if self.global_vars.contains_key(n) || !self.local_symbols.insert(n.clone()) {
           log_error!(a.span, "symbol '{}' has already been defined", n);
