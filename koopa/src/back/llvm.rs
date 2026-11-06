@@ -79,6 +79,11 @@ impl<W: Write> VisitorImpl<'_, W> {
     if !self.program.inst_layout().is_empty() {
       writeln!(self.w)?;
     }
+    // Allocate every function name while the global prefix is active. Calls
+    // can refer to later functions (including mutually recursive definitions).
+    for func in self.program.func_layout() {
+      self.nm.func_name(self.program.func(*func));
+    }
     // functions
     for (i, func) in self.program.func_layout().iter().enumerate() {
       if i != 0 {
@@ -515,6 +520,40 @@ mod test {
       }
     });
     ir
+  }
+
+  #[test]
+  fn forward_and_recursive_calls_use_global_names() {
+    use crate::ir::{Program, Type, builder_traits::*};
+
+    let mut program = Program::new();
+    let main = program.new_func_def("@main".into(), Vec::new(), Type::get_i32());
+    let helper = program.new_func_def("@helper".into(), Vec::new(), Type::get_i32());
+    let getint = program.new_func_decl("@getint".into(), Vec::new(), Type::get_i32());
+    for (function, callees) in [(main, vec![helper]), (helper, vec![getint, main])] {
+      let func = program.func_mut(function);
+      let entry = func.dfg_mut().new_bb().basic_block(Some("%entry".into()));
+      func.layout_mut().bbs_mut().push_key_back(entry).unwrap();
+      let mut instructions = Vec::new();
+      for callee in callees {
+        instructions.push(func.dfg_mut().new_value().call(callee, Vec::new()));
+      }
+      let ret = func.dfg_mut().new_value().ret(instructions.last().copied());
+      instructions.push(ret);
+      func
+        .layout_mut()
+        .bb_mut(entry)
+        .insts_mut()
+        .extend(instructions);
+    }
+    let mut generator = LlvmGenerator::new(Vec::new());
+    generator.generate_on(&program).unwrap();
+    let output = String::from_utf8(generator.writer()).unwrap();
+    assert!(output.contains("call i32 @helper()"));
+    assert!(output.contains("call i32 @main()"));
+    assert!(output.contains("call i32 @getint()"));
+    assert!(output.contains("define i32 @helper()"));
+    assert!(output.contains("declare i32 @getint()"));
   }
 
   #[test]
