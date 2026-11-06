@@ -23,6 +23,7 @@ pub struct NameManager {
   prefix: Prefix,
   global_names: HashSet<StringRc>,
   bb_names: HashSet<StringRc>,
+  shared_local_namespace: bool,
   global_vars: HashMap<*const ValueData, Rc<String>>,
   funcs: HashMap<*const FunctionData, Rc<String>>,
   bbs: HashMap<*const BasicBlockData, Rc<String>>,
@@ -63,6 +64,11 @@ impl NameManager {
     );
     self.cur_scope = ScopeKind::Global;
     self.bb_names.clear();
+    if self.shared_local_namespace {
+      for name in self.bbs.values() {
+        self.global_names.remove(name);
+      }
+    }
     self.bbs.clear();
     for name in self.values.values() {
       self.global_names.remove(name);
@@ -72,6 +78,11 @@ impl NameManager {
   /// Sets the prefix of generated names.
   pub fn set_prefix(&mut self, prefix: Prefix) {
     self.prefix = prefix;
+  }
+
+  /// Makes basic blocks and local values use the same identifier namespace.
+  pub(super) fn share_local_namespace(&mut self) {
+    self.shared_local_namespace = true;
   }
 
   /// Returns the name of the given function.
@@ -92,7 +103,13 @@ impl NameManager {
     if let Some(name) = self.bbs.get(&ptr) {
       name.clone()
     } else {
-      let name = self.next_name(bb.name(), |s| &mut s.bb_names);
+      let name = self.next_name(bb.name(), |s| {
+        if s.shared_local_namespace {
+          &mut s.global_names
+        } else {
+          &mut s.bb_names
+        }
+      });
       self.bbs.insert(ptr, name);
       self.bbs[&ptr].clone()
     }
@@ -136,18 +153,21 @@ impl NameManager {
   /// and stores it to the given name set.
   fn next_name<F>(&mut self, name: &Option<String>, name_set: F) -> Rc<String>
   where
-    F: for<'a> FnOnce(&'a mut Self) -> &'a mut HashSet<StringRc>,
+    F: for<'a> Fn(&'a mut Self) -> &'a mut HashSet<StringRc>,
   {
     // check if there is a name
     if let Some(name) = name {
       self.next_name_str(name, name_set)
     } else {
       // generate a temporary name
-      let name = self.prefix.temp_name(self.next_id);
-      self.next_id += 1;
-      let names = name_set(self);
-      names.insert(name.clone().into());
-      names.get(&name).unwrap().to_rc()
+      loop {
+        let name = self.prefix.temp_name(self.next_id);
+        self.next_id += 1;
+        let names = name_set(self);
+        if names.insert(name.clone().into()) {
+          break names.get(&name).unwrap().to_rc();
+        }
+      }
     }
   }
 
@@ -230,7 +250,6 @@ impl Prefix {
       }
     }
   }
-
   /// Returns a temp name by the given id.
   fn temp_name(&self, id: usize) -> String {
     match self {

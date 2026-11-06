@@ -17,6 +17,7 @@ impl<W: Write> back::Visitor<W> for Visitor {
   type Output = ();
 
   fn visit(&mut self, w: &mut W, nm: &mut NameManager, program: &Program) -> Result<()> {
+    nm.share_local_namespace();
     let mut visitor = VisitorImpl {
       w,
       nm,
@@ -514,6 +515,43 @@ mod test {
       }
     });
     ir
+  }
+
+  #[test]
+  fn basic_blocks_and_values_have_unique_llvm_names() {
+    let program = Driver::from("fun @main(): i32 { %entry: %entry = add 1, 2 ret %entry }")
+      .generate_program()
+      .unwrap();
+    let mut generator = LlvmGenerator::new(Vec::new());
+    generator.generate_on(&program).unwrap();
+    let output = String::from_utf8(generator.writer()).unwrap();
+    assert!(output.contains("$entry:\n  %$entry_0 = add i32 1, 2"));
+    assert!(output.contains("ret i32 %$entry_0"));
+  }
+
+  #[test]
+  fn temporary_names_do_not_reuse_explicit_names() {
+    use crate::ir::{Program, Type, builder_traits::*};
+
+    let mut program = Program::new();
+    let main = program.new_func_def("@main".into(), Vec::new(), Type::get_i32());
+    let func = program.func_mut(main);
+    let entry = func.dfg_mut().new_bb().basic_block(Some("%entry".into()));
+    func.layout_mut().bbs_mut().push_key_back(entry).unwrap();
+    let named = func.dfg_mut().new_value().alloc(Type::get_i32());
+    func.dfg_mut().set_value_name(named, Some("%0".into()));
+    let unnamed = func.dfg_mut().new_value().alloc(Type::get_i32());
+    let zero = func.dfg_mut().new_value().integer(0);
+    let ret = func.dfg_mut().new_value().ret(Some(zero));
+    func
+      .layout_mut()
+      .bb_mut(entry)
+      .insts_mut()
+      .extend([named, unnamed, ret]);
+    let mut generator = LlvmGenerator::new(Vec::new());
+    generator.generate_on(&program).unwrap();
+    let output = String::from_utf8(generator.writer()).unwrap();
+    assert!(output.contains("%$0 = alloca i32\n  %$1 = alloca i32"));
   }
 
   #[test]
