@@ -387,9 +387,50 @@ impl<'a> InterpreterImpl<'a> {
   }
 
   fn update_bb_params(&mut self, bb: BasicBlock, args: &[Value]) {
+    // All incoming arguments refer to the environment before the transfer.
+    // In particular, a loop back edge may permute its own block parameters.
+    let args: Vec<_> = args.iter().map(|arg| self.eval_value(*arg)).collect();
     let bb = func!(self).dfg().bb(bb);
-    for (param, arg) in bb.params().iter().zip(args.iter()) {
-      self.insert_val(func!(self).dfg().value(*param), self.eval_value(*arg));
+    for (param, arg) in bb.params().iter().zip(args) {
+      self.insert_val(func!(self).dfg().value(*param), arg);
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use koopa::back::Generator;
+  use koopa::front::Driver;
+  use std::io::sink;
+
+  fn run(source: &str) -> Result<i32> {
+    let program = Driver::from(source).generate_program().unwrap();
+    Generator::with_visitor(sink(), Interpreter::new(Vec::new())).generate_on(&program)
+  }
+
+  #[test]
+  fn block_arguments_are_assigned_in_parallel() {
+    for transfer in [
+      "jump %loop(%b, %a, %next)",
+      "br 1, %loop(%b, %a, %next), %exit",
+      "br 0, %exit, %loop(%b, %a, %next)",
+    ] {
+      let source = format!(
+        "fun @main(): i32 {{
+        %entry:
+          jump %loop(1, 2, 0)
+        %loop(%a: i32, %b: i32, %n: i32):
+          %cond = lt %n, 1
+          br %cond, %body, %exit
+        %body:
+          %next = add %n, 1
+          {transfer}
+        %exit:
+          ret %b
+        }}"
+      );
+      assert_eq!(run(&source).unwrap(), 1);
     }
   }
 }
