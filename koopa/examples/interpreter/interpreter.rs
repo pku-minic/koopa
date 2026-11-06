@@ -4,9 +4,9 @@ use koopa::ir::entities::ValueData;
 use koopa::ir::layout::BasicBlockNode;
 use koopa::ir::values::*;
 use koopa::ir::{BasicBlock, BinaryOp, FunctionData, Program, Type, TypeKind, Value, ValueKind};
+use std::alloc::{Layout, alloc_zeroed, dealloc, handle_alloc_error};
 use std::collections::HashMap;
 use std::io::{Error, Result, Write};
-use std::pin::Pin;
 use std::ptr::{NonNull, null};
 
 pub fn new_error(message: &str) -> Error {
@@ -36,7 +36,7 @@ impl<W: Write> Visitor<W> for Interpreter {
 
 struct InterpreterImpl<'a> {
   program: &'a Program,
-  global_allocs: Vec<Pin<Box<Val>>>,
+  global_allocs: Vec<Allocation>,
   vars: HashMap<*const ValueData, Val>,
   envs: Vec<Environment<'a>>,
   ext_funcs: ExternFuncs,
@@ -72,17 +72,20 @@ impl<'a> InterpreterImpl<'a> {
   }
 
   fn interpret(&mut self) -> Result<i32> {
+    if Type::get_pointer(Type::get_i32()).size() != size_of::<*mut ()>() {
+      return Err(new_error("interpreter requires the host pointer size"));
+    }
     // evaluate all global variables
     for var in self.program.inst_layout() {
       let value = self.program.borrow_value(*var);
       match value.kind() {
         ValueKind::GlobalAlloc(ga) => {
           let val = self.eval_global_const(&self.program.borrow_value(ga.init()));
-          self.global_allocs.push(Pin::new(Box::new(val)));
-          self.vars.insert(
-            &value as &ValueData,
-            Val::new_val_pointer(self.global_allocs.last().map(|v| &**v)),
-          );
+          let ty = self.program.borrow_value(ga.init()).ty().clone();
+          let allocation = Allocation::new(&ty)?;
+          val.store_to_unsafe_ptr(Some(allocation.ptr), &ty)?;
+          self.vars.insert(&value as &ValueData, allocation.value());
+          self.global_allocs.push(allocation);
         }
         _ => panic!("invalid global variable"),
       }
@@ -146,25 +149,28 @@ impl<'a> InterpreterImpl<'a> {
   }
 
   fn get_pointer(src: Val, offset: isize, base_size: usize) -> Result<Val> {
+    let byte_offset = isize::try_from(base_size)
+      .ok()
+      .and_then(|size| size.checked_mul(offset))
+      .ok_or_else(|| new_error("pointer offset overflow"))?;
+    let offset_pointer = |ptr: Option<NonNull<()>>| {
+      ptr.and_then(|p| NonNull::new(p.as_ptr().cast::<u8>().wrapping_offset(byte_offset).cast()))
+    };
     match src {
       Val::Pointer { ptr, index, len } => {
-        let new_index = (index as isize + offset) as usize;
-        (new_index < len)
-          .then(|| Val::Pointer {
-            ptr: ptr.map(|p| unsafe { NonNull::new_unchecked(p.as_ptr().offset(offset)) }),
+        let new_index = index.checked_add_signed(offset);
+        match new_index {
+          Some(new_index) if new_index < len => Ok(Val::Pointer {
+            ptr: offset_pointer(ptr),
             index: new_index,
             len,
-          })
-          .ok_or_else(|| {
-            new_error(&format!(
-              "pointer calculation out of bounds with index {} and length {}",
-              index, len
-            ))
-          })
+          }),
+          _ => Err(new_error(&format!(
+            "pointer calculation out of bounds with index {index}, offset {offset} and length {len}"
+          ))),
+        }
       }
-      Val::UnsafePointer(ptr) => Ok(Val::UnsafePointer(ptr.map(|p| unsafe {
-        NonNull::new_unchecked((p.as_ptr() as isize + base_size as isize * offset) as *mut ())
-      }))),
+      Val::UnsafePointer(ptr) => Ok(Val::UnsafePointer(offset_pointer(ptr))),
       _ => panic!("invalid pointer"),
     }
   }
@@ -203,7 +209,7 @@ impl<'a> InterpreterImpl<'a> {
     for inst in bb.insts().keys() {
       let inst = func!(self).dfg().value(*inst);
       match inst.kind() {
-        ValueKind::Alloc(_) => self.eval_alloc(inst),
+        ValueKind::Alloc(_) => self.eval_alloc(inst)?,
         ValueKind::Load(v) => self.eval_load(inst, v)?,
         ValueKind::Store(v) => self.eval_store(v)?,
         ValueKind::GetPtr(v) => self.eval_getptr(inst, v)?,
@@ -219,27 +225,25 @@ impl<'a> InterpreterImpl<'a> {
     unreachable!()
   }
 
-  fn eval_alloc(&mut self, inst: &ValueData) {
+  fn eval_alloc(&mut self, inst: &ValueData) -> Result<()> {
     let base = match inst.ty().kind() {
       TypeKind::Pointer(base) => base,
       _ => panic!("invalid pointer type"),
     };
+    let allocation = Allocation::new(base)?;
     let env = self.envs.last_mut().unwrap();
-    env
-      .allocs
-      .push(Pin::new(Box::new(Self::new_zeroinit(base))));
-    env
-      .vals
-      .insert(inst, Val::new_val_pointer(env.allocs.last().map(|v| &**v)));
+    env.vals.insert(inst, allocation.value());
+    env.allocs.push(allocation);
+    Ok(())
   }
 
   fn eval_load(&mut self, inst: &ValueData, load: &Load) -> Result<()> {
-    let val = match self.eval_value(load.src()) {
-      Val::Pointer { ptr, .. } => ptr.map(|p| unsafe { p.as_ref().clone() }),
-      Val::UnsafePointer(ptr) => Val::load_from_unsafe_ptr(ptr, inst.ty()),
+    let ptr = match self.eval_value(load.src()) {
+      Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => ptr,
       _ => panic!("invalid pointer"),
-    }
-    .ok_or_else(|| new_error("accessing to null pointer"))?;
+    };
+    let val = Val::load_from_unsafe_ptr(ptr, inst.ty())
+      .ok_or_else(|| new_error("accessing to null pointer"))?;
     self.insert_val(inst, val);
     Ok(())
   }
@@ -247,11 +251,18 @@ impl<'a> InterpreterImpl<'a> {
   fn eval_store(&self, store: &Store) -> Result<()> {
     let val = self.eval_value(store.value());
     match self.eval_value(store.dest()) {
-      Val::Pointer { ptr, .. } => ptr
-        .map(|p| unsafe { *p.as_ptr() = val })
-        .ok_or_else(|| new_error("accessing to null pointer")),
-      Val::UnsafePointer(ptr) => val.store_to_unsafe_ptr(ptr, value!(self, store.value()).ty()),
+      Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => {
+        val.store_to_unsafe_ptr(ptr, &self.value_type(store.value()))
+      }
       _ => panic!("invalid pointer"),
+    }
+  }
+
+  fn value_type(&self, value: Value) -> Type {
+    if value.is_global() {
+      self.program.borrow_value(value).ty().clone()
+    } else {
+      value!(self, value).ty().clone()
     }
   }
 
@@ -283,15 +294,21 @@ impl<'a> InterpreterImpl<'a> {
       _ => panic!("invalid pointer"),
     };
     let ptr = match self.eval_value(gep.src()) {
-      Val::Pointer { ptr, .. } => ptr
-        .map(|p| match unsafe { p.as_ref() } {
-          Val::Array(arr) => Self::get_pointer(Val::new_array_pointer(arr), offset, base_size),
-          _ => panic!("invalid array"),
-        })
-        .ok_or_else(|| new_error("accessing to null pointer"))??,
-      Val::UnsafePointer(ptr) => Val::UnsafePointer(ptr.map(|p| unsafe {
-        NonNull::new_unchecked((p.as_ptr() as isize + base_size as isize * offset) as *mut ())
-      })),
+      Val::Pointer { ptr, .. } => {
+        if ptr.is_none() {
+          return Err(new_error("accessing to null pointer"));
+        }
+        let src_ty = self.value_type(gep.src());
+        let len = match src_ty.kind() {
+          TypeKind::Pointer(base) => match base.kind() {
+            TypeKind::Array(_, len) => *len,
+            _ => panic!("invalid array type"),
+          },
+          _ => panic!("invalid pointer type"),
+        };
+        Self::get_pointer(Val::Pointer { ptr, index: 0, len }, offset, base_size)?
+      }
+      pointer @ Val::UnsafePointer(_) => Self::get_pointer(pointer, offset, base_size)?,
       _ => panic!("invalid pointer"),
     };
     self.insert_val(inst, ptr);
@@ -456,11 +473,113 @@ mod tests {
       42
     );
   }
+
+  #[test]
+  fn native_storage_preserves_pointer_and_aggregate_loads() {
+    assert_eq!(
+      run(
+        "global @g = alloc [[i32, 2], 2], {{1, 2}, {3, 4}}
+      global @pointer = alloc *i32, zeroinit
+      fun @main(): i32 {
+      %entry:
+        %copy = alloc [[i32, 2], 2]
+        %array = load @g
+        store %array, %copy
+        %row = getelemptr %copy, 1
+        %element = getelemptr %row, 0
+        store %element, @pointer
+        %loaded = load @pointer
+        store 42, %loaded
+        %answer = load %element
+        ret %answer
+      }"
+      )
+      .unwrap(),
+      42
+    );
+  }
+
+  #[cfg(not(miri))]
+  #[test]
+  fn native_calls_share_multidimensional_storage_and_pointer_aliases() {
+    unsafe extern "C" fn mutate(
+      matrix: *mut [i32; 3],
+      alias: *mut i32,
+      out: *mut *mut i32,
+    ) -> *mut i32 {
+      unsafe {
+        let first = matrix.cast::<i32>();
+        if first.add(4) != alias || *first.add(5) != 6 {
+          return std::ptr::null_mut();
+        }
+        *first = 9;
+        *alias = 30;
+        *out = alias;
+        alias
+      }
+    }
+    let program = Driver::from(
+      "global @g = alloc [[i32, 3], 2], {{1, 2, 3}, {4, 5, 6}}
+      decl @mutate(*[i32, 3], *i32, **i32): *i32
+      fun @main(): i32 {
+      %entry:
+        %out = alloc *i32
+        %first_row = getelemptr @g, 0
+        %second_row = getelemptr @g, 1
+        %alias = getelemptr %second_row, 1
+        %returned = call @mutate(%first_row, %alias, %out)
+        %before = load %alias
+        %changed = add %before, 3
+        store %changed, %returned
+        %out_pointer = load %out
+        %a = load %out_pointer
+        %first = getelemptr %first_row, 0
+        %b = load %first
+        %sum = add %a, %b
+        ret %sum
+      }",
+    )
+    .generate_program()
+    .unwrap();
+    let externs = ExternFuncs::with_test_symbols(vec![("mutate", mutate as *const ())]);
+    assert_eq!(
+      InterpreterImpl::new(&program, externs).interpret().unwrap(),
+      42
+    );
+  }
+}
+
+// Memory visible to native functions must have the target's actual scalar and
+// contiguous array layout, never the layout of the interpreter's Val enum.
+struct Allocation {
+  ptr: NonNull<()>,
+  layout: Layout,
+}
+
+impl Allocation {
+  fn new(ty: &Type) -> Result<Self> {
+    let layout = Layout::from_size_align(ty.size().max(1), align_of::<usize>())
+      .map_err(|_| new_error("invalid allocation size"))?;
+    let ptr = NonNull::new(unsafe { alloc_zeroed(layout) })
+      .unwrap_or_else(|| handle_alloc_error(layout))
+      .cast();
+    Ok(Self { ptr, layout })
+  }
+
+  fn value(&self) -> Val {
+    Val::new_val_pointer(Some(self.ptr))
+  }
+}
+
+impl Drop for Allocation {
+  fn drop(&mut self) {
+    unsafe { dealloc(self.ptr.as_ptr().cast(), self.layout) };
+  }
 }
 
 struct Environment<'a> {
   func: &'a FunctionData,
-  allocs: Vec<Pin<Box<Val>>>,
+  allocs: Vec<Allocation>,
   vals: HashMap<*const ValueData, Val>,
 }
 
@@ -480,7 +599,7 @@ pub enum Val {
   Int(i32),
   Array(Box<[Val]>),
   Pointer {
-    ptr: Option<NonNull<Val>>,
+    ptr: Option<NonNull<()>>,
     // if the pointer points to an array element,
     // the index and the total length of the parent array are recorded
     // in case of an out-of-bounds access
@@ -491,20 +610,11 @@ pub enum Val {
 }
 
 impl Val {
-  fn new_val_pointer(parent: Option<&Val>) -> Self {
+  fn new_val_pointer(ptr: Option<NonNull<()>>) -> Self {
     Self::Pointer {
-      ptr: parent.map(|p| unsafe { NonNull::new_unchecked(p as *const Val as *mut Val) }),
+      ptr,
       index: 0,
-      // A standalone object is a one-element array for pointer arithmetic.
-      len: usize::from(parent.is_some()),
-    }
-  }
-
-  fn new_array_pointer(arr: &[Val]) -> Self {
-    Self::Pointer {
-      ptr: Some(unsafe { NonNull::new_unchecked(arr.as_ptr() as *mut Val) }),
-      index: 0,
-      len: arr.len(),
+      len: usize::from(ptr.is_some()),
     }
   }
 
@@ -516,7 +626,7 @@ impl Val {
           .map(|i| {
             Val::load_from_unsafe_ptr(
               Some(unsafe {
-                NonNull::new_unchecked((p.as_ptr() as usize + ty.size() * i) as *mut ())
+                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(ty.size() * i).cast())
               }),
               ty,
             )
@@ -525,9 +635,9 @@ impl Val {
           .collect::<Vec<_>>()
           .into_boxed_slice(),
       ),
-      TypeKind::Pointer(_) => Val::UnsafePointer(NonNull::new(unsafe {
-        *(p.as_ptr() as *const usize) as *mut ()
-      })),
+      TypeKind::Pointer(_) => {
+        Val::UnsafePointer(NonNull::new(unsafe { *p.as_ptr().cast::<*mut ()>() }))
+      }
       _ => panic!("invalid type"),
     })
   }
@@ -551,17 +661,21 @@ impl Val {
           arr.iter().enumerate().try_for_each(|(i, v)| {
             v.store_to_unsafe_ptr(
               Some(unsafe {
-                NonNull::new_unchecked((p.as_ptr() as usize + base.size() * i) as *mut ())
+                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(base.size() * i).cast())
               }),
               base,
             )
           })
         }
-        Val::UnsafePointer(ptr) => {
-          unsafe { *(p.as_ptr() as *mut *const ()) = ptr.map_or(null(), |p| p.as_ptr()) };
+        Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => {
+          unsafe { *p.as_ptr().cast::<*const ()>() = ptr.map_or(null(), |p| p.as_ptr()) };
           Ok(())
         }
-        _ => Err(new_error("incompatible type of value")),
+        Val::Undef => {
+          // Choose zero for an unspecified initial value, just like local alloc.
+          unsafe { p.as_ptr().cast::<u8>().write_bytes(0, ty.size()) };
+          Ok(())
+        }
       })
       .ok_or_else(|| new_error("accessing to null pointer"))?
   }

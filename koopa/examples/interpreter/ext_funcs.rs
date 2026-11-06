@@ -8,6 +8,8 @@ use std::ptr::NonNull;
 
 pub struct ExternFuncs {
   libs: Vec<Library>,
+  #[cfg(all(test, not(miri)))]
+  test_symbols: Vec<(&'static str, *const ())>,
 }
 
 impl ExternFuncs {
@@ -17,6 +19,8 @@ impl ExternFuncs {
         .iter()
         .map(|f| unsafe { Library::new(f) })
         .collect::<Result<_, _>>()?,
+      #[cfg(all(test, not(miri)))]
+      test_symbols: Vec::new(),
     })
   }
 
@@ -31,6 +35,10 @@ impl ExternFuncs {
       TypeKind::Function(params, ret) => (params, ret),
       _ => panic!("invalid function"),
     };
+    #[cfg(all(test, not(miri)))]
+    if let Some((_, symbol)) = self.test_symbols.iter().find(|(n, _)| *n == name) {
+      return unsafe { Self::call_ext_func(*symbol, args, params_ty, ret_ty) };
+    }
     let sym_name = CString::new(name).map_err(|e| new_error(&format!("{}", e)))?;
     let sym = self
       .libs
@@ -38,6 +46,14 @@ impl ExternFuncs {
       .find_map(|l| unsafe { l.get::<*const ()>(sym_name.to_bytes_with_nul()) }.ok())
       .ok_or_else(|| new_error(&format!("external function '{}' not found", name)))?;
     unsafe { Self::call_ext_func(*sym, args, params_ty, ret_ty) }
+  }
+
+  #[cfg(all(test, not(miri)))]
+  pub fn with_test_symbols(symbols: Vec<(&'static str, *const ())>) -> Self {
+    Self {
+      libs: Vec::new(),
+      test_symbols: symbols,
+    }
   }
 
   unsafe fn call_ext_func(
