@@ -39,7 +39,10 @@ impl DeadCodeElimination {
     while let Some(inst) = self.worklist.pop() {
       // mark all of its operand as undead
       for u in data.dfg().value(inst).kind().value_uses() {
-        if !self.liveset.contains(&u) && data.dfg().value(u).kind().is_local_inst() {
+        if !u.is_global()
+          && !self.liveset.contains(&u)
+          && data.dfg().value(u).kind().is_local_inst()
+        {
           self.liveset.insert(u);
           self.worklist.push(u);
         }
@@ -162,5 +165,40 @@ impl DeadCodeElimination {
         | ValueKind::Jump(_)
         | ValueKind::Return(_)
     )
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use koopa::back::KoopaGenerator;
+  use koopa::front::Driver;
+
+  #[test]
+  fn global_operands_are_not_looked_up_in_the_local_dfg() {
+    let mut program = Driver::from(
+      "global @g = alloc i32, 42
+      decl @consume(*i32)
+      fun @main(): i32 {
+      %entry:
+        store 42, @g
+        call @consume(@g)
+        %answer = load @g
+        ret %answer
+      }",
+    )
+    .generate_program()
+    .unwrap();
+    let mut pass = DeadCodeElimination::new();
+    for (&func, data) in program.funcs_mut() {
+      pass.run_on(func, data);
+    }
+    let mut generator = KoopaGenerator::new(Vec::new());
+    generator.generate_on(&program).unwrap();
+    let source = String::from_utf8(generator.writer()).unwrap();
+    assert!(source.contains("store 42, @g"));
+    assert!(source.contains("call @consume(@g)"));
+    assert!(source.contains("load @g"));
+    Driver::from(source).generate_program().unwrap();
   }
 }
