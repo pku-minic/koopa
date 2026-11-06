@@ -149,7 +149,10 @@ fun @main(): i32 {
     // snapshots alive while reusing the same builder.
     let builder_ptr = &mut builder as *mut RawProgramBuilder;
     let first = unsafe { koopa_build_raw_program(&mut *builder_ptr, &program) };
-    let repeated = unsafe { koopa_build_raw_program(&mut *builder_ptr, &program) };
+    // Force the builder's snapshot vector to grow while older raw pointers live.
+    let repeated: Vec<_> = (0..8)
+      .map(|_| unsafe { koopa_build_raw_program(&mut *builder_ptr, &program) })
+      .collect();
 
     let main = program.func_layout()[0];
     let func = program.func_mut(main);
@@ -170,7 +173,22 @@ fun @main(): i32 {
     drop(other);
 
     assert_eq!(dump(&first), original);
-    assert_eq!(dump(&repeated), original);
+    for raw in &repeated {
+      assert_eq!(dump(raw), original);
+    }
+    // Check the back-links too: raw-to-Koopa generation does not read used_by.
+    let raw_func = unsafe { &**(first.funcs.buffer as *const RawFunction) };
+    let raw_bb = unsafe { &**(raw_func.bbs.buffer as *const RawBasicBlock) };
+    let raw_ret = unsafe { *(raw_bb.insts.buffer as *const RawValue) };
+    let RawValueKind::Return(ret) = &(unsafe { &*raw_ret }).kind else {
+      panic!("expected return");
+    };
+    let raw_zero = unsafe { &*ret.value };
+    assert_eq!(raw_zero.used_by.len, 1);
+    assert_eq!(
+      unsafe { *(raw_zero.used_by.buffer as *const RawValue) },
+      raw_ret
+    );
     assert_eq!(
       dump(&updated),
       original
