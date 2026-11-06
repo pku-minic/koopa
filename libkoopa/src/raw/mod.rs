@@ -132,6 +132,55 @@ fun @main(): i32 {
   }
 
   #[test]
+  fn test_raw_builder_preserves_snapshots_across_builds() {
+    use koopa::ir::{ValueKind, builder_traits::*};
+
+    fn dump(raw: &RawProgram) -> String {
+      let program = generate_program(raw).unwrap_or_else(|e| panic!("error code: {}", e as i32));
+      let mut generator = KoopaGenerator::new(Vec::new());
+      generator.generate_on(&program).unwrap();
+      String::from_utf8(generator.writer()).unwrap()
+    }
+
+    let original = "fun @main(): i32 {\n%entry:\n  ret 0\n}\n";
+    let mut program = Driver::from(original).generate_program().unwrap();
+    let mut builder = RawProgramBuilder::new();
+    // Exercise the C API's lifetime contract: C callers can keep several
+    // snapshots alive while reusing the same builder.
+    let builder_ptr = &mut builder as *mut RawProgramBuilder;
+    let first = unsafe { koopa_build_raw_program(&mut *builder_ptr, &program) };
+    let repeated = unsafe { koopa_build_raw_program(&mut *builder_ptr, &program) };
+
+    let main = program.func_layout()[0];
+    let func = program.func_mut(main);
+    func.set_name("@updated".into());
+    let zero = *func
+      .dfg()
+      .values()
+      .iter()
+      .find(|(_, value)| matches!(value.kind(), ValueKind::Integer(_)))
+      .unwrap()
+      .0;
+    func.dfg_mut().replace_value_with(zero).integer(42);
+    let updated = unsafe { koopa_build_raw_program(&mut *builder_ptr, &program) };
+
+    let other = Driver::from(RECURSIVE_PROGRAM).generate_program().unwrap();
+    let unrelated = unsafe { koopa_build_raw_program(&mut *builder_ptr, &other) };
+    drop(program);
+    drop(other);
+
+    assert_eq!(dump(&first), original);
+    assert_eq!(dump(&repeated), original);
+    assert_eq!(
+      dump(&updated),
+      original
+        .replace("@main", "@updated")
+        .replace("ret 0", "ret 42")
+    );
+    assert_eq!(dump(&unrelated), RECURSIVE_PROGRAM);
+  }
+
+  #[test]
   fn test_raw_generator_loop() {
     let program = build_and_generate(LOOP_PROGRAM);
     let mut g = KoopaGenerator::new(Vec::new());
