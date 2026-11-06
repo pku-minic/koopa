@@ -45,3 +45,27 @@ fn rejects_undefined_branch_targets_without_panicking() {
     assert!(Driver::from(source).generate_program().is_err());
   }
 }
+
+#[test]
+fn rejects_aggregate_initializers_with_incompatible_types() {
+  for source in [
+    "global @g = alloc *i32, {1, 2}",
+    "global @g = alloc [*i32, 1], {{1}}",
+    "global @g = alloc [[i32, 2], 2], {{1}, {2, 3}}",
+    "fun @f() { %entry: %p = alloc *i32 store {1}, %p ret }",
+    "fun @f() { %entry: %p = alloc [i32, 2] store {1}, %p ret }",
+  ] {
+    assert!(Driver::from(source).generate_program().is_err(), "{source}");
+  }
+}
+
+#[test]
+fn accepts_array_and_pointer_initializers_of_the_declared_type() {
+  for source in [
+    "global @g = alloc *i32, zeroinit",
+    "global @g = alloc *i32, undef",
+    "global @g = alloc [[i32, 2], 2], {{1, 2}, {3, 4}}",
+  ] {
+    assert!(Driver::from(source).generate_program().is_ok(), "{source}");
+  }
+}
