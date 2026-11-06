@@ -34,20 +34,21 @@ impl ConstantFolding {
               BinaryOp::Lt => Some((l.value() < r.value()) as i32),
               BinaryOp::Ge => Some((l.value() >= r.value()) as i32),
               BinaryOp::Le => Some((l.value() <= r.value()) as i32),
-              BinaryOp::Add => Some(l.value() + r.value()),
-              BinaryOp::Sub => Some(l.value() - r.value()),
-              BinaryOp::Mul => Some(l.value() * r.value()),
-              BinaryOp::Div => (r.value() != 0).then(|| l.value() / r.value()),
-              BinaryOp::Mod => (r.value() != 0).then(|| l.value() % r.value()),
+              BinaryOp::Add => Some(l.value().wrapping_add(r.value())),
+              BinaryOp::Sub => Some(l.value().wrapping_sub(r.value())),
+              BinaryOp::Mul => Some(l.value().wrapping_mul(r.value())),
+              BinaryOp::Div => l.value().checked_div(r.value()),
+              BinaryOp::Mod => l.value().checked_rem(r.value()),
               BinaryOp::And => Some(l.value() & r.value()),
               BinaryOp::Or => Some(l.value() | r.value()),
               BinaryOp::Xor => Some(l.value() ^ r.value()),
-              BinaryOp::Shl => Some(l.value() << r.value()),
-              BinaryOp::Shr => Some((l.value() as u32 >> r.value()) as i32),
-              BinaryOp::Sar => Some(l.value() >> r.value()),
+              BinaryOp::Shl => l.value().checked_shl(r.value() as u32),
+              BinaryOp::Shr => (l.value() as u32)
+                .checked_shr(r.value() as u32)
+                .map(|v| v as i32),
+              BinaryOp::Sar => l.value().checked_shr(r.value() as u32),
             },
-            (ValueKind::Undef(_), _) => todo!(),
-            (_, ValueKind::Undef(_)) => todo!(),
+            (ValueKind::Undef(_), _) | (_, ValueKind::Undef(_)) => None,
             _ => continue,
           }
         }
@@ -116,6 +117,51 @@ impl ConstantFolding {
         data.dfg_mut().replace_value_with(p).raw(value);
         let p = data.dfg_mut().new_value().raw(param);
         data.dfg_mut().bb_mut(bb).params_mut()[i] = p;
+      }
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use koopa::front::Driver;
+
+  #[test]
+  fn folds_i32_arithmetic_without_host_panics() {
+    for (expression, expected) in [
+      ("add 2147483647, 1", Some(i32::MIN)),
+      ("sub -2147483648, 1", Some(i32::MAX)),
+      ("mul 1073741824, 4", Some(0)),
+      ("div 1, 0", None),
+      ("div -2147483648, -1", None),
+      ("mod -2147483648, -1", None),
+      ("shl 1, 32", None),
+      ("shr 1, -1", None),
+      ("sar 1, 32", None),
+      ("add undef, 1", None),
+      ("add 1, undef", None),
+    ] {
+      let source = format!("fun @main(): i32 {{ %entry: %result = {expression} ret %result }}");
+      let mut program = Driver::from(source).generate_program().unwrap();
+      let func = program.func_layout()[0];
+      let data = program.func_mut(func);
+      ConstantFolding::new().run_on(func, data);
+      let ret = *data
+        .layout()
+        .bbs()
+        .front_node()
+        .unwrap()
+        .insts()
+        .back_key()
+        .unwrap();
+      let ValueKind::Return(ret) = data.dfg().value(ret).kind() else {
+        panic!("expected return");
+      };
+      match (data.dfg().value(ret.value().unwrap()).kind(), expected) {
+        (ValueKind::Integer(value), Some(expected)) => assert_eq!(value.value(), expected),
+        (ValueKind::Undef(_), None) => {}
+        _ => panic!("unexpected folded value for {expression}"),
       }
     }
   }
