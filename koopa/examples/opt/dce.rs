@@ -28,6 +28,8 @@ impl DeadCodeElimination {
   }
 
   fn mark(&mut self, data: &FunctionData) {
+    self.liveset.clear();
+    self.worklist.clear();
     // iterate through all values to find critical instructions
     for (v, value) in data.dfg().values() {
       if Self::is_critical_inst(value.kind()) {
@@ -109,46 +111,45 @@ impl DeadCodeElimination {
         index += 1;
         !m.contains_key(&(index - 1))
       });
-      m.iter().for_each(|(_, param)| {
+      m.values().for_each(|param| {
         data.dfg_mut().remove_value(*param);
       });
+      let params = data.dfg().bb(*b).params().to_vec();
+      for (index, param) in params.into_iter().enumerate() {
+        data.dfg_mut().update_value(param, |value| {
+          let ValueKind::BlockArgRef(arg) = value.kind_mut() else {
+            unreachable!("expected block parameter");
+          };
+          *arg.index_mut() = index;
+        });
+      }
     });
     // update arguments of all related branch/jump instructions
     bbs.into_iter().for_each(|(b, m)| {
       let users = data.dfg().bb(b).used_by().clone();
       users.into_iter().for_each(|user| {
-        // get instruction from DFG
-        let mut inst = data.dfg().value(user).clone();
-        // get argument list
-        let args = match inst.kind_mut() {
-          ValueKind::Branch(br) => {
-            if br.true_bb() == b {
-              br.true_args_mut()
-            } else {
-              br.false_args_mut()
+        // Keep the DFG use lists in sync, and let the next liveness sweep
+        // remove newly dead instructions from both the DFG and the layout.
+        data.dfg_mut().update_value(user, |inst| {
+          let retain_args = |args: &mut Vec<Value>| {
+            let mut index = 0;
+            args.retain(|_| {
+              let retained = !m.contains_key(&index);
+              index += 1;
+              retained
+            });
+          };
+          match inst.kind_mut() {
+            ValueKind::Branch(br) => {
+              if br.true_bb() == b {
+                retain_args(br.true_args_mut());
+              }
+              if br.false_bb() == b {
+                retain_args(br.false_args_mut());
+              }
             }
-          }
-          ValueKind::Jump(jump) => jump.args_mut(),
-          _ => panic!("invalid branch/jump instruction"),
-        };
-        // update argument list
-        let mut removed_args = HashSet::new();
-        let mut index = 0;
-        args.retain(|a| {
-          index += 1;
-          let removed = !m.contains_key(&(index - 1));
-          // record removed values
-          if removed {
-            removed_args.insert(*a);
-          }
-          removed
-        });
-        // replace the existing instruction
-        data.dfg_mut().replace_value_with(user).raw(inst);
-        // remove unused values
-        removed_args.into_iter().for_each(|v| {
-          if data.dfg().value(v).used_by().is_empty() {
-            data.dfg_mut().remove_value(v);
+            ValueKind::Jump(jump) => retain_args(jump.args_mut()),
+            _ => panic!("invalid branch/jump instruction"),
           }
         });
       });
@@ -200,5 +201,46 @@ mod tests {
     assert!(source.contains("call @consume(@g)"));
     assert!(source.contains("load @g"));
     Driver::from(source).generate_program().unwrap();
+  }
+
+  #[test]
+  fn removing_block_parameters_updates_indices_and_liveness() {
+    let mut program = Driver::from(
+      "global @g = alloc i32, 42
+      decl @consume(*i32)
+      fun @f(%input: i32): i32 {
+      %entry:
+        %dead = add 1, 2
+        jump %merge(%dead, @g, %input)
+      %merge(%unused: i32, %pointer: *i32, %answer: i32):
+        call @consume(%pointer)
+        ret %answer
+      }",
+    )
+    .generate_program()
+    .unwrap();
+    let func = *program.func_layout().last().unwrap();
+    let data = program.func_mut(func);
+    DeadCodeElimination::new().run_on(func, data);
+    let merge = *data.layout().bbs().back_key().unwrap();
+    assert_eq!(data.dfg().bb(merge).params().len(), 2);
+    for (index, param) in data.dfg().bb(merge).params().iter().enumerate() {
+      let ValueKind::BlockArgRef(arg) = data.dfg().value(*param).kind() else {
+        panic!("expected block parameter");
+      };
+      assert_eq!(arg.index(), index);
+    }
+    assert!(
+      !data
+        .dfg()
+        .values()
+        .values()
+        .any(|v| matches!(v.kind(), ValueKind::Binary(_)))
+    );
+    let mut generator = KoopaGenerator::new(Vec::new());
+    generator.generate_on(&program).unwrap();
+    Driver::from(String::from_utf8(generator.writer()).unwrap())
+      .generate_program()
+      .unwrap();
   }
 }
