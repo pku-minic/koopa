@@ -82,3 +82,31 @@ fn rejects_nonpositive_array_lengths() {
     }
   }
 }
+
+#[test]
+fn rejects_values_that_do_not_dominate_their_uses() {
+  for branch in ["br @cond, %define, %skip", "br @cond, %skip, %define"] {
+    let source = format!(
+      "fun @f(@cond: i32): i32 {{
+        %entry: {branch}
+        %define: %value = add 1, 2 jump %merge
+        %skip: jump %merge
+        %merge: ret %value
+      }}"
+    );
+    assert!(Driver::from(source).generate_program().is_err());
+  }
+}
+
+#[test]
+fn accepts_dominating_values_across_diamonds_and_loops() {
+  let source = "fun @f(@cond: i32): i32 {
+    %entry: %value = add 1, 2 br @cond, %left, %right
+    %left: jump %loop
+    %right: jump %loop
+    %loop: br @cond, %body, %exit
+    %body: jump %loop
+    %exit: ret %value
+  }";
+  assert!(Driver::from(source).generate_program().is_ok());
+}

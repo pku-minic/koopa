@@ -451,35 +451,41 @@ impl Builder {
   fn generate_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
     // try to find symbol in global scope
     // if not found, find symbol in local definitions
-    let mut visited_bbs = HashSet::new();
     self
       .global_vars
       .get(symbol)
       .copied()
-      .or_else(|| self.generate_local_symbol(&mut visited_bbs, bb_name, symbol))
-      .ok_or_else(|| return_error!(span, "symbol '{}' not found", symbol))
+      .or_else(|| self.generate_local_symbol(bb_name, symbol))
+      .ok_or_else(|| {
+        log_error!(
+          span,
+          "symbol '{}' is not defined on every path to this use",
+          symbol
+        )
+      })
   }
 
   /// Generates the symbol locally by the symbol name.
-  fn generate_local_symbol<'a>(
-    &'a self,
-    visited_bbs: &mut HashSet<&'a str>,
-    bb_name: &'a str,
-    symbol: &str,
-  ) -> Option<Value> {
-    if visited_bbs.insert(bb_name) {
-      // find symbol in local scope of the current basic block
-      // if not found, try to find symbol in all predecessors
-      let bb_info = &self.local_bbs[bb_name];
-      bb_info.local_defs.get(symbol).copied().or_else(|| {
-        bb_info
-          .preds
-          .iter()
-          .find_map(|pred| self.generate_local_symbol(visited_bbs, pred, symbol))
-      })
-    } else {
-      None
+  fn generate_local_symbol(&self, bb_name: &str, symbol: &str) -> Option<Value> {
+    let mut pending = vec![bb_name];
+    let mut visited = HashSet::new();
+    let mut definition = None;
+    // A definition must dominate the use: every path back to the entry must
+    // encounter it. Stop at definitions, and visit loop back edges only once.
+    while let Some(bb_name) = pending.pop() {
+      if !visited.insert(bb_name) {
+        continue;
+      }
+      let info = &self.local_bbs[bb_name];
+      if let Some(value) = info.local_defs.get(symbol) {
+        definition = Some(*value);
+      } else if info.preds.is_empty() {
+        return None;
+      } else {
+        pending.extend(info.preds.iter().map(String::as_str));
+      }
     }
+    definition
   }
 
   /// Generates the basic block handle by the given basic block name.
