@@ -60,14 +60,15 @@ where
 }
 
 /// Generates the given program to the given
-/// file descriptor (UNIX) or handle (Windows).
+/// file descriptor (UNIX) or handle (Windows). The caller retains ownership.
 ///
 /// Returns the error code.
 fn dump_to_raw<V>(program: &Program, file: RawFile) -> ErrorCode
 where
   V: Visitor<File> + Default,
 {
-  let mut g = Generator::<_, V>::new(file_from_raw(file));
+  let file = unwrap_or_return!(file_from_raw(file), InvalidFile);
+  let mut g = Generator::<_, V>::new(file);
   unwrap_or_return!(g.generate_on(program), IoError);
   ErrorCode::Success
 }
@@ -97,7 +98,7 @@ ffi! {
   }
 
   /// Generates text-form Koopa IR program to the given
-  /// file descriptor (UNIX) or handle (Windows).
+  /// file descriptor (UNIX) or handle (Windows). The caller retains ownership.
   ///
   /// Returns the error code.
   fn koopa_dump_to_raw(program: &Program, file: RawFile) -> ErrorCode {
@@ -128,7 +129,7 @@ ffi! {
   }
 
   /// Generates LLVM IR to the given
-  /// file descriptor (UNIX) or handle (Windows).
+  /// file descriptor (UNIX) or handle (Windows). The caller retains ownership.
   ///
   /// Returns the error code.
   fn koopa_dump_llvm_to_raw(program: &Program, file: RawFile) -> ErrorCode {

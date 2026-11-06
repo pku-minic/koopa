@@ -54,12 +54,12 @@ ffi! {
   }
 
   /// Parses text-form Koopa IR program from the given
-  /// file descriptor (UNIX) or handle (Windows).
+  /// file descriptor (UNIX) or handle (Windows). The caller retains ownership.
   /// Updates the `program` if no errors occurred.
   ///
   /// Returns the error code.
   fn koopa_parse_from_raw(file: RawFile, program: &mut *mut Program) -> ErrorCode {
-    let file = file_from_raw(file);
+    let file = unwrap_or_return!(file_from_raw(file), InvalidFile);
     let driver = Driver::new(FileType::Buffer, file);
     let prog = unwrap_or_return!(driver.generate_program(), InvalidKoopaProgram);
     *program = new_pointer(prog);
