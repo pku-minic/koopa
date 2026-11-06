@@ -433,6 +433,29 @@ mod tests {
       assert_eq!(run(&source).unwrap(), 1);
     }
   }
+
+  #[test]
+  fn zero_offset_preserves_scalar_and_array_allocation_pointers() {
+    assert_eq!(
+      run(
+        "global @g = alloc i32, 40
+        fun @main(): i32 {
+        %entry:
+          %local = alloc [i32, 1]
+          %array = getptr %local, 0
+          %element = getelemptr %array, 0
+          store 2, %element
+          %global = getptr @g, 0
+          %a = load %global
+          %b = load %element
+          %sum = add %a, %b
+          ret %sum
+        }"
+      )
+      .unwrap(),
+      42
+    );
+  }
 }
 
 struct Environment<'a> {
@@ -472,7 +495,8 @@ impl Val {
     Self::Pointer {
       ptr: parent.map(|p| unsafe { NonNull::new_unchecked(p as *const Val as *mut Val) }),
       index: 0,
-      len: 0,
+      // A standalone object is a one-element array for pointer arithmetic.
+      len: usize::from(parent.is_some()),
     }
   }
 
