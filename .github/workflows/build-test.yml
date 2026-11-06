@@ -60,7 +60,12 @@ jobs:
       run: cargo +stable fmt --all --check
 
     - name: Test
-      run: cargo +stable test --workspace
+      run: |
+        cargo +stable test --workspace --all-targets
+        cargo +stable test --workspace --all-targets --all-features
+        cargo +stable test --workspace --doc
 
     - name: Miri
-      run: cargo +nightly miri test --workspace
+      run: |
+        cargo +nightly miri test --workspace
+        cargo +nightly miri test -p koopa --example interpreter --example opt
