@@ -503,12 +503,12 @@ impl Builder {
     args_ty: &[Type],
   ) -> Result<Vec<Value>, Error> {
     // check length of argument list
-    if args.len() != args.len() {
+    if args.len() != args_ty.len() {
       return_error!(
         span,
         "expected {} {}, found {} {}",
-        args.len(),
-        "arguments".to_plural(args.len()),
+        args_ty.len(),
+        "arguments".to_plural(args_ty.len()),
         args.len(),
         "arguments".to_plural(args.len())
       );
