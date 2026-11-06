@@ -42,7 +42,8 @@ pub(crate) fn file_from_raw(handle: RawFile) -> Result<File> {
     .map(File::from)
 }
 
-#[cfg(test)]
+// These tests exercise OS descriptor ownership, which Miri isolation cannot access.
+#[cfg(all(test, not(miri)))]
 mod tests {
   use super::*;
   use crate::{

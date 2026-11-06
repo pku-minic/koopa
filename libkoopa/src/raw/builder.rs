@@ -3,6 +3,7 @@ use koopa::ir::entities::{BasicBlockData, ValueData};
 use koopa::ir::values::*;
 use koopa::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind};
 use koopa::ir::{BinaryOp, Value, ValueKind};
+use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
@@ -22,9 +23,30 @@ struct RawProgramStorage {
   slices: Vec<Vec<*const ()>>,
   strs: HashMap<String, CString>,
   tys: HashMap<Type, Box<RawTypeKind>>,
-  funcs: HashMap<Function, Box<MaybeUninit<RawFunctionData>>>,
-  bbs: HashMap<BasicBlock, Box<MaybeUninit<RawBasicBlockData>>>,
-  values: HashMap<Value, Box<MaybeUninit<RawValueData>>>,
+  funcs: HashMap<Function, RawEntity<RawFunctionData>>,
+  bbs: HashMap<BasicBlock, RawEntity<RawBasicBlockData>>,
+  values: HashMap<Value, RawEntity<RawValueData>>,
+}
+
+/// Stable storage for entities referenced before recursive construction finishes.
+/// Interior mutability keeps existing raw pointers valid while filling the entity
+/// or its `used_by` slice. Never create references to an uninitialized entity.
+struct RawEntity<T>(Box<UnsafeCell<MaybeUninit<T>>>);
+
+impl<T> RawEntity<T> {
+  fn new() -> Self {
+    Self(Box::new(UnsafeCell::new(MaybeUninit::uninit())))
+  }
+
+  fn as_ptr(&self) -> *const T {
+    self.0.get().cast()
+  }
+
+  fn write(&self, value: T) {
+    // SAFETY: this allocation has the layout of T, and no references to its
+    // contents are exposed during construction. Raw pointers may already exist.
+    unsafe { self.0.get().cast::<T>().write(value) };
+  }
 }
 
 impl RawProgramBuilder {
@@ -69,10 +91,12 @@ impl RawProgramStorage {
         slice
       })
       .collect();
-    for (data, slice) in self.values.values_mut().zip(slices) {
+    for (data, slice) in self.values.values().zip(slices) {
       // SAFETY: every placeholder is initialized before its BuildRaw call
       // returns, and the complete program traversal above has finished.
-      unsafe { data.assume_init_mut() }.used_by = slice;
+      // Write through the original raw pointer rather than borrowing the entire
+      // entity mutably, which would invalidate pointers already stored in raw IR.
+      unsafe { (&raw mut (*data.as_ptr().cast_mut()).used_by).write(slice) };
     }
     raw
   }
@@ -216,12 +240,12 @@ impl BuildRaw for Function {
     if let Some(f) = builder.funcs.get(self) {
       f.as_ptr()
     } else {
-      builder.funcs.insert(*self, Box::new_uninit());
+      builder.funcs.insert(*self, RawEntity::new());
       let func = info.program.func(*self);
       let last_func = info.cur_func.replace(func);
       let f = func.build(builder, info);
       info.cur_func = last_func;
-      let fb = builder.funcs.get_mut(self).unwrap();
+      let fb = builder.funcs.get(self).unwrap();
       fb.write(f);
       fb.as_ptr()
     }
@@ -250,11 +274,11 @@ impl BuildRaw for BasicBlock {
     if let Some(b) = builder.bbs.get(self) {
       b.as_ptr()
     } else {
-      builder.bbs.insert(*self, Box::new_uninit());
+      builder.bbs.insert(*self, RawEntity::new());
       let last_bb = info.cur_bb.replace(*self);
       let b = info.cur_func.unwrap().dfg().bb(*self).build(builder, info);
       info.cur_bb = last_bb;
-      let bb = builder.bbs.get_mut(self).unwrap();
+      let bb = builder.bbs.get(self).unwrap();
       bb.write(b);
       bb.as_ptr()
     }
@@ -286,7 +310,7 @@ impl BuildRaw for Value {
     if let Some(v) = builder.values.get(self) {
       v.as_ptr()
     } else {
-      builder.values.insert(*self, Box::new_uninit());
+      builder.values.insert(*self, RawEntity::new());
       let (v, used_by) = if self.is_global() {
         // get global value
         let value = info.program.borrow_value(*self);
@@ -306,7 +330,7 @@ impl BuildRaw for Value {
       // insert `used_by` list to info
       info.value_used_by.insert(*self, used_by);
       // store raw value data
-      let vb = builder.values.get_mut(self).unwrap();
+      let vb = builder.values.get(self).unwrap();
       vb.write(v);
       vb.as_ptr()
     }
