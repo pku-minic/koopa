@@ -20,6 +20,7 @@ colored = "3"
 phf = { version = "0.13.1", features = ["macros"] }
 
 [dev-dependencies]
+libffi = "5.2.0"
 libloading = "0.9"
 
 [[example]]
