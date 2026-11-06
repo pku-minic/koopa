@@ -96,13 +96,18 @@ impl ConstantFolding {
             _ => panic!("invalid branch/jump instruction"),
           };
           // check if is constant
+          if value.is_global() {
+            continue 'outer;
+          }
           let value = data.dfg().value(value);
           if !value.kind().is_const() || !ans.is_none_or(|v| data.dfg().data_eq(&v, value)) {
             continue 'outer;
           }
           ans = Some(value.clone());
         }
-        evaluated.push((i, ans.unwrap()));
+        if let Some(ans) = ans {
+          evaluated.push((i, ans));
+        }
       }
       if !evaluated.is_empty() {
         bb_params.push((*b, evaluated));
@@ -164,5 +169,33 @@ mod tests {
         _ => panic!("unexpected folded value for {expression}"),
       }
     }
+  }
+
+  #[test]
+  fn block_parameters_with_global_or_missing_inputs_are_not_folded() {
+    let mut program = Driver::from(
+      "global @g = alloc i32, 42
+      fun @main(): i32 {
+      %entry:
+        jump %target(@g)
+      %target(%pointer: *i32):
+        %answer = load %pointer
+        ret %answer
+      }",
+    )
+    .generate_program()
+    .unwrap();
+    let func = program.func_layout()[0];
+    let data = program.func_mut(func);
+    let unused = data
+      .dfg_mut()
+      .new_bb()
+      .basic_block_with_params(Some("%unreachable".into()), vec![Type::get_i32()]);
+    let param = data.dfg().bb(unused).params()[0];
+    ConstantFolding::new().run_on(func, data);
+    assert!(matches!(
+      data.dfg().value(param).kind(),
+      ValueKind::BlockArgRef(_)
+    ));
   }
 }
