@@ -72,7 +72,7 @@ macro_rules! generate_init {
         let $elem_ty = match $ty.kind() {
           TypeKind::Array(base, len) => {
             if *len != agg.elems.len() {
-              log_error!(
+              return_error!(
                 $ast.span,
                 "expected array length {}, found length {}",
                 len,
@@ -81,7 +81,6 @@ macro_rules! generate_init {
             }
             base
           }
-          TypeKind::Pointer(base) => base,
           _ => return_error!($ast.span, "invalid aggregate type '{}'", $ty),
         };
         let elems = agg.elems.iter().map($agg_rec).collect::<Result<_, _>>()?;
