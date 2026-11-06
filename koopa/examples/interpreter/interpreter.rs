@@ -332,29 +332,33 @@ impl<'a> InterpreterImpl<'a> {
     let rhs = self.eval_value(bin.rhs());
     let (lv, rv) = match (lhs, rhs) {
       (Val::Int(lv), Val::Int(rv)) => (lv, rv),
+      (Val::Undef, _) | (_, Val::Undef) => {
+        self.insert_val(inst, Val::Undef);
+        return;
+      }
       _ => panic!("invalid lhs or rhs"),
     };
     // perform binary operation
     let ans = match bin.op() {
-      BinaryOp::NotEq => (lv != rv) as i32,
-      BinaryOp::Eq => (lv == rv) as i32,
-      BinaryOp::Gt => (lv > rv) as i32,
-      BinaryOp::Lt => (lv < rv) as i32,
-      BinaryOp::Ge => (lv >= rv) as i32,
-      BinaryOp::Le => (lv <= rv) as i32,
-      BinaryOp::Add => lv + rv,
-      BinaryOp::Sub => lv - rv,
-      BinaryOp::Mul => lv * rv,
-      BinaryOp::Div => lv / rv,
-      BinaryOp::Mod => lv % rv,
-      BinaryOp::And => lv & rv,
-      BinaryOp::Or => lv | rv,
-      BinaryOp::Xor => lv ^ rv,
-      BinaryOp::Shl => lv << rv,
-      BinaryOp::Shr => ((lv as u32) >> rv) as i32,
-      BinaryOp::Sar => lv >> rv,
+      BinaryOp::NotEq => Some((lv != rv) as i32),
+      BinaryOp::Eq => Some((lv == rv) as i32),
+      BinaryOp::Gt => Some((lv > rv) as i32),
+      BinaryOp::Lt => Some((lv < rv) as i32),
+      BinaryOp::Ge => Some((lv >= rv) as i32),
+      BinaryOp::Le => Some((lv <= rv) as i32),
+      BinaryOp::Add => Some(lv.wrapping_add(rv)),
+      BinaryOp::Sub => Some(lv.wrapping_sub(rv)),
+      BinaryOp::Mul => Some(lv.wrapping_mul(rv)),
+      BinaryOp::Div => lv.checked_div(rv),
+      BinaryOp::Mod => lv.checked_rem(rv),
+      BinaryOp::And => Some(lv & rv),
+      BinaryOp::Or => Some(lv | rv),
+      BinaryOp::Xor => Some(lv ^ rv),
+      BinaryOp::Shl => lv.checked_shl(rv as u32),
+      BinaryOp::Shr => (lv as u32).checked_shr(rv as u32).map(|v| v as i32),
+      BinaryOp::Sar => lv.checked_shr(rv as u32),
     };
-    self.insert_val(inst, Val::Int(ans));
+    self.insert_val(inst, ans.map_or(Val::Undef, Val::Int));
   }
 
   fn eval_call(&mut self, inst: &ValueData, call: &Call) -> Result<()> {
@@ -472,6 +476,36 @@ mod tests {
       }}"
     );
     assert_eq!(run(&source).unwrap(), iterations);
+  }
+
+  #[test]
+  fn integer_operations_match_i32_and_undefined_ir_semantics() {
+    for (expression, expected) in [
+      ("add 2147483647, 1", Some(i32::MIN)),
+      ("sub -2147483648, 1", Some(i32::MAX)),
+      ("mul 1073741824, 4", Some(0)),
+      ("div 1, 0", None),
+      ("div -2147483648, -1", None),
+      ("mod -2147483648, -1", None),
+      ("shl 1, 32", None),
+      ("shr 1, -1", None),
+      ("sar 1, 32", None),
+      ("add undef, 1", None),
+      ("add 1, undef", None),
+    ] {
+      let source = format!("fun @main(): i32 {{ %entry: %result = {expression} ret %result }}");
+      let result = run(&source);
+      if let Some(expected) = expected {
+        assert_eq!(result.unwrap(), expected);
+      } else {
+        // An undefined result cannot be returned as the interpreter exit code.
+        assert!(result.is_err(), "{expression}");
+      }
+    }
+    assert_eq!(
+      run("fun @main(): i32 { %entry: %unused = add undef, 1 ret 42 }").unwrap(),
+      42
+    );
   }
 
   #[test]
