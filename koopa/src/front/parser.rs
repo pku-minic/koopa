@@ -219,10 +219,14 @@ impl<T: Read> Parser<T> {
     // check & eat ','
     self.expect(TokenKind::Other(','))?;
     // get length
-    let len = read!(self, TokenKind::Int, "length")? as usize;
+    let len_span = self.span();
+    let len = read!(self, TokenKind::Int, "length")?;
+    if len <= 0 {
+      return_error!(len_span, "array length must be positive, found {}", len);
+    }
     // check & eat ']'
     span.update_span(self.expect(TokenKind::Other(']'))?);
-    Ok(ast::ArrayType::new_boxed(span, base, len))
+    Ok(ast::ArrayType::new_boxed(span, base, len as usize))
   }
 
   /// Parses pointer types.

@@ -69,3 +69,16 @@ fn accepts_array_and_pointer_initializers_of_the_declared_type() {
     assert!(Driver::from(source).generate_program().is_ok(), "{source}");
   }
 }
+
+#[test]
+fn rejects_nonpositive_array_lengths() {
+  for ty in ["[i32, 0]", "[i32, -1]", "[[i32, 0], 2]", "*[i32, -1]"] {
+    for source in [
+      format!("global @g = alloc {ty}, zeroinit"),
+      format!("fun @f() {{ %entry: %p = alloc {ty} ret }}"),
+      format!("decl @f({ty})"),
+    ] {
+      assert!(Driver::from(source).generate_program().is_err());
+    }
+  }
+}
