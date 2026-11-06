@@ -78,9 +78,23 @@ impl Default for Layout {
 /// [`push_key_back`](BasicBlockList::push_key_back),
 /// [`insert_key_before`](key_node_list::CursorMut::insert_key_before) or
 /// [`insert_key_after`](key_node_list::CursorMut::insert_key_after).
+///
+/// Removing a block preserves its instruction list and detaches its
+/// instructions from the layout. Inserting the returned node into a block
+/// list preserves those instructions and updates their parent block.
+/// Inserting a node whose instructions already occur in the destination
+/// layout panics without changing the destination list.
 pub type BasicBlockList = KeyNodeList<BasicBlock, BasicBlockNode, BasicBlockMap>;
 
 type InstBBCell = Weak<RefCell<HashMap<Value, BasicBlock>>>;
+
+#[derive(Clone)]
+struct BlockAttachment {
+  bb: BasicBlock,
+  inst_bb: InstBBCell,
+}
+
+type AttachmentCell = Rc<RefCell<Option<BlockAttachment>>>;
 
 /// The underlying hash map of the [`BasicBlockList`].
 pub struct BasicBlockMap {
@@ -127,7 +141,8 @@ impl Map<BasicBlock, BasicBlockNode> for BasicBlockMap {
     T: Into<BasicBlockNode>,
   {
     if let Entry::Vacant(e) = self.map.entry(k) {
-      let node = BasicBlockNode::new(k, self.inst_bb.clone());
+      let mut node = v.into();
+      node.attach(k, self.inst_bb.clone());
       e.insert(node);
       Ok(())
     } else {
@@ -140,14 +155,21 @@ impl Map<BasicBlock, BasicBlockNode> for BasicBlockMap {
     BasicBlock: Borrow<Q>,
     Q: ?Sized + Hash + Eq,
   {
-    self.map.remove_entry(k)
+    self.map.remove_entry(k).map(|(key, mut node)| {
+      node.detach();
+      (key, node)
+    })
   }
 }
 
 /// The node in [`BasicBlockList`] that holds the instruction list
 /// ([`InstList`]) in the basic block.
+///
+/// A removed node can be edited independently of its original layout,
+/// including after that layout has been dropped.
 pub struct BasicBlockNode {
   insts: InstList,
+  attachment: AttachmentCell,
   prev: Option<BasicBlock>,
   next: Option<BasicBlock>,
 }
@@ -155,11 +177,36 @@ pub struct BasicBlockNode {
 impl_node!(BasicBlockNode { Key = BasicBlock, prev = prev, next = next });
 
 impl BasicBlockNode {
-  fn new(bb: BasicBlock, inst_bb: InstBBCell) -> Self {
+  fn new() -> Self {
+    let attachment = Rc::new(RefCell::new(None));
     Self {
-      insts: InstList::with_map(InstMap::new(bb, inst_bb)),
+      insts: InstList::with_map(InstMap::new(attachment.clone())),
+      attachment,
       prev: None,
       next: None,
+    }
+  }
+
+  fn attach(&mut self, bb: BasicBlock, inst_bb: InstBBCell) {
+    self.detach();
+    if let Some(index) = inst_bb.upgrade() {
+      let mut index = index.as_ref().borrow_mut();
+      assert!(
+        self.insts.keys().all(|inst| !index.contains_key(inst)),
+        "instruction already belongs to a basic block in this layout"
+      );
+      index.extend(self.insts.keys().map(|inst| (*inst, bb)));
+    }
+    *self.attachment.as_ref().borrow_mut() = Some(BlockAttachment { bb, inst_bb });
+  }
+
+  fn detach(&mut self) {
+    let attachment = self.attachment.as_ref().borrow_mut().take();
+    if let Some(index) = attachment.and_then(|a| a.inst_bb.upgrade()) {
+      let mut index = index.as_ref().borrow_mut();
+      for inst in self.insts.keys() {
+        index.remove(inst);
+      }
     }
   }
 
@@ -175,14 +222,15 @@ impl BasicBlockNode {
 }
 
 impl From<()> for BasicBlockNode {
-  /// This function will always panic, so do not call this.
-  ///
-  /// This function is declared to fit the type bounds of methods in
-  /// [`KeyNodeList`] such as [`push_key_front`](KeyNodeList::push_key_front).
-  /// The actual construction of `BasicBlockNode` is done in
-  /// [`BasicBlockMap`].
+  /// Creates an empty basic block node that is not attached to a layout.
   fn from(_: ()) -> Self {
-    panic!("shound not be called")
+    Self::new()
+  }
+}
+
+impl Drop for BasicBlockNode {
+  fn drop(&mut self) {
+    self.detach();
   }
 }
 
@@ -197,20 +245,20 @@ impl From<()> for BasicBlockNode {
 /// [`push_key_back`](BasicBlockList::push_key_back),
 /// [`insert_key_before`](key_node_list::CursorMut::insert_key_before) or
 /// [`insert_key_after`](key_node_list::CursorMut::insert_key_after).
+/// Insertion returns an error if the instruction already belongs to any
+/// basic block in the same layout.
 pub type InstList = KeyNodeList<Value, InstNode, InstMap>;
 
 /// The underlying hash map of the [`InstList`].
 pub struct InstMap {
-  bb: BasicBlock,
-  inst_bb: InstBBCell,
+  attachment: AttachmentCell,
   map: HashMap<Value, InstNode>,
 }
 
 impl InstMap {
-  fn new(bb: BasicBlock, inst_bb: InstBBCell) -> Self {
+  fn new(attachment: AttachmentCell) -> Self {
     Self {
-      bb,
-      inst_bb,
+      attachment,
       map: HashMap::new(),
     }
   }
@@ -222,6 +270,18 @@ impl Map<Value, InstNode> for InstMap {
   }
 
   fn clear(&mut self) {
+    if let Some(index) = self
+      .attachment
+      .as_ref()
+      .borrow()
+      .as_ref()
+      .and_then(|a| a.inst_bb.upgrade())
+    {
+      let mut index = index.as_ref().borrow_mut();
+      for inst in self.map.keys() {
+        index.remove(inst);
+      }
+    }
     self.map.clear()
   }
 
@@ -246,18 +306,21 @@ impl Map<Value, InstNode> for InstMap {
     T: Into<InstNode>,
   {
     if self.contains_key(&k) {
-      Err((k, v))
-    } else {
-      self
-        .inst_bb
-        .upgrade()
-        .unwrap()
-        .as_ref()
-        .borrow_mut()
-        .insert(k, self.bb);
-      self.map.insert(k, v.into());
-      Ok(())
+      return Err((k, v));
     }
+    let attachment = self.attachment.as_ref().borrow().clone();
+    let parent = attachment.and_then(|a| a.inst_bb.upgrade().map(|index| (a.bb, index)));
+    if let Some((_, index)) = &parent
+      && index.as_ref().borrow().contains_key(&k)
+    {
+      return Err((k, v));
+    }
+    let node = v.into();
+    self.map.insert(k, node);
+    if let Some((bb, index)) = parent {
+      index.as_ref().borrow_mut().insert(k, bb);
+    }
+    Ok(())
   }
 
   fn remove_entry<Q>(&mut self, k: &Q) -> Option<(Value, InstNode)>
@@ -266,14 +329,15 @@ impl Map<Value, InstNode> for InstMap {
     Q: ?Sized + Hash + Eq,
   {
     let kv = self.map.remove_entry(k);
-    if kv.is_some() {
-      self
-        .inst_bb
-        .upgrade()
-        .unwrap()
+    if kv.is_some()
+      && let Some(index) = self
+        .attachment
         .as_ref()
-        .borrow_mut()
-        .remove(k);
+        .borrow()
+        .as_ref()
+        .and_then(|a| a.inst_bb.upgrade())
+    {
+      index.as_ref().borrow_mut().remove(k);
     }
     kv
   }
@@ -293,5 +357,203 @@ impl From<()> for InstNode {
       prev: None,
       next: None,
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::ir::{Program, Type, builder_traits::*};
+
+  fn handles() -> (Program, [BasicBlock; 3], [Value; 3]) {
+    let mut program = Program::new();
+    let func = program.new_func_def("@test".into(), Vec::new(), Type::get_unit());
+    let dfg = program.func_mut(func).dfg_mut();
+    let bbs = std::array::from_fn(|_| dfg.new_bb().basic_block(None));
+    let insts = std::array::from_fn(|_| dfg.new_value().alloc(Type::get_i32()));
+    (program, bbs, insts)
+  }
+
+  #[test]
+  fn reinserting_blocks_preserves_instruction_order() {
+    let (_program, [first, second, _], [a, b, c]) = handles();
+    let mut layout = Layout::new();
+    layout.bbs_mut().extend([first, second]);
+    layout.bb_mut(first).insts_mut().extend([a, b]);
+    layout.bb_mut(second).insts_mut().push_key_back(c).unwrap();
+
+    let (key, node) = layout.bbs_mut().remove(&first).unwrap();
+    assert_eq!(layout.parent_bb(a), None);
+    assert_eq!(layout.parent_bb(b), None);
+    assert_eq!(layout.parent_bb(c), Some(second));
+    assert_eq!(node.insts().keys().copied().collect::<Vec<_>>(), [a, b]);
+    assert!(layout.bbs_mut().push_back(key, node).is_ok());
+    assert_eq!(
+      layout.bbs().keys().copied().collect::<Vec<_>>(),
+      [second, first]
+    );
+    assert_eq!(
+      layout.bbs()[&first]
+        .insts()
+        .keys()
+        .copied()
+        .collect::<Vec<_>>(),
+      [a, b]
+    );
+    assert_eq!(layout.parent_bb(a), Some(first));
+    assert_eq!(layout.parent_bb(b), Some(first));
+  }
+
+  #[test]
+  fn clearing_instructions_and_blocks_updates_parent_index() {
+    let (_program, [first, second, _], [a, b, c]) = handles();
+    let mut layout = Layout::new();
+    layout.bbs_mut().extend([first, second]);
+    layout.bb_mut(first).insts_mut().extend([a, b]);
+    layout.bb_mut(second).insts_mut().push_key_back(c).unwrap();
+
+    layout.bb_mut(first).insts_mut().clear();
+    assert_eq!(layout.parent_bb(a), None);
+    assert_eq!(layout.parent_bb(b), None);
+    assert_eq!(layout.parent_bb(c), Some(second));
+    layout.bb_mut(first).insts_mut().push_key_back(a).unwrap();
+    assert_eq!(layout.parent_bb(a), Some(first));
+    layout.bbs_mut().clear();
+    assert!(layout.bbs().is_empty());
+    assert_eq!(layout.parent_bb(a), None);
+    assert_eq!(layout.parent_bb(c), None);
+  }
+
+  #[test]
+  fn removed_nodes_do_not_change_the_old_parent_index() {
+    let (_program, [first, second, _], [a, b, c]) = handles();
+    let mut layout = Layout::new();
+    layout.bbs_mut().extend([first, second]);
+    layout.bb_mut(first).insts_mut().extend([a, b]);
+    let (_, mut node) = layout.bbs_mut().remove(&first).unwrap();
+    assert_eq!(layout.parent_bb(a), None);
+    assert_eq!(layout.parent_bb(b), None);
+    layout.bb_mut(second).insts_mut().extend([a, b, c]);
+    node.insts_mut().remove(&a).unwrap();
+    node.insts_mut().clear();
+    node.insts_mut().push_key_back(c).unwrap();
+    drop(node);
+    for inst in [a, b, c] {
+      assert_eq!(layout.parent_bb(inst), Some(second));
+    }
+  }
+
+  #[test]
+  fn detached_nodes_outlive_layouts_and_can_move_to_another_layout() {
+    let (_program, [first, second, third], [a, b, c]) = handles();
+    let mut old = Layout::new();
+    old.bbs_mut().push_key_back(first).unwrap();
+    old.bb_mut(first).insts_mut().push_key_back(a).unwrap();
+    let (_, mut node) = old.bbs_mut().remove(&first).unwrap();
+    drop(old);
+    node.insts_mut().remove(&a).unwrap();
+    node.insts_mut().extend([a, b]);
+    node.insts_mut().clear();
+    node.insts_mut().push_key_back(a).unwrap();
+
+    let mut new = Layout::new();
+    new.bbs_mut().push_key_back(second).unwrap();
+    new.bb_mut(second).insts_mut().push_key_back(c).unwrap();
+    assert!(new.bbs_mut().push_back(third, node).is_ok());
+    assert_eq!(new.parent_bb(a), Some(third));
+    assert_eq!(new.parent_bb(c), Some(second));
+    new.bb_mut(third).insts_mut().push_key_back(b).unwrap();
+    assert_eq!(new.parent_bb(b), Some(third));
+    assert_eq!(
+      new.bbs()[&third]
+        .insts()
+        .keys()
+        .copied()
+        .collect::<Vec<_>>(),
+      [a, b]
+    );
+  }
+
+  #[test]
+  fn transferring_blocks_updates_only_the_destination_layout() {
+    let (_program, [first, second, third], [a, b, _]) = handles();
+    let mut source = Layout::new();
+    source.bbs_mut().extend([first, second]);
+    source.bb_mut(first).insts_mut().push_key_back(a).unwrap();
+    let (_, node) = source.bbs_mut().remove(&first).unwrap();
+    source.bb_mut(second).insts_mut().push_key_back(a).unwrap();
+
+    let mut destination = Layout::new();
+    assert!(destination.bbs_mut().push_back(third, node).is_ok());
+    destination
+      .bb_mut(third)
+      .insts_mut()
+      .push_key_back(b)
+      .unwrap();
+    assert_eq!(source.parent_bb(a), Some(second));
+    assert_eq!(source.parent_bb(b), None);
+    assert_eq!(destination.parent_bb(a), Some(third));
+    assert_eq!(destination.parent_bb(b), Some(third));
+    destination.bbs_mut().clear();
+    assert_eq!(source.parent_bb(a), Some(second));
+    assert_eq!(destination.parent_bb(a), None);
+    assert_eq!(destination.parent_bb(b), None);
+  }
+
+  #[test]
+  fn instructions_cannot_belong_to_two_blocks() {
+    let (_program, [first, second, _], [a, _, _]) = handles();
+    let mut layout = Layout::new();
+    layout.bbs_mut().extend([first, second]);
+    layout.bb_mut(first).insts_mut().push_key_back(a).unwrap();
+    assert_eq!(layout.bb_mut(second).insts_mut().push_key_back(a), Err(a));
+    assert_eq!(layout.parent_bb(a), Some(first));
+    assert!(layout.bbs()[&second].insts().is_empty());
+    let (inst, node) = layout.bb_mut(first).insts_mut().remove(&a).unwrap();
+    assert_eq!(layout.parent_bb(a), None);
+    assert!(
+      layout
+        .bb_mut(second)
+        .insts_mut()
+        .push_back(inst, node)
+        .is_ok()
+    );
+    assert_eq!(layout.parent_bb(a), Some(second));
+  }
+
+  #[test]
+  fn duplicate_block_keys_return_the_original_node() {
+    let (_program, [first, second, _], [a, b, _]) = handles();
+    let mut layout = Layout::new();
+    layout.bbs_mut().push_key_back(first).unwrap();
+    layout.bb_mut(first).insts_mut().push_key_back(a).unwrap();
+    let mut node = BasicBlockNode::from(());
+    node.insts_mut().push_key_back(b).unwrap();
+    let Err((key, node)) = layout.bbs_mut().push_back(first, node) else {
+      panic!("duplicate block key was accepted");
+    };
+    assert_eq!(key, first);
+    assert_eq!(node.insts().keys().copied().collect::<Vec<_>>(), [b]);
+    assert_eq!(layout.parent_bb(a), Some(first));
+    assert_eq!(layout.parent_bb(b), None);
+    assert!(layout.bbs_mut().push_back(second, node).is_ok());
+    assert_eq!(layout.parent_bb(b), Some(second));
+  }
+
+  #[test]
+  fn conflicting_block_insertion_preserves_the_destination() {
+    let (_program, [first, second, _], [a, b, _]) = handles();
+    let mut layout = Layout::new();
+    layout.bbs_mut().push_key_back(first).unwrap();
+    layout.bb_mut(first).insts_mut().push_key_back(a).unwrap();
+    let mut node = BasicBlockNode::from(());
+    node.insts_mut().extend([b, a]);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+      let _ = layout.bbs_mut().push_back(second, node);
+    }));
+    assert!(result.is_err());
+    assert_eq!(layout.bbs().keys().copied().collect::<Vec<_>>(), [first]);
+    assert_eq!(layout.parent_bb(a), Some(first));
+    assert_eq!(layout.parent_bb(b), None);
   }
 }
