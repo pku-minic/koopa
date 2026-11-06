@@ -1,25 +1,30 @@
 use super::entities::*;
-use crate::utils::new_uninit_box;
 use koopa::ir::entities::{BasicBlockData, ValueData};
 use koopa::ir::values::*;
 use koopa::ir::{BasicBlock, Function, FunctionData, Program, Type, TypeKind};
 use koopa::ir::{BinaryOp, Value, ValueKind};
-use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
 use std::os::raw::{c_char, c_void};
 use std::ptr::null;
 
 /// Raw builder that builds raw programs from Koopa IR programs.
 #[derive(Default)]
 pub struct RawProgramBuilder {
+  programs: Vec<RawProgramStorage>,
+}
+
+/// Owns one immutable raw-program snapshot, including its recursive entities.
+#[derive(Default)]
+struct RawProgramStorage {
   slices: Vec<Vec<*const ()>>,
   strs: HashMap<String, CString>,
   tys: HashMap<Type, Box<RawTypeKind>>,
-  funcs: HashMap<Function, Box<RawFunctionData>>,
-  bbs: HashMap<BasicBlock, Box<RawBasicBlockData>>,
-  values: HashMap<Value, Box<UnsafeCell<RawValueData>>>,
+  funcs: HashMap<Function, Box<MaybeUninit<RawFunctionData>>>,
+  bbs: HashMap<BasicBlock, Box<MaybeUninit<RawBasicBlockData>>>,
+  values: HashMap<Value, Box<MaybeUninit<RawValueData>>>,
 }
 
 impl RawProgramBuilder {
@@ -28,8 +33,18 @@ impl RawProgramBuilder {
     Self::default()
   }
 
-  /// Builds on the given Koopa IR program.
+  /// Builds a snapshot of the given Koopa IR program.
+  ///
+  /// Earlier snapshots remain valid until this builder is dropped, even if
+  /// the source program is changed or another program is built afterwards.
   pub fn build_on(&mut self, program: &Program) -> RawProgram<'_> {
+    self.programs.push(RawProgramStorage::default());
+    self.programs.last_mut().unwrap().build_on(program)
+  }
+}
+
+impl RawProgramStorage {
+  fn build_on(&mut self, program: &Program) -> RawProgram<'_> {
     let mut info = ProgramInfo::new(program);
     let raw = RawProgram {
       values: iter_into_raw(program.inst_layout().iter(), self, &mut info),
@@ -43,7 +58,7 @@ impl RawProgramBuilder {
       .map(|value| {
         let v: Vec<_> = info.value_used_by[value]
           .iter()
-          .map(|v| self.values[v].get() as *const ())
+          .map(|v| self.values[v].as_ptr() as *const ())
           .collect();
         let slice = RawSlice {
           buffer: v.as_ptr() as *const c_void,
@@ -54,8 +69,10 @@ impl RawProgramBuilder {
         slice
       })
       .collect();
-    for (data, slice) in self.values.values_mut().zip(slices.into_iter()) {
-      data.get_mut().used_by = slice;
+    for (data, slice) in self.values.values_mut().zip(slices) {
+      // SAFETY: every placeholder is initialized before its BuildRaw call
+      // returns, and the complete program traversal above has finished.
+      unsafe { data.assume_init_mut() }.used_by = slice;
     }
     raw
   }
@@ -93,7 +110,7 @@ impl Default for RawSlice {
 /// Converts an iterator to [`RawSlice`].
 fn iter_into_raw<'a, I, T, R>(
   iter: I,
-  builder: &mut RawProgramBuilder,
+  builder: &mut RawProgramStorage,
   info: &mut ProgramInfo,
 ) -> RawSlice
 where
@@ -120,13 +137,13 @@ trait BuildRaw {
   const KIND: RawSliceItemKind = RawSliceItemKind::Unknown;
 
   /// Builds a new raw structure.
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw;
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw;
 }
 
 impl BuildRaw for str {
   type Raw = *const c_char;
 
-  fn build(&self, builder: &mut RawProgramBuilder, _: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, _: &mut ProgramInfo) -> Self::Raw {
     if let Some(s) = builder.strs.get(self) {
       s.as_ptr()
     } else {
@@ -140,7 +157,7 @@ impl BuildRaw for str {
 impl BuildRaw for String {
   type Raw = *const c_char;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     self.as_str().build(builder, info)
   }
 }
@@ -152,7 +169,7 @@ where
 {
   type Raw = R;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     self.as_ref().map_or(R::NULL, |s| s.build(builder, info))
   }
 }
@@ -162,7 +179,7 @@ impl BuildRaw for Type {
 
   const KIND: RawSliceItemKind = RawSliceItemKind::Type;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(t) = builder.tys.get(self) {
       t.as_ref()
     } else {
@@ -176,7 +193,7 @@ impl BuildRaw for Type {
 impl BuildRaw for TypeKind {
   type Raw = RawTypeKind;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     match self {
       TypeKind::Int32 => RawTypeKind::Int32,
       TypeKind::Unit => RawTypeKind::Unit,
@@ -195,18 +212,18 @@ impl BuildRaw for Function {
 
   const KIND: RawSliceItemKind = RawSliceItemKind::Function;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(f) = builder.funcs.get(self) {
-      f.as_ref()
+      f.as_ptr()
     } else {
-      builder.funcs.insert(*self, unsafe { new_uninit_box() });
+      builder.funcs.insert(*self, Box::new_uninit());
       let func = info.program.func(*self);
       let last_func = info.cur_func.replace(func);
       let f = func.build(builder, info);
       info.cur_func = last_func;
       let fb = builder.funcs.get_mut(self).unwrap();
-      **fb = f;
-      fb.as_ref()
+      fb.write(f);
+      fb.as_ptr()
     }
   }
 }
@@ -214,7 +231,7 @@ impl BuildRaw for Function {
 impl BuildRaw for FunctionData {
   type Raw = RawFunctionData;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawFunctionData {
       ty: self.ty().build(builder, info),
       name: self.name().build(builder, info),
@@ -229,17 +246,17 @@ impl BuildRaw for BasicBlock {
 
   const KIND: RawSliceItemKind = RawSliceItemKind::BasicBlock;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(b) = builder.bbs.get(self) {
-      b.as_ref()
+      b.as_ptr()
     } else {
-      builder.bbs.insert(*self, unsafe { new_uninit_box() });
+      builder.bbs.insert(*self, Box::new_uninit());
       let last_bb = info.cur_bb.replace(*self);
       let b = info.cur_func.unwrap().dfg().bb(*self).build(builder, info);
       info.cur_bb = last_bb;
       let bb = builder.bbs.get_mut(self).unwrap();
-      **bb = b;
-      bb.as_ref()
+      bb.write(b);
+      bb.as_ptr()
     }
   }
 }
@@ -247,7 +264,7 @@ impl BuildRaw for BasicBlock {
 impl BuildRaw for BasicBlockData {
   type Raw = RawBasicBlockData;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawBasicBlockData {
       name: self.name().build(builder, info),
       params: iter_into_raw(self.params().iter(), builder, info),
@@ -265,11 +282,11 @@ impl BuildRaw for Value {
 
   const KIND: RawSliceItemKind = RawSliceItemKind::Value;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     if let Some(v) = builder.values.get(self) {
-      v.get() as _
+      v.as_ptr()
     } else {
-      builder.values.insert(*self, unsafe { new_uninit_box() });
+      builder.values.insert(*self, Box::new_uninit());
       let (v, used_by) = if self.is_global() {
         // get global value
         let value = info.program.borrow_value(*self);
@@ -290,8 +307,8 @@ impl BuildRaw for Value {
       info.value_used_by.insert(*self, used_by);
       // store raw value data
       let vb = builder.values.get_mut(self).unwrap();
-      *vb.get_mut() = v;
-      vb.get() as *const RawValueData
+      vb.write(v);
+      vb.as_ptr()
     }
   }
 }
@@ -299,7 +316,7 @@ impl BuildRaw for Value {
 impl BuildRaw for ValueData {
   type Raw = RawValueData;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawValueData {
       ty: self.ty().build(builder, info),
       name: self.name().build(builder, info),
@@ -312,7 +329,7 @@ impl BuildRaw for ValueData {
 impl BuildRaw for ValueKind {
   type Raw = RawValueKind;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     match self {
       ValueKind::Integer(v) => RawValueKind::Integer(v.build(builder, info)),
       ValueKind::ZeroInit(_) => RawValueKind::ZeroInit,
@@ -338,7 +355,7 @@ impl BuildRaw for ValueKind {
 impl BuildRaw for Integer {
   type Raw = RawInteger;
 
-  fn build(&self, _: &mut RawProgramBuilder, _: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, _: &mut RawProgramStorage, _: &mut ProgramInfo) -> Self::Raw {
     RawInteger {
       value: self.value(),
     }
@@ -348,7 +365,7 @@ impl BuildRaw for Integer {
 impl BuildRaw for Aggregate {
   type Raw = RawAggregate;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawAggregate {
       elems: iter_into_raw(self.elems().iter(), builder, info),
     }
@@ -358,7 +375,7 @@ impl BuildRaw for Aggregate {
 impl BuildRaw for FuncArgRef {
   type Raw = RawFuncArgRef;
 
-  fn build(&self, _: &mut RawProgramBuilder, _: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, _: &mut RawProgramStorage, _: &mut ProgramInfo) -> Self::Raw {
     RawFuncArgRef {
       index: self.index(),
     }
@@ -368,7 +385,7 @@ impl BuildRaw for FuncArgRef {
 impl BuildRaw for BlockArgRef {
   type Raw = RawBlockArgRef;
 
-  fn build(&self, _: &mut RawProgramBuilder, _: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, _: &mut RawProgramStorage, _: &mut ProgramInfo) -> Self::Raw {
     RawBlockArgRef {
       index: self.index(),
     }
@@ -378,7 +395,7 @@ impl BuildRaw for BlockArgRef {
 impl BuildRaw for GlobalAlloc {
   type Raw = RawGlobalAlloc;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawGlobalAlloc {
       init: self.init().build(builder, info),
     }
@@ -388,7 +405,7 @@ impl BuildRaw for GlobalAlloc {
 impl BuildRaw for Load {
   type Raw = RawLoad;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawLoad {
       src: self.src().build(builder, info),
     }
@@ -398,7 +415,7 @@ impl BuildRaw for Load {
 impl BuildRaw for Store {
   type Raw = RawStore;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawStore {
       value: self.value().build(builder, info),
       dest: self.dest().build(builder, info),
@@ -409,7 +426,7 @@ impl BuildRaw for Store {
 impl BuildRaw for GetPtr {
   type Raw = RawGetPtr;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawGetPtr {
       src: self.src().build(builder, info),
       index: self.index().build(builder, info),
@@ -420,7 +437,7 @@ impl BuildRaw for GetPtr {
 impl BuildRaw for GetElemPtr {
   type Raw = RawGetElemPtr;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawGetElemPtr {
       src: self.src().build(builder, info),
       index: self.index().build(builder, info),
@@ -431,7 +448,7 @@ impl BuildRaw for GetElemPtr {
 impl BuildRaw for Binary {
   type Raw = RawBinary;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawBinary {
       op: match self.op() {
         BinaryOp::NotEq => RawBinaryOp::NotEq,
@@ -461,7 +478,7 @@ impl BuildRaw for Binary {
 impl BuildRaw for Branch {
   type Raw = RawBranch;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawBranch {
       cond: self.cond().build(builder, info),
       true_bb: self.true_bb().build(builder, info),
@@ -475,7 +492,7 @@ impl BuildRaw for Branch {
 impl BuildRaw for Jump {
   type Raw = RawJump;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawJump {
       target: self.target().build(builder, info),
       args: iter_into_raw(self.args().iter(), builder, info),
@@ -486,7 +503,7 @@ impl BuildRaw for Jump {
 impl BuildRaw for Call {
   type Raw = RawCall;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawCall {
       callee: self.callee().build(builder, info),
       args: iter_into_raw(self.args().iter(), builder, info),
@@ -497,7 +514,7 @@ impl BuildRaw for Call {
 impl BuildRaw for Return {
   type Raw = RawReturn;
 
-  fn build(&self, builder: &mut RawProgramBuilder, info: &mut ProgramInfo) -> Self::Raw {
+  fn build(&self, builder: &mut RawProgramStorage, info: &mut ProgramInfo) -> Self::Raw {
     RawReturn {
       value: self.value().build(builder, info),
     }
