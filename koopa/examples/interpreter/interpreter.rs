@@ -421,6 +421,138 @@ impl<'a> InterpreterImpl<'a> {
   }
 }
 
+// Memory visible to native functions must have the target's actual scalar and
+// contiguous array layout, never the layout of the interpreter's Val enum.
+struct Allocation {
+  ptr: NonNull<()>,
+  layout: Layout,
+}
+
+impl Allocation {
+  fn new(ty: &Type) -> Result<Self> {
+    let layout = Layout::from_size_align(ty.size().max(1), align_of::<usize>())
+      .map_err(|_| new_error("invalid allocation size"))?;
+    let ptr = NonNull::new(unsafe { alloc_zeroed(layout) })
+      .unwrap_or_else(|| handle_alloc_error(layout))
+      .cast();
+    Ok(Self { ptr, layout })
+  }
+
+  fn value(&self) -> Val {
+    Val::new_val_pointer(Some(self.ptr))
+  }
+}
+
+impl Drop for Allocation {
+  fn drop(&mut self) {
+    unsafe { dealloc(self.ptr.as_ptr().cast(), self.layout) };
+  }
+}
+
+struct Environment<'a> {
+  func: &'a FunctionData,
+  allocs: Vec<Allocation>,
+  vals: HashMap<*const ValueData, Val>,
+}
+
+impl<'a> Environment<'a> {
+  fn new(func: &'a FunctionData, vals: HashMap<*const ValueData, Val>) -> Self {
+    Self {
+      func,
+      allocs: Vec::new(),
+      vals,
+    }
+  }
+}
+
+#[derive(Clone)]
+pub enum Val {
+  Undef,
+  Int(i32),
+  Array(Box<[Val]>),
+  Pointer {
+    ptr: Option<NonNull<()>>,
+    // if the pointer points to an array element,
+    // the index and the total length of the parent array are recorded
+    // in case of an out-of-bounds access
+    index: usize,
+    len: usize,
+  },
+  UnsafePointer(Option<NonNull<()>>),
+}
+
+impl Val {
+  fn new_val_pointer(ptr: Option<NonNull<()>>) -> Self {
+    Self::Pointer {
+      ptr,
+      index: 0,
+      len: usize::from(ptr.is_some()),
+    }
+  }
+
+  fn load_from_unsafe_ptr(ptr: Option<NonNull<()>>, ty: &Type) -> Option<Self> {
+    ptr.map(|p| match ty.kind() {
+      TypeKind::Int32 => Val::Int(unsafe { *(p.as_ptr() as *const i32) }),
+      TypeKind::Array(ty, len) => Val::Array(
+        (0..*len)
+          .map(|i| {
+            Val::load_from_unsafe_ptr(
+              Some(unsafe {
+                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(ty.size() * i).cast())
+              }),
+              ty,
+            )
+            .unwrap()
+          })
+          .collect::<Vec<_>>()
+          .into_boxed_slice(),
+      ),
+      TypeKind::Pointer(_) => {
+        Val::UnsafePointer(NonNull::new(unsafe { *p.as_ptr().cast::<*mut ()>() }))
+      }
+      _ => panic!("invalid type"),
+    })
+  }
+
+  fn as_bool(&self) -> bool {
+    matches!(self, Val::Int(i) if *i != 0)
+  }
+
+  fn store_to_unsafe_ptr(&self, ptr: Option<NonNull<()>>, ty: &Type) -> Result<()> {
+    ptr
+      .map(|p| match self {
+        Val::Int(i) => {
+          unsafe { *(p.as_ptr() as *mut i32) = *i };
+          Ok(())
+        }
+        Val::Array(arr) => {
+          let base = match ty.kind() {
+            TypeKind::Array(base, _) => base,
+            _ => panic!("invalid array type"),
+          };
+          arr.iter().enumerate().try_for_each(|(i, v)| {
+            v.store_to_unsafe_ptr(
+              Some(unsafe {
+                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(base.size() * i).cast())
+              }),
+              base,
+            )
+          })
+        }
+        Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => {
+          unsafe { *p.as_ptr().cast::<*const ()>() = ptr.map_or(null(), |p| p.as_ptr()) };
+          Ok(())
+        }
+        Val::Undef => {
+          // Choose zero for an unspecified initial value, just like local alloc.
+          unsafe { p.as_ptr().cast::<u8>().write_bytes(0, ty.size()) };
+          Ok(())
+        }
+      })
+      .ok_or_else(|| new_error("accessing to null pointer"))?
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -603,137 +735,5 @@ mod tests {
       InterpreterImpl::new(&program, externs).interpret().unwrap(),
       42
     );
-  }
-}
-
-// Memory visible to native functions must have the target's actual scalar and
-// contiguous array layout, never the layout of the interpreter's Val enum.
-struct Allocation {
-  ptr: NonNull<()>,
-  layout: Layout,
-}
-
-impl Allocation {
-  fn new(ty: &Type) -> Result<Self> {
-    let layout = Layout::from_size_align(ty.size().max(1), align_of::<usize>())
-      .map_err(|_| new_error("invalid allocation size"))?;
-    let ptr = NonNull::new(unsafe { alloc_zeroed(layout) })
-      .unwrap_or_else(|| handle_alloc_error(layout))
-      .cast();
-    Ok(Self { ptr, layout })
-  }
-
-  fn value(&self) -> Val {
-    Val::new_val_pointer(Some(self.ptr))
-  }
-}
-
-impl Drop for Allocation {
-  fn drop(&mut self) {
-    unsafe { dealloc(self.ptr.as_ptr().cast(), self.layout) };
-  }
-}
-
-struct Environment<'a> {
-  func: &'a FunctionData,
-  allocs: Vec<Allocation>,
-  vals: HashMap<*const ValueData, Val>,
-}
-
-impl<'a> Environment<'a> {
-  fn new(func: &'a FunctionData, vals: HashMap<*const ValueData, Val>) -> Self {
-    Self {
-      func,
-      allocs: Vec::new(),
-      vals,
-    }
-  }
-}
-
-#[derive(Clone)]
-pub enum Val {
-  Undef,
-  Int(i32),
-  Array(Box<[Val]>),
-  Pointer {
-    ptr: Option<NonNull<()>>,
-    // if the pointer points to an array element,
-    // the index and the total length of the parent array are recorded
-    // in case of an out-of-bounds access
-    index: usize,
-    len: usize,
-  },
-  UnsafePointer(Option<NonNull<()>>),
-}
-
-impl Val {
-  fn new_val_pointer(ptr: Option<NonNull<()>>) -> Self {
-    Self::Pointer {
-      ptr,
-      index: 0,
-      len: usize::from(ptr.is_some()),
-    }
-  }
-
-  fn load_from_unsafe_ptr(ptr: Option<NonNull<()>>, ty: &Type) -> Option<Self> {
-    ptr.map(|p| match ty.kind() {
-      TypeKind::Int32 => Val::Int(unsafe { *(p.as_ptr() as *const i32) }),
-      TypeKind::Array(ty, len) => Val::Array(
-        (0..*len)
-          .map(|i| {
-            Val::load_from_unsafe_ptr(
-              Some(unsafe {
-                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(ty.size() * i).cast())
-              }),
-              ty,
-            )
-            .unwrap()
-          })
-          .collect::<Vec<_>>()
-          .into_boxed_slice(),
-      ),
-      TypeKind::Pointer(_) => {
-        Val::UnsafePointer(NonNull::new(unsafe { *p.as_ptr().cast::<*mut ()>() }))
-      }
-      _ => panic!("invalid type"),
-    })
-  }
-
-  fn as_bool(&self) -> bool {
-    matches!(self, Val::Int(i) if *i != 0)
-  }
-
-  fn store_to_unsafe_ptr(&self, ptr: Option<NonNull<()>>, ty: &Type) -> Result<()> {
-    ptr
-      .map(|p| match self {
-        Val::Int(i) => {
-          unsafe { *(p.as_ptr() as *mut i32) = *i };
-          Ok(())
-        }
-        Val::Array(arr) => {
-          let base = match ty.kind() {
-            TypeKind::Array(base, _) => base,
-            _ => panic!("invalid array type"),
-          };
-          arr.iter().enumerate().try_for_each(|(i, v)| {
-            v.store_to_unsafe_ptr(
-              Some(unsafe {
-                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(base.size() * i).cast())
-              }),
-              base,
-            )
-          })
-        }
-        Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => {
-          unsafe { *p.as_ptr().cast::<*const ()>() = ptr.map_or(null(), |p| p.as_ptr()) };
-          Ok(())
-        }
-        Val::Undef => {
-          // Choose zero for an unspecified initial value, just like local alloc.
-          unsafe { p.as_ptr().cast::<u8>().write_bytes(0, ty.size()) };
-          Ok(())
-        }
-      })
-      .ok_or_else(|| new_error("accessing to null pointer"))?
   }
 }

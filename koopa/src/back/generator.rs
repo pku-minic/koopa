@@ -239,9 +239,9 @@ impl Prefix {
         max_len,
       } => {
         let mut name = if let Some(name) = name.strip_prefix('@') {
-          format!("{}{}", named, name)
+          format!("{named}{name}")
         } else {
-          format!("{}{}", temp, &name[1..])
+          format!("{temp}{}", &name[1..])
         };
         if let Some(max_len) = max_len {
           name.truncate(max_len.get());
@@ -250,11 +250,12 @@ impl Prefix {
       }
     }
   }
+
   /// Returns a temp name by the given id.
   fn temp_name(&self, id: usize) -> String {
     match self {
-      Prefix::Default => format!("%{}", id),
-      Prefix::Custom { temp, .. } => format!("{}{}", temp, id),
+      Prefix::Default => format!("%{id}"),
+      Prefix::Custom { temp, .. } => format!("{temp}{id}"),
     }
   }
 }

@@ -17,38 +17,6 @@ pub struct RawProgramBuilder {
   programs: Vec<RawProgramStorage>,
 }
 
-/// Owns one immutable raw-program snapshot, including its recursive entities.
-#[derive(Default)]
-struct RawProgramStorage {
-  slices: Vec<Vec<*const ()>>,
-  strs: HashMap<String, CString>,
-  tys: HashMap<Type, Box<RawTypeKind>>,
-  funcs: HashMap<Function, RawEntity<RawFunctionData>>,
-  bbs: HashMap<BasicBlock, RawEntity<RawBasicBlockData>>,
-  values: HashMap<Value, RawEntity<RawValueData>>,
-}
-
-/// Stable storage for entities referenced before recursive construction finishes.
-/// Interior mutability keeps existing raw pointers valid while filling the entity
-/// or its `used_by` slice. Never create references to an uninitialized entity.
-struct RawEntity<T>(Box<UnsafeCell<MaybeUninit<T>>>);
-
-impl<T> RawEntity<T> {
-  fn new() -> Self {
-    Self(Box::new(UnsafeCell::new(MaybeUninit::uninit())))
-  }
-
-  fn as_ptr(&self) -> *const T {
-    self.0.get().cast()
-  }
-
-  fn write(&self, value: T) {
-    // SAFETY: this allocation has the layout of T, and no references to its
-    // contents are exposed during construction. Raw pointers may already exist.
-    unsafe { self.0.get().cast::<T>().write(value) };
-  }
-}
-
 impl RawProgramBuilder {
   /// Creates a new raw builder.
   pub fn new() -> Self {
@@ -63,6 +31,17 @@ impl RawProgramBuilder {
     self.programs.push(RawProgramStorage::default());
     self.programs.last_mut().unwrap().build_on(program)
   }
+}
+
+/// Owns one immutable raw-program snapshot, including its recursive entities.
+#[derive(Default)]
+struct RawProgramStorage {
+  slices: Vec<Vec<*const ()>>,
+  strs: HashMap<String, CString>,
+  tys: HashMap<Type, Box<RawTypeKind>>,
+  funcs: HashMap<Function, RawEntity<RawFunctionData>>,
+  bbs: HashMap<BasicBlock, RawEntity<RawBasicBlockData>>,
+  values: HashMap<Value, RawEntity<RawValueData>>,
 }
 
 impl RawProgramStorage {
@@ -99,6 +78,27 @@ impl RawProgramStorage {
       unsafe { (&raw mut (*data.as_ptr().cast_mut()).used_by).write(slice) };
     }
     raw
+  }
+}
+
+/// Stable storage for entities referenced before recursive construction finishes.
+/// Interior mutability keeps existing raw pointers valid while filling the entity
+/// or its `used_by` slice. Never create references to an uninitialized entity.
+struct RawEntity<T>(Box<UnsafeCell<MaybeUninit<T>>>);
+
+impl<T> RawEntity<T> {
+  fn new() -> Self {
+    Self(Box::new(UnsafeCell::new(MaybeUninit::uninit())))
+  }
+
+  fn as_ptr(&self) -> *const T {
+    self.0.get().cast()
+  }
+
+  fn write(&self, value: T) {
+    // SAFETY: this allocation has the layout of T, and no references to its
+    // contents are exposed during construction. Raw pointers may already exist.
+    unsafe { self.0.get().cast::<T>().write(value) };
   }
 }
 
