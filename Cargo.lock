@@ -86,6 +86,8 @@ name = "libkoopa"
 version = "0.0.10"
 dependencies = [
  "koopa",
+ "libc",
+ "windows-sys",
 ]
 
 [[package]]

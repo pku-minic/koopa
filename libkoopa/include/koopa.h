@@ -479,7 +479,9 @@ koopa_error_code_t koopa_parse_from_stdin(koopa_program_t *program);
 
 ///
 /// Parses text-form Koopa IR program from the given
-/// file descriptor (UNIX) or handle (Windows). The caller retains ownership.
+/// file descriptor (UNIX) or handle (Windows). The caller retains ownership
+/// and should keep the file open for the call. If the library cannot duplicate
+/// the descriptor or handle, it returns KOOPA_EC_INVALID_FILE.
 /// Updates the `program` if no errors occurred.
 ///
 /// Returns the error code.
@@ -522,7 +524,9 @@ koopa_error_code_t koopa_dump_to_stdout(koopa_program_t program);
 
 ///
 /// Generates text-form Koopa IR program to the given
-/// file descriptor (UNIX) or handle (Windows). The caller retains ownership.
+/// file descriptor (UNIX) or handle (Windows). The caller retains ownership
+/// and should keep the file open for the call. If the library cannot duplicate
+/// the descriptor or handle, it returns KOOPA_EC_INVALID_FILE.
 ///
 /// Returns the error code.
 ///
@@ -556,7 +560,9 @@ koopa_error_code_t koopa_dump_llvm_to_stdout(koopa_program_t program);
 
 ///
 /// Generates LLVM IR to the given
-/// file descriptor (UNIX) or handle (Windows). The caller retains ownership.
+/// file descriptor (UNIX) or handle (Windows). The caller retains ownership
+/// and should keep the file open for the call. If the library cannot duplicate
+/// the descriptor or handle, it returns KOOPA_EC_INVALID_FILE.
 ///
 /// Returns the error code.
 ///
