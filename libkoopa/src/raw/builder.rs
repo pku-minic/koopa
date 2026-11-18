@@ -25,8 +25,8 @@ impl RawProgramBuilder {
 
   /// Builds a snapshot of the given Koopa IR program.
   ///
-  /// Earlier snapshots remain valid until this builder is dropped, even if
-  /// the source program is changed or another program is built afterwards.
+  /// The builder owns the storage for every snapshot until it is dropped.
+  /// Later builds and changes to the source program preserve earlier snapshots.
   pub fn build_on(&mut self, program: &Program) -> RawProgram<'_> {
     self.programs.push(RawProgramStorage::default());
     self.programs.last_mut().unwrap().build_on(program)
