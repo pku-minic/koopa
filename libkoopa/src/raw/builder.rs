@@ -96,8 +96,10 @@ impl<T> RawEntity<T> {
   }
 
   fn write(&self, value: T) {
-    // SAFETY: this allocation has the layout of T, and no references to its
-    // contents are exposed during construction. Raw pointers may already exist.
+    // SAFETY: this allocation has the layout of T. During construction, other
+    // raw IR nodes may already store its address (e.g. a jump whose target is
+    // the block being built). The builder does not dereference those pointers
+    // or create references to T before this write initializes it in place.
     unsafe { self.0.get().cast::<T>().write(value) };
   }
 }
