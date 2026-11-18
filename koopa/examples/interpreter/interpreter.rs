@@ -5,7 +5,7 @@ use koopa::ir::layout::BasicBlockNode;
 use koopa::ir::values::*;
 use koopa::ir::{BasicBlock, BinaryOp, FunctionData, Program, Type, TypeKind, Value, ValueKind};
 use std::alloc::{Layout, alloc_zeroed, dealloc, handle_alloc_error};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{Error, Result, Write};
 use std::ptr::{NonNull, null};
 
@@ -37,6 +37,7 @@ impl<W: Write> Visitor<W> for Interpreter {
 struct InterpreterImpl<'a> {
   program: &'a Program,
   global_allocs: Vec<Allocation>,
+  pointer_slots: PointerSlots,
   vars: HashMap<*const ValueData, Val>,
   envs: Vec<Environment<'a>>,
   ext_funcs: ExternFuncs,
@@ -65,6 +66,7 @@ impl<'a> InterpreterImpl<'a> {
     Self {
       program,
       global_allocs: Vec::new(),
+      pointer_slots: PointerSlots::default(),
       vars: HashMap::new(),
       envs: Vec::new(),
       ext_funcs,
@@ -84,7 +86,7 @@ impl<'a> InterpreterImpl<'a> {
       let val = self.eval_global_const(&self.program.borrow_value(ga.init()));
       let ty = self.program.borrow_value(ga.init()).ty().clone();
       let allocation = Allocation::new(&ty)?;
-      val.store_to_unsafe_ptr(Some(allocation.ptr), &ty)?;
+      val.store_to_unsafe_ptr(Some(allocation.ptr), &ty, &mut self.pointer_slots)?;
       self.vars.insert(&value as &ValueData, allocation.value());
       self.global_allocs.push(allocation);
     }
@@ -193,7 +195,12 @@ impl<'a> InterpreterImpl<'a> {
       ));
       // evaluate the entry basic block
       let ret = self.eval_bb(bb);
-      self.envs.pop();
+      let env = self.envs.pop().unwrap();
+      for alloc in &env.allocs {
+        self
+          .pointer_slots
+          .forget_range(alloc.ptr, alloc.layout.size());
+      }
       ret
     } else {
       // call the external function
@@ -248,18 +255,22 @@ impl<'a> InterpreterImpl<'a> {
     let (Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr)) = self.eval_value(load.src()) else {
       panic!("invalid pointer");
     };
-    let val = Val::load_from_unsafe_ptr(ptr, inst.ty())
+    let val = Val::load_from_unsafe_ptr(ptr, inst.ty(), &mut self.pointer_slots)
       .ok_or_else(|| new_error("accessing to null pointer"))?;
     self.insert_val(inst, val);
     Ok(())
   }
 
-  fn eval_store(&self, store: &Store) -> Result<()> {
+  fn eval_store(&mut self, store: &Store) -> Result<()> {
     let val = self.eval_value(store.value());
     let (Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr)) = self.eval_value(store.dest()) else {
       panic!("invalid pointer");
     };
-    val.store_to_unsafe_ptr(ptr, &self.value_type(store.value()))
+    val.store_to_unsafe_ptr(
+      ptr,
+      &self.value_type(store.value()),
+      &mut self.pointer_slots,
+    )
   }
 
   fn value_type(&self, value: Value) -> Type {
@@ -456,6 +467,51 @@ impl<'a> Environment<'a> {
   }
 }
 
+// Native slots contain only an address. Keep bounds for interpreter-written
+// pointers separately so the bytes still have the layout expected by C.
+#[derive(Default)]
+struct PointerSlots(BTreeMap<usize, (NonNull<()>, usize, usize)>);
+
+impl PointerSlots {
+  fn load(&mut self, slot: NonNull<()>, ptr: Option<NonNull<()>>) -> Val {
+    let addr = slot.addr().get();
+    if let Some(&(stored, index, len)) = self.0.get(&addr) {
+      if ptr == Some(stored) {
+        return Val::Pointer { ptr, index, len };
+      }
+      // A native function may have replaced the pointer through an alias.
+      self.0.remove(&addr);
+    }
+    match ptr {
+      Some(_) => Val::UnsafePointer(ptr),
+      None => Val::new_val_pointer(None),
+    }
+  }
+
+  fn record(&mut self, slot: NonNull<()>, value: &Val) {
+    let addr = slot.addr().get();
+    if let Val::Pointer {
+      ptr: Some(target),
+      index,
+      len,
+    } = value
+    {
+      self.0.insert(addr, (*target, *index, *len));
+    } else {
+      self.0.remove(&addr);
+    }
+  }
+
+  fn forget_range(&mut self, ptr: NonNull<()>, size: usize) {
+    let start = ptr.addr().get();
+    // Include slots partially overwritten through a native alias.
+    let range = start.saturating_sub(size_of::<*mut ()>() - 1)..start + size;
+    while let Some((&addr, _)) = self.0.range(range.clone()).next() {
+      self.0.remove(&addr);
+    }
+  }
+}
+
 #[derive(Clone)]
 pub enum Val {
   Undef,
@@ -481,7 +537,11 @@ impl Val {
     }
   }
 
-  fn load_from_unsafe_ptr(ptr: Option<NonNull<()>>, ty: &Type) -> Option<Self> {
+  fn load_from_unsafe_ptr(
+    ptr: Option<NonNull<()>>,
+    ty: &Type,
+    slots: &mut PointerSlots,
+  ) -> Option<Self> {
     ptr.map(|p| match ty.kind() {
       TypeKind::Int32 => Val::Int(unsafe { *(p.as_ptr() as *const i32) }),
       TypeKind::Array(ty, len) => Val::Array(
@@ -492,15 +552,14 @@ impl Val {
                 NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(ty.size() * i).cast())
               }),
               ty,
+              slots,
             )
             .unwrap()
           })
           .collect::<Vec<_>>()
           .into_boxed_slice(),
       ),
-      TypeKind::Pointer(_) => {
-        Val::UnsafePointer(NonNull::new(unsafe { *p.as_ptr().cast::<*mut ()>() }))
-      }
+      TypeKind::Pointer(_) => slots.load(p, NonNull::new(unsafe { *p.as_ptr().cast::<*mut ()>() })),
       _ => panic!("invalid type"),
     })
   }
@@ -509,10 +568,16 @@ impl Val {
     matches!(self, Val::Int(i) if *i != 0)
   }
 
-  fn store_to_unsafe_ptr(&self, ptr: Option<NonNull<()>>, ty: &Type) -> Result<()> {
+  fn store_to_unsafe_ptr(
+    &self,
+    ptr: Option<NonNull<()>>,
+    ty: &Type,
+    slots: &mut PointerSlots,
+  ) -> Result<()> {
     ptr
       .map(|p| match self {
         Val::Int(i) => {
+          slots.forget_range(p, size_of::<i32>());
           unsafe { *(p.as_ptr() as *mut i32) = *i };
           Ok(())
         }
@@ -526,15 +591,18 @@ impl Val {
                 NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(base.size() * i).cast())
               }),
               base,
+              slots,
             )
           })
         }
         Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => {
+          slots.record(p, self);
           unsafe { *p.as_ptr().cast::<*const ()>() = ptr.map_or(null(), |p| p.as_ptr()) };
           Ok(())
         }
         Val::Undef => {
           // Choose zero for an unspecified initial value, just like local alloc.
+          slots.forget_range(p, ty.size());
           unsafe { p.as_ptr().cast::<u8>().write_bytes(0, ty.size()) };
           Ok(())
         }
@@ -678,6 +746,41 @@ mod tests {
     );
   }
 
+  #[test]
+  fn pointer_slots_preserve_subarray_bounds_across_calls_and_aggregate_copies() {
+    let run_offset = |offset| {
+      run(&format!(
+        "
+      fun @save(@slot: **i32, @p: *i32) {{
+      %entry: store @p, @slot ret
+      }}
+      fun @main(): i32 {{
+      %entry:
+        %matrix = alloc [[i32, 2], 2]
+        %row = getelemptr %matrix, 0
+        %last = getelemptr %row, 1
+        %src = alloc [*i32, 1]
+        %slot = getelemptr %src, 0
+        call @save(%slot, %last)
+        %copy = alloc [*i32, 1]
+        %aggregate = load %src
+        store %aggregate, %copy
+        %dest = getelemptr %copy, 0
+        %p = load %dest
+        %next = getptr %p, {offset}
+        ret 42
+      }}"
+      ))
+    };
+    assert_eq!(run_offset(-1).unwrap(), 42);
+    assert!(
+      run_offset(1)
+        .unwrap_err()
+        .to_string()
+        .contains("out of bounds")
+    );
+  }
+
   #[cfg(not(miri))]
   #[test]
   fn native_calls_share_multidimensional_storage_and_pointer_aliases() {
@@ -706,6 +809,8 @@ mod tests {
         %first_row = getelemptr @g, 0
         %second_row = getelemptr @g, 1
         %alias = getelemptr %second_row, 1
+        %original = getelemptr %first_row, 0
+        store %original, %out
         %returned = call @mutate(%first_row, %alias, %out)
         %before = load %alias
         %changed = add %before, 3
