@@ -80,10 +80,10 @@ impl Default for Layout {
 /// [`insert_key_after`](key_node_list::CursorMut::insert_key_after).
 ///
 /// Removing a block preserves its instruction list and detaches its
-/// instructions from the layout. Inserting the returned node into a block
-/// list preserves those instructions and updates their parent block.
-/// Inserting a node whose instructions already occur in the destination
-/// layout panics without changing the destination list.
+/// instructions from the layout. Inserting the returned node into a block list
+/// preserves those instructions and updates their parent block. Inserting a
+/// node whose instructions already occur in the destination layout panics
+/// without changing the destination list.
 pub type BasicBlockList = KeyNodeList<BasicBlock, BasicBlockNode, BasicBlockMap>;
 
 type InstBBCell = Weak<RefCell<HashMap<Value, BasicBlock>>>;
