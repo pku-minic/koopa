@@ -1,9 +1,9 @@
 use std::fs::File;
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, Result};
 #[cfg(unix)]
-use std::os::fd::{BorrowedFd, RawFd};
+use std::os::fd::{FromRawFd, RawFd};
 #[cfg(windows)]
-use std::os::windows::io::{BorrowedHandle, RawHandle};
+use std::os::windows::io::{FromRawHandle, RawHandle};
 
 /// Raw file ID.
 #[cfg(unix)]
@@ -16,30 +16,53 @@ pub(crate) type RawFile = RawHandle;
 /// Duplicates a caller-owned file descriptor without taking its ownership.
 #[cfg(unix)]
 pub(crate) fn file_from_raw(fd: RawFile) -> Result<File> {
-  if fd < 0 {
-    return Err(Error::new(
-      ErrorKind::InvalidInput,
-      "invalid file descriptor",
-    ));
+  #[cfg(not(any(target_os = "espidf", target_os = "vita")))]
+  let command = libc::F_DUPFD_CLOEXEC;
+  #[cfg(any(target_os = "espidf", target_os = "vita"))]
+  let command = libc::F_DUPFD;
+  // fcntl checks the raw descriptor and returns a new, owned descriptor.
+  // Keep standard input/output/error slots free when they are closed.
+  let duplicate = unsafe { libc::fcntl(fd, command, 3) };
+  if duplicate < 0 {
+    return Err(Error::last_os_error());
   }
-  // SAFETY: the C API accepts an open descriptor, which remains borrowed for
-  // this call only. The returned File owns a separate descriptor.
-  unsafe { BorrowedFd::borrow_raw(fd) }
-    .try_clone_to_owned()
-    .map(File::from)
+  Ok(unsafe { File::from_raw_fd(duplicate) })
 }
 
 /// Duplicates a caller-owned file handle without taking its ownership.
 #[cfg(windows)]
 pub(crate) fn file_from_raw(handle: RawFile) -> Result<File> {
-  if handle.is_null() || handle as isize == -1 {
-    return Err(Error::new(ErrorKind::InvalidInput, "invalid file handle"));
+  use windows_sys::Win32::Foundation::{
+    DUPLICATE_SAME_ACCESS, DuplicateHandle, INVALID_HANDLE_VALUE,
+  };
+  use windows_sys::Win32::System::Threading::GetCurrentProcess;
+
+  // INVALID_HANDLE_VALUE also denotes the current process to DuplicateHandle.
+  if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+    return Err(Error::new(
+      std::io::ErrorKind::InvalidInput,
+      "invalid file handle",
+    ));
   }
-  // SAFETY: the C API accepts an open handle, which remains borrowed for
-  // this call only. The returned File owns a separate handle.
-  unsafe { BorrowedHandle::borrow_raw(handle) }
-    .try_clone_to_owned()
-    .map(File::from)
+  let process = unsafe { GetCurrentProcess() };
+  let mut duplicate = std::ptr::null_mut();
+  // DuplicateHandle validates the source and initializes a non-inheritable,
+  // owned handle on success.
+  if unsafe {
+    DuplicateHandle(
+      process,
+      handle,
+      process,
+      &mut duplicate,
+      0,
+      0,
+      DUPLICATE_SAME_ACCESS,
+    )
+  } == 0
+  {
+    return Err(Error::last_os_error());
+  }
+  Ok(unsafe { File::from_raw_handle(duplicate) })
 }
 
 // These tests exercise OS descriptor ownership, which Miri isolation cannot access.
@@ -147,15 +170,21 @@ mod tests {
   #[test]
   fn invalid_raw_file_returns_an_error() {
     #[cfg(unix)]
-    let invalid = -1;
+    let invalid_files = [-1, RawFd::MAX];
     #[cfg(windows)]
-    let invalid = std::ptr::null_mut();
-    let mut program = std::ptr::null_mut();
-    assert!(matches!(
-      koopa_parse_from_raw(invalid, &mut program),
-      ErrorCode::InvalidFile
-    ));
-    assert!(program.is_null());
+    let invalid_files = [
+      std::ptr::null_mut(),
+      windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE,
+      std::ptr::without_provenance_mut(isize::MAX as usize & !3),
+    ];
+    for invalid in invalid_files {
+      let mut program = std::ptr::null_mut();
+      assert!(matches!(
+        koopa_parse_from_raw(invalid, &mut program),
+        ErrorCode::InvalidFile
+      ));
+      assert!(program.is_null());
+    }
   }
 
   #[test]
