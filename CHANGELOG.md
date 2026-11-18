@@ -2,6 +2,32 @@
 
 All notable changes to the Koopa will be documented in this file.
 
+## Unreleased
+
+### Added
+
+* Added `Type::checked_size` and `Type::checked_size_with_ptr_size` to compute byte sizes for the configured target or an explicit pointer width. Both return `None` on overflow. `Type::size` now panics on overflow in all build profiles.
+
+### Changed
+
+* The frontend resolves definitions in the current and entry blocks directly, avoiding repeated predecessor walks for function arguments and other entry-block values.
+* The `interpreter` example calls external functions through `libffi` using the declared C signature. Building the bundled `libffi` requires a C compiler, Make, Autoconf and Automake.
+* Updated `key-node-list` to 0.0.7.
+* CI now runs the `interpreter` and `opt` example tests, including their Miri suites.
+
+### Fixed
+
+* The frontend reports missing or extra arguments on calls, jumps and branches, and reports undefined branch targets. It distinguishes unknown symbols from definitions that do not dominate a use.
+* The frontend rejects nonpositive array lengths, lengths and byte sizes that overflow `usize`, and aggregate initializers that do not match the declared type or array length.
+* Removing and reinserting a basic block preserves its instructions and their order. Moving or clearing blocks keeps `Layout::parent_bb` accurate, and the layout rejects duplicate instruction ownership.
+* LLVM output uses distinct names for block labels, local values and generated temporaries. Calls to functions defined later, including mutually recursive functions, use the correct global names.
+* Reusing a `libkoopa` raw program builder produces independent snapshots. Each snapshot and its `used_by` links remain valid until the builder is deleted, even after the source program is changed or deleted.
+* The `libkoopa` raw-file parse and dump functions leave caller-owned descriptors and handles open and return `KOOPA_EC_INVALID_FILE` when duplication fails.
+* The `interpreter` example assigns block arguments in parallel and executes jumps and branches iteratively, so loops can swap parameters and run without growing the host call stack.
+* Interpreter allocations use checked sizes and contiguous native storage, so external functions can read and update nested arrays through aliases. Zero-offset `getptr` works on allocations, and interpreter-managed pointers retain their bounds across stores and loads.
+* The interpreter and the constant-folding pass use wrapping `i32` addition, subtraction and multiplication. They propagate `undef` and produce it for invalid division, remainder and shift operations.
+* In the `opt` example, dead-code elimination handles global operands and keeps block parameter indices and incoming arguments in sync. Constant folding handles block parameters with global inputs or no incoming edges.
+
 ## 0.0.10 - 2026-03-19
 
 ### Added
