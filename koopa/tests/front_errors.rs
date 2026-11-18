@@ -84,6 +84,17 @@ fn rejects_nonpositive_array_lengths() {
 }
 
 #[test]
+fn rejects_arrays_whose_byte_size_overflows() {
+  let len = usize::MAX / 4 + 1;
+  for ty in [format!("[i32, {len}]"), format!("*[[i32, 2], {}]", len / 2)] {
+    let source = format!("decl @f({ty})");
+    assert!(Driver::from(source).generate_program().is_err());
+  }
+  let source = format!("decl @f([i32, {}])", len - 1);
+  assert!(Driver::from(source).generate_program().is_ok());
+}
+
+#[test]
 fn rejects_values_that_do_not_dominate_their_uses() {
   for branch in ["br @cond, %define, %skip", "br @cond, %skip, %define"] {
     let source = format!(

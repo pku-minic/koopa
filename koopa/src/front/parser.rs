@@ -224,9 +224,12 @@ impl<T: Read> Parser<T> {
     if len <= 0 {
       return_error!(len_span, "array length must be positive, found {}", len);
     }
+    let Ok(len) = usize::try_from(len) else {
+      return_error!(len_span, "array length {} is too large", len);
+    };
     // check & eat ']'
     span.update_span(self.expect(TokenKind::Other(']'))?);
-    Ok(ast::ArrayType::new_boxed(span, base, len as usize))
+    Ok(ast::ArrayType::new_boxed(span, base, len))
   }
 
   /// Parses pointer types.

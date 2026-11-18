@@ -384,7 +384,13 @@ impl Builder {
   fn generate_type(ast: &AstBox) -> Type {
     match &ast.kind {
       AstKind::IntType(_) => Type::get_i32(),
-      AstKind::ArrayType(ast) => Type::get_array(Self::generate_type(&ast.base), ast.len),
+      AstKind::ArrayType(array) => {
+        let ty = Type::get_array(Self::generate_type(&array.base), array.len);
+        if ty.checked_size().is_none() {
+          log_error!(ast.span, "array type '{}' is too large", ty);
+        }
+        ty
+      }
       AstKind::PointerType(ast) => Type::get_pointer(Self::generate_type(&ast.base)),
       AstKind::FunType(ast) => Type::get_function(
         ast.params.iter().map(Self::generate_type).collect(),
