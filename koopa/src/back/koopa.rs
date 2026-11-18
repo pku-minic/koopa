@@ -82,9 +82,8 @@ impl<W: Write> VisitorImpl<'_, W> {
     // function name
     write!(self.w, " {}(", self.nm.func_name(func))?;
     // unwrap function type
-    let (param_ty, ret_ty) = match func.ty().kind() {
-      TypeKind::Function(param, ret) => (param, ret),
-      _ => panic!("invalid function type"),
+    let TypeKind::Function(param_ty, ret_ty) = func.ty().kind() else {
+      panic!("invalid function type");
     };
     // parameters
     if is_decl {
@@ -151,9 +150,8 @@ impl<W: Write> VisitorImpl<'_, W> {
 
   /// Generates the given global instruction.
   fn visit_global_inst(&mut self, inst: &ValueData) -> Result<()> {
-    let alloc = match inst.kind() {
-      ValueKind::GlobalAlloc(alloc) => alloc,
-      _ => panic!("invalid global instruction"),
+    let ValueKind::GlobalAlloc(alloc) = inst.kind() else {
+      panic!("invalid global instruction");
     };
     let init = self.program.borrow_value(alloc.init());
     write!(
@@ -191,9 +189,8 @@ impl<W: Write> VisitorImpl<'_, W> {
 
   /// Generates allocation.
   fn visit_alloc(&mut self, ty: &Type) -> Result<()> {
-    let base = match ty.kind() {
-      TypeKind::Pointer(base) => base,
-      _ => panic!("invalid pointer type"),
+    let TypeKind::Pointer(base) = ty.kind() else {
+      panic!("invalid pointer type");
     };
     write!(self.w, "alloc {}", base)
   }

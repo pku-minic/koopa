@@ -358,10 +358,12 @@ impl GenerateOnRaw for RawValue {
           match &raw.kind {
             RawValueKind::ZeroInit => build_value!(program, info, b, { b.zero_init(ty) }),
             RawValueKind::Undef => build_value!(program, info, b, { b.undef(ty) }),
-            RawValueKind::Alloc => match ty.kind() {
-              TypeKind::Pointer(base) => builder!(program, info).alloc(base.clone()),
-              _ => unreachable!(),
-            },
+            RawValueKind::Alloc => {
+              let TypeKind::Pointer(base) = ty.kind() else {
+                unreachable!();
+              };
+              builder!(program, info).alloc(base.clone())
+            }
             _ => unreachable!(),
           }
         }
