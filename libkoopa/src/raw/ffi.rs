@@ -22,8 +22,11 @@ ffi! {
   /// Builds a raw program of the given Koopa IR program
   /// using the given raw program builder.
   ///
-  /// The generated raw program is valid iff the raw program builder
-  /// is still alive (not deleted).
+  /// Each call builds an independent, read-only snapshot. The builder owns
+  /// the storage for every snapshot it has built and releases it when deleted.
+  /// Earlier snapshots remain valid after later builds and after the source
+  /// program is changed or deleted. Use separate builders for snapshots that
+  /// need to be released at different times.
   fn koopa_build_raw_program<'rpb>(
     builder: &'rpb mut RawProgramBuilder,
     program: &Program,

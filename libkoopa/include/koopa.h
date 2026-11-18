@@ -577,9 +577,11 @@ void koopa_delete_raw_program_builder(koopa_raw_program_builder_t builder);
 /// Builds a raw program of the given Koopa IR program
 /// using the given raw program builder.
 ///
-/// The generated raw program is valid iff the raw program builder
-/// is still alive (not deleted). The generated raw program should
-/// not be modified manually.
+/// Each call builds an independent, read-only snapshot. The builder owns
+/// the storage for every snapshot it has built and releases it when deleted.
+/// Earlier snapshots remain valid after later builds and after the source
+/// program is changed or deleted. Use separate builders for snapshots that
+/// need to be released at different times.
 ///
 koopa_raw_program_t koopa_build_raw_program(koopa_raw_program_builder_t builder,
                                             koopa_program_t program);
