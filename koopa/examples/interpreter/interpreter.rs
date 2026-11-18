@@ -13,6 +13,12 @@ pub fn new_error(message: &str) -> Error {
   Error::other(message)
 }
 
+fn native_size(ty: &Type) -> Result<usize> {
+  ty.checked_size_with_ptr_size(size_of::<*mut ()>())
+    .filter(|&size| size <= isize::MAX as usize)
+    .ok_or_else(|| new_error("type is too large for native memory"))
+}
+
 pub struct Interpreter {
   libs: Vec<String>,
 }
@@ -83,10 +89,12 @@ impl<'a> InterpreterImpl<'a> {
       let ValueKind::GlobalAlloc(ga) = value.kind() else {
         panic!("invalid global variable");
       };
-      let val = self.eval_global_const(&self.program.borrow_value(ga.init()));
-      let ty = self.program.borrow_value(ga.init()).ty().clone();
-      let allocation = Allocation::new(&ty)?;
-      val.store_to_unsafe_ptr(Some(allocation.ptr), &ty, &mut self.pointer_slots)?;
+      let init = self.program.borrow_value(ga.init());
+      let ty = init.ty();
+      let size = native_size(ty)?;
+      let allocation = Allocation::new(size)?;
+      let val = self.eval_global_const(&init);
+      val.store_to_unsafe_ptr(Some(allocation.ptr), ty, size, &mut self.pointer_slots)?;
       self.vars.insert(&value as &ValueData, allocation.value());
       self.global_allocs.push(allocation);
     }
@@ -140,9 +148,7 @@ impl<'a> InterpreterImpl<'a> {
   fn new_zeroinit(ty: &Type) -> Val {
     match ty.kind() {
       TypeKind::Int32 => Val::Int(0),
-      TypeKind::Array(base, len) => {
-        Val::Array((0..*len).map(|_| Self::new_zeroinit(base)).collect())
-      }
+      TypeKind::Array(..) => Val::ZeroArray,
       TypeKind::Pointer(_) => Val::new_val_pointer(None),
       _ => panic!("invalid type of zero initializer"),
     }
@@ -244,7 +250,7 @@ impl<'a> InterpreterImpl<'a> {
     let TypeKind::Pointer(base) = inst.ty().kind() else {
       panic!("invalid pointer type");
     };
-    let allocation = Allocation::new(base)?;
+    let allocation = Allocation::new(native_size(base)?)?;
     let env = self.envs.last_mut().unwrap();
     env.vals.insert(inst, allocation.value());
     env.allocs.push(allocation);
@@ -255,8 +261,13 @@ impl<'a> InterpreterImpl<'a> {
     let (Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr)) = self.eval_value(load.src()) else {
       panic!("invalid pointer");
     };
-    let val = Val::load_from_unsafe_ptr(ptr, inst.ty(), &mut self.pointer_slots)
-      .ok_or_else(|| new_error("accessing to null pointer"))?;
+    let val = Val::load_from_unsafe_ptr(
+      ptr,
+      inst.ty(),
+      native_size(inst.ty())?,
+      &mut self.pointer_slots,
+    )
+    .ok_or_else(|| new_error("accessing to null pointer"))?;
     self.insert_val(inst, val);
     Ok(())
   }
@@ -266,11 +277,8 @@ impl<'a> InterpreterImpl<'a> {
     let (Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr)) = self.eval_value(store.dest()) else {
       panic!("invalid pointer");
     };
-    val.store_to_unsafe_ptr(
-      ptr,
-      &self.value_type(store.value()),
-      &mut self.pointer_slots,
-    )
+    let ty = self.value_type(store.value());
+    val.store_to_unsafe_ptr(ptr, &ty, native_size(&ty)?, &mut self.pointer_slots)
   }
 
   fn value_type(&self, value: Value) -> Type {
@@ -290,7 +298,7 @@ impl<'a> InterpreterImpl<'a> {
     let TypeKind::Pointer(base) = inst.ty().kind() else {
       panic!("invalid pointer");
     };
-    let base_size = base.size();
+    let base_size = native_size(base)?;
     let ptr = Self::get_pointer(self.eval_value(gp.src()), offset as isize, base_size)?;
     self.insert_val(inst, ptr);
     Ok(())
@@ -306,7 +314,7 @@ impl<'a> InterpreterImpl<'a> {
     let TypeKind::Pointer(base) = inst.ty().kind() else {
       panic!("invalid pointer");
     };
-    let base_size = base.size();
+    let base_size = native_size(base)?;
     let ptr = match self.eval_value(gep.src()) {
       Val::Pointer { ptr, .. } => {
         if ptr.is_none() {
@@ -431,8 +439,8 @@ struct Allocation {
 }
 
 impl Allocation {
-  fn new(ty: &Type) -> Result<Self> {
-    let layout = Layout::from_size_align(ty.size().max(1), align_of::<usize>())
+  fn new(size: usize) -> Result<Self> {
+    let layout = Layout::from_size_align(size.max(1), align_of::<usize>())
       .map_err(|_| new_error("invalid allocation size"))?;
     let ptr = NonNull::new(unsafe { alloc_zeroed(layout) })
       .unwrap_or_else(|| handle_alloc_error(layout))
@@ -503,6 +511,9 @@ impl PointerSlots {
   }
 
   fn forget_range(&mut self, ptr: NonNull<()>, size: usize) {
+    if size == 0 {
+      return;
+    }
     let start = ptr.addr().get();
     // Include slots partially overwritten through a native alias.
     let range = start.saturating_sub(size_of::<*mut ()>() - 1)..start + size;
@@ -515,6 +526,7 @@ impl PointerSlots {
 #[derive(Clone)]
 pub enum Val {
   Undef,
+  ZeroArray,
   Int(i32),
   Array(Box<[Val]>),
   Pointer {
@@ -540,6 +552,7 @@ impl Val {
   fn load_from_unsafe_ptr(
     ptr: Option<NonNull<()>>,
     ty: &Type,
+    size: usize,
     slots: &mut PointerSlots,
   ) -> Option<Self> {
     ptr.map(|p| match ty.kind() {
@@ -547,11 +560,13 @@ impl Val {
       TypeKind::Array(ty, len) => Val::Array(
         (0..*len)
           .map(|i| {
+            let stride = size / len;
             Val::load_from_unsafe_ptr(
               Some(unsafe {
-                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(ty.size() * i).cast())
+                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(stride * i).cast())
               }),
               ty,
+              stride,
               slots,
             )
             .unwrap()
@@ -572,6 +587,7 @@ impl Val {
     &self,
     ptr: Option<NonNull<()>>,
     ty: &Type,
+    size: usize,
     slots: &mut PointerSlots,
   ) -> Result<()> {
     ptr
@@ -582,15 +598,17 @@ impl Val {
           Ok(())
         }
         Val::Array(arr) => {
-          let TypeKind::Array(base, _) = ty.kind() else {
+          let TypeKind::Array(base, len) = ty.kind() else {
             panic!("invalid array type");
           };
           arr.iter().enumerate().try_for_each(|(i, v)| {
+            let stride = size / len;
             v.store_to_unsafe_ptr(
               Some(unsafe {
-                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(base.size() * i).cast())
+                NonNull::new_unchecked(p.as_ptr().cast::<u8>().add(stride * i).cast())
               }),
               base,
+              stride,
               slots,
             )
           })
@@ -600,10 +618,10 @@ impl Val {
           unsafe { *p.as_ptr().cast::<*const ()>() = ptr.map_or(null(), |p| p.as_ptr()) };
           Ok(())
         }
-        Val::Undef => {
+        Val::ZeroArray | Val::Undef => {
           // Choose zero for an unspecified initial value, just like local alloc.
-          slots.forget_range(p, ty.size());
-          unsafe { p.as_ptr().cast::<u8>().write_bytes(0, ty.size()) };
+          slots.forget_range(p, size);
+          unsafe { p.as_ptr().cast::<u8>().write_bytes(0, size) };
           Ok(())
         }
       })
@@ -744,6 +762,21 @@ mod tests {
       .unwrap(),
       42
     );
+  }
+
+  #[test]
+  fn rejects_unrepresentable_native_layouts_before_initializing_globals() {
+    use koopa::ir::builder_traits::{GlobalInstBuilder, ValueBuilder};
+    let mut program = Program::new();
+    let ty = Type::get_array(Type::get_i32(), usize::MAX);
+    let zero = program.new_value().zero_init(ty);
+    program.new_value().global_alloc(zero);
+    let err = Generator::with_visitor(sink(), Interpreter::new(Vec::new()))
+      .generate_on(&program)
+      .unwrap_err();
+    assert_eq!(err.to_string(), "type is too large for native memory");
+    // Alignment padding must fit even when the unpadded size fits isize.
+    assert!(Allocation::new(isize::MAX as usize).is_err());
   }
 
   #[test]

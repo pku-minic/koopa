@@ -124,12 +124,26 @@ impl Type {
   }
 
   /// Returns the size of the current type in bytes.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the byte size overflows `usize`.
   pub fn size(&self) -> usize {
+    self.checked_size().expect("type size overflows usize")
+  }
+
+  /// Returns the target byte size, or `None` if it overflows `usize`.
+  pub fn checked_size(&self) -> Option<usize> {
+    self.checked_size_with_ptr_size(PTR_SIZE.load(Ordering::Relaxed))
+  }
+
+  /// Computes the byte size for an explicit pointer width in bytes.
+  pub fn checked_size_with_ptr_size(&self, ptr_size: usize) -> Option<usize> {
     match self.kind() {
-      TypeKind::Int32 => 4,
-      TypeKind::Unit => 0,
-      TypeKind::Array(ty, len) => ty.size() * len,
-      TypeKind::Pointer(..) | TypeKind::Function(..) => PTR_SIZE.load(Ordering::Relaxed),
+      TypeKind::Int32 => Some(4),
+      TypeKind::Unit => Some(0),
+      TypeKind::Array(ty, len) => ty.checked_size_with_ptr_size(ptr_size)?.checked_mul(*len),
+      TypeKind::Pointer(..) | TypeKind::Function(..) => Some(ptr_size),
     }
   }
 }
