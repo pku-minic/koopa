@@ -121,3 +121,9 @@ fn accepts_dominating_values_across_diamonds_and_loops() {
   }";
   assert!(Driver::from(source).generate_program().is_ok());
 }
+
+#[test]
+fn rejects_entry_values_used_before_their_definition() {
+  let source = "fun @f(): i32 { %entry: %a = add %b, 1 %b = add 2, 3 ret %a }";
+  assert!(Driver::from(source).generate_program().is_err());
+}
