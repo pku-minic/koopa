@@ -53,24 +53,17 @@ impl RawProgramStorage {
       rpb: PhantomData,
     };
     // fill `used_by` fields of all values
-    let slices: Vec<_> = self
-      .values
-      .keys()
-      .map(|value| {
-        let v: Vec<_> = info.value_used_by[value]
-          .iter()
-          .map(|v| self.values[v].as_ptr() as *const ())
-          .collect();
-        let slice = RawSlice {
-          buffer: v.as_ptr() as *const c_void,
-          len: v.len() as u32,
-          kind: RawSliceItemKind::Value,
-        };
-        self.slices.push(v);
-        slice
-      })
-      .collect();
-    for (data, slice) in self.values.values().zip(slices) {
+    for (value, data) in &self.values {
+      let users: Vec<_> = info.value_used_by[value]
+        .iter()
+        .map(|user| self.values[user].as_ptr() as *const ())
+        .collect();
+      let slice = RawSlice {
+        buffer: users.as_ptr() as *const c_void,
+        len: users.len() as u32,
+        kind: RawSliceItemKind::Value,
+      };
+      self.slices.push(users);
       // SAFETY: every placeholder is initialized before its BuildRaw call
       // returns, and the complete program traversal above has finished.
       // Write through the original raw pointer rather than borrowing the entire
