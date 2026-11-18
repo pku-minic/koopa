@@ -340,8 +340,19 @@ impl Builder {
     let entry_bb_name = &bbs[0].name;
     let entry_info = &mut self.local_bbs.get_mut(entry_bb_name).unwrap();
     entry_info.local_defs = args;
-    // fill predecessors
+    // Collect names before generating instructions, so diagnostics do not
+    // depend on which arm of a branch is visited first. A name only becomes
+    // usable once its instruction is inserted into the block's local_defs.
     for block in bbs {
+      for stmt in &block.stmts {
+        if let AstKind::SymbolDef(def) = &stmt.kind
+          && (self.global_vars.contains_key(&def.name)
+            || !self.local_symbols.insert(def.name.clone()))
+        {
+          log_error!(stmt.span, "symbol '{}' has already been defined", def.name);
+        }
+      }
+      // Fill predecessors.
       let last_inst = block.stmts.last().unwrap();
       let mut add_pred = |bb_name| {
         // Invalid targets have already been diagnosed while collecting
@@ -455,20 +466,19 @@ impl Builder {
 
   /// Generates the symbol by the symbol name.
   fn generate_symbol(&self, span: &Span, bb_name: &str, symbol: &str) -> ValueResult {
-    // try to find symbol in global scope
-    // if not found, find symbol in local definitions
-    self
-      .global_vars
-      .get(symbol)
-      .copied()
-      .or_else(|| self.generate_local_symbol(bb_name, symbol))
-      .ok_or_else(|| {
-        log_error!(
-          span,
-          "symbol '{}' is not defined on every path to this use",
-          symbol
-        )
-      })
+    if let Some(&value) = self.global_vars.get(symbol) {
+      return Ok(value);
+    }
+    if !self.local_symbols.contains(symbol) {
+      return_error!(span, "symbol '{}' not found", symbol);
+    }
+    self.generate_local_symbol(bb_name, symbol).ok_or_else(|| {
+      log_error!(
+        span,
+        "symbol '{}' is not defined on every path to this use",
+        symbol
+      )
+    })
   }
 
   /// Generates the symbol locally by the symbol name.
@@ -547,11 +557,6 @@ impl Builder {
       AstKind::Return(ret) => self.generate_return(func, &ast.span, bb_name, ret_ty, ret),
       AstKind::Error(_) => Error::default().into(),
       AstKind::SymbolDef(def) => {
-        // check if has already been defined
-        if self.global_vars.contains_key(&def.name) || !self.local_symbols.insert(def.name.clone())
-        {
-          log_error!(ast.span, "symbol '{}' has already been defined", def.name);
-        }
         // generate the value of the instruction
         let inst = self.generate_inst(func, bb_name, &def.value)?;
         // check type
@@ -820,6 +825,36 @@ impl ToPlural for &str {
       format!("{}s", self)
     } else {
       self.into()
+    }
+  }
+}
+
+#[cfg(all(test, feature = "no-front-logger"))]
+mod tests {
+  use super::*;
+  use crate::front::{lexer::Lexer, parser::Parser, span::FileType};
+
+  #[test]
+  fn distinguishes_unknown_names_from_non_dominating_definitions() {
+    Span::reset(FileType::Buffer);
+    let source = b"fun @f(): i32 { %entry: br 1, %left, %right
+      %left: ret 0 %right: %value = add 1, 2 ret %value }";
+    let mut parser = Parser::new(Lexer::new(source.as_slice())).unwrap();
+    let mut builder = Builder::new();
+    builder.build_on(&parser.parse_next().unwrap());
+    assert_eq!(Span::error_num(), 0);
+    let span = Span::default();
+    for (name, expected) in [
+      ("%typo", "symbol '%typo' not found"),
+      (
+        "%value",
+        "symbol '%value' is not defined on every path to this use",
+      ),
+    ] {
+      let Err(Error::Normal(message)) = builder.generate_symbol(&span, "%left", name) else {
+        panic!("expected a diagnostic for {name}");
+      };
+      assert!(message.contains(expected), "{message}");
     }
   }
 }
