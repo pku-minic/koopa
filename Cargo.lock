@@ -41,9 +41,9 @@ checksum = "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48"
 
 [[package]]
 name = "key-node-list"
-version = "0.0.6"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b44fd3cac52c8507289d366d162a73aeec88f78f9dbacfb847867b7a2c0edfc0"
+checksum = "72f9a0d8dc02061dc09a08a3a665cdc49c1657fe84c0b06193d73b3f3bfdf472"
 
 [[package]]
 name = "koopa"
