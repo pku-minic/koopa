@@ -124,15 +124,13 @@ mod test {
         inst.ty(),
         &Type::get_pointer(Type::get_array(Type::get_i32(), 10))
       );
-      match inst.kind() {
-        ValueKind::GlobalAlloc(alloc) => {
-          assert!(matches!(
-            program.borrow_value(alloc.init()).kind(),
-            ValueKind::ZeroInit(..)
-          ));
-        }
-        _ => panic!(),
-      }
+      let ValueKind::GlobalAlloc(alloc) = inst.kind() else {
+        panic!();
+      };
+      assert!(matches!(
+        program.borrow_value(alloc.init()).kind(),
+        ValueKind::ZeroInit(..)
+      ));
     }
     for func in program.funcs().values() {
       assert_eq!(func.name(), "@test");

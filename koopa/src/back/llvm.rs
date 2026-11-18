@@ -108,9 +108,8 @@ impl<W: Write> VisitorImpl<'_, W> {
       write!(self.w, "define")?;
     }
     // unwrap function type
-    let (param_ty, ret_ty) = match func.ty().kind() {
-      TypeKind::Function(param, ret) => (param, ret),
-      _ => panic!("invalid function type"),
+    let TypeKind::Function(param_ty, ret_ty) = func.ty().kind() else {
+      panic!("invalid function type");
     };
     // return type
     write!(self.w, " ")?;
@@ -207,9 +206,8 @@ impl<W: Write> VisitorImpl<'_, W> {
 
   /// Generates the given global instruction.
   fn visit_global_inst(&mut self, inst: &ValueData) -> Result<()> {
-    let alloc = match inst.kind() {
-      ValueKind::GlobalAlloc(alloc) => alloc,
-      _ => panic!("invalid global instruction"),
+    let ValueKind::GlobalAlloc(alloc) = inst.kind() else {
+      panic!("invalid global instruction");
     };
     let init = self.program.borrow_value(alloc.init());
     write!(self.w, "{} = global ", self.nm.value_name(inst))?;
@@ -242,9 +240,8 @@ impl<W: Write> VisitorImpl<'_, W> {
 
   /// Generates allocation.
   fn visit_alloc(&mut self, ty: &Type) -> Result<()> {
-    let base = match ty.kind() {
-      TypeKind::Pointer(base) => base,
-      _ => panic!("invalid pointer type"),
+    let TypeKind::Pointer(base) = ty.kind() else {
+      panic!("invalid pointer type");
     };
     write!(self.w, "alloca ")?;
     self.visit_type(base)
@@ -269,10 +266,11 @@ impl<W: Write> VisitorImpl<'_, W> {
   /// Generates pointer calculation.
   fn visit_getptr(&mut self, gp: &GetPtr) -> Result<()> {
     write!(self.w, "getelementptr inbounds ")?;
-    self.visit_type(match value_ty!(self, gp.src()).kind() {
-      TypeKind::Pointer(base) => base,
-      _ => panic!("invalid pointer type"),
-    })?;
+    let src_ty = value_ty!(self, gp.src());
+    let TypeKind::Pointer(base) = src_ty.kind() else {
+      panic!("invalid pointer type");
+    };
+    self.visit_type(base)?;
     write!(self.w, ", ")?;
     self.visit_value(true, gp.src())?;
     write!(self.w, ", ")?;
@@ -282,10 +280,11 @@ impl<W: Write> VisitorImpl<'_, W> {
   /// Generates element pointer calculation.
   fn visit_getelemptr(&mut self, gep: &GetElemPtr) -> Result<()> {
     write!(self.w, "getelementptr inbounds ")?;
-    self.visit_type(match value_ty!(self, gep.src()).kind() {
-      TypeKind::Pointer(base) => base,
-      _ => panic!("invalid pointer type"),
-    })?;
+    let src_ty = value_ty!(self, gep.src());
+    let TypeKind::Pointer(base) = src_ty.kind() else {
+      panic!("invalid pointer type");
+    };
+    self.visit_type(base)?;
     write!(self.w, ", ")?;
     self.visit_value(true, gep.src())?;
     write!(self.w, ", i32 0, ")?;

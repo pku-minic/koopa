@@ -31,9 +31,8 @@ impl ExternFuncs {
     );
     assert!(!func.name().is_empty(), "invalid function name");
     let name = &func.name()[1..];
-    let (params_ty, ret_ty) = match func.ty().kind() {
-      TypeKind::Function(params, ret) => (params, ret),
-      _ => panic!("invalid function"),
+    let TypeKind::Function(params_ty, ret_ty) = func.ty().kind() else {
+      panic!("invalid function");
     };
     #[cfg(all(test, not(miri)))]
     if let Some((_, symbol)) = self.test_symbols.iter().find(|(n, _)| *n == name) {

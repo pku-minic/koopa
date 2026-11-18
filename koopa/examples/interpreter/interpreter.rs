@@ -78,17 +78,15 @@ impl<'a> InterpreterImpl<'a> {
     // evaluate all global variables
     for var in self.program.inst_layout() {
       let value = self.program.borrow_value(*var);
-      match value.kind() {
-        ValueKind::GlobalAlloc(ga) => {
-          let val = self.eval_global_const(&self.program.borrow_value(ga.init()));
-          let ty = self.program.borrow_value(ga.init()).ty().clone();
-          let allocation = Allocation::new(&ty)?;
-          val.store_to_unsafe_ptr(Some(allocation.ptr), &ty)?;
-          self.vars.insert(&value as &ValueData, allocation.value());
-          self.global_allocs.push(allocation);
-        }
-        _ => panic!("invalid global variable"),
-      }
+      let ValueKind::GlobalAlloc(ga) = value.kind() else {
+        panic!("invalid global variable");
+      };
+      let val = self.eval_global_const(&self.program.borrow_value(ga.init()));
+      let ty = self.program.borrow_value(ga.init()).ty().clone();
+      let allocation = Allocation::new(&ty)?;
+      val.store_to_unsafe_ptr(Some(allocation.ptr), &ty)?;
+      self.vars.insert(&value as &ValueData, allocation.value());
+      self.global_allocs.push(allocation);
     }
     // evaluate on the main function
     self
@@ -177,11 +175,10 @@ impl<'a> InterpreterImpl<'a> {
 
   fn eval_func(&mut self, func: &'a FunctionData, args: Vec<Val>) -> Result<Val> {
     // check parameter count
-    let param_len = match func.ty().kind() {
-      TypeKind::Function(params, _) => params.len(),
-      _ => panic!("invalid function"),
+    let TypeKind::Function(params, _) = func.ty().kind() else {
+      panic!("invalid function");
     };
-    assert_eq!(param_len, args.len(), "parameter count mismatch");
+    assert_eq!(params.len(), args.len(), "parameter count mismatch");
     // check if is a function declaration
     if let Some(bb) = func.layout().bbs().front_node() {
       // setup the environment
@@ -237,9 +234,8 @@ impl<'a> InterpreterImpl<'a> {
   }
 
   fn eval_alloc(&mut self, inst: &ValueData) -> Result<()> {
-    let base = match inst.ty().kind() {
-      TypeKind::Pointer(base) => base,
-      _ => panic!("invalid pointer type"),
+    let TypeKind::Pointer(base) = inst.ty().kind() else {
+      panic!("invalid pointer type");
     };
     let allocation = Allocation::new(base)?;
     let env = self.envs.last_mut().unwrap();
@@ -249,9 +245,8 @@ impl<'a> InterpreterImpl<'a> {
   }
 
   fn eval_load(&mut self, inst: &ValueData, load: &Load) -> Result<()> {
-    let ptr = match self.eval_value(load.src()) {
-      Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => ptr,
-      _ => panic!("invalid pointer"),
+    let (Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr)) = self.eval_value(load.src()) else {
+      panic!("invalid pointer");
     };
     let val = Val::load_from_unsafe_ptr(ptr, inst.ty())
       .ok_or_else(|| new_error("accessing to null pointer"))?;
@@ -261,12 +256,10 @@ impl<'a> InterpreterImpl<'a> {
 
   fn eval_store(&self, store: &Store) -> Result<()> {
     let val = self.eval_value(store.value());
-    match self.eval_value(store.dest()) {
-      Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr) => {
-        val.store_to_unsafe_ptr(ptr, &self.value_type(store.value()))
-      }
-      _ => panic!("invalid pointer"),
-    }
+    let (Val::Pointer { ptr, .. } | Val::UnsafePointer(ptr)) = self.eval_value(store.dest()) else {
+      panic!("invalid pointer");
+    };
+    val.store_to_unsafe_ptr(ptr, &self.value_type(store.value()))
   }
 
   fn value_type(&self, value: Value) -> Type {
@@ -279,43 +272,41 @@ impl<'a> InterpreterImpl<'a> {
 
   fn eval_getptr(&mut self, inst: &ValueData, gp: &GetPtr) -> Result<()> {
     // evaluate on index (offset)
-    let offset = match self.eval_value(gp.index()) {
-      Val::Int(i) => i as isize,
-      _ => panic!("invalid index"),
+    let Val::Int(offset) = self.eval_value(gp.index()) else {
+      panic!("invalid index");
     };
     // perform pointer calculation
-    let base_size = match inst.ty().kind() {
-      TypeKind::Pointer(base) => base.size(),
-      _ => panic!("invalid pointer"),
+    let TypeKind::Pointer(base) = inst.ty().kind() else {
+      panic!("invalid pointer");
     };
-    let ptr = Self::get_pointer(self.eval_value(gp.src()), offset, base_size)?;
+    let base_size = base.size();
+    let ptr = Self::get_pointer(self.eval_value(gp.src()), offset as isize, base_size)?;
     self.insert_val(inst, ptr);
     Ok(())
   }
 
   fn eval_getelemptr(&mut self, inst: &ValueData, gep: &GetElemPtr) -> Result<()> {
     // evaluate on index (offset)
-    let offset = match self.eval_value(gep.index()) {
-      Val::Int(i) => i as isize,
-      _ => panic!("invalid index"),
+    let Val::Int(offset) = self.eval_value(gep.index()) else {
+      panic!("invalid index");
     };
+    let offset = offset as isize;
     // perform pointer calculation
-    let base_size = match inst.ty().kind() {
-      TypeKind::Pointer(base) => base.size(),
-      _ => panic!("invalid pointer"),
+    let TypeKind::Pointer(base) = inst.ty().kind() else {
+      panic!("invalid pointer");
     };
+    let base_size = base.size();
     let ptr = match self.eval_value(gep.src()) {
       Val::Pointer { ptr, .. } => {
         if ptr.is_none() {
           return Err(new_error("accessing to null pointer"));
         }
         let src_ty = self.value_type(gep.src());
-        let len = match src_ty.kind() {
-          TypeKind::Pointer(base) => match base.kind() {
-            TypeKind::Array(_, len) => *len,
-            _ => panic!("invalid array type"),
-          },
-          _ => panic!("invalid pointer type"),
+        let TypeKind::Pointer(array_ty) = src_ty.kind() else {
+          panic!("invalid pointer type");
+        };
+        let &TypeKind::Array(_, len) = array_ty.kind() else {
+          panic!("invalid array type");
         };
         Self::get_pointer(Val::Pointer { ptr, index: 0, len }, offset, base_size)?
       }
@@ -526,9 +517,8 @@ impl Val {
           Ok(())
         }
         Val::Array(arr) => {
-          let base = match ty.kind() {
-            TypeKind::Array(base, _) => base,
-            _ => panic!("invalid array type"),
+          let TypeKind::Array(base, _) = ty.kind() else {
+            panic!("invalid array type");
           };
           arr.iter().enumerate().try_for_each(|(i, v)| {
             v.store_to_unsafe_ptr(

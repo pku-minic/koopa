@@ -152,11 +152,10 @@ pub trait LocalInstBuilder: ValueBuilder {
   /// Panics if the type of the source value is not a pointer type.
   fn load(mut self, src: Value) -> Value {
     let src_ty = self.value_type(src);
-    let ty = match src_ty.kind() {
-      TypeKind::Pointer(ty) => ty.clone(),
-      _ => panic!("expected a pointer type"),
+    let TypeKind::Pointer(base) = src_ty.kind() else {
+      panic!("expected a pointer type");
     };
-    self.insert_value(Load::new_data(src, ty))
+    self.insert_value(Load::new_data(src, base.clone()))
   }
 
   /// Creates a memory store with the given value and destination.
@@ -203,13 +202,14 @@ pub trait LocalInstBuilder: ValueBuilder {
       self.value_type(index).is_i32(),
       "`index` must be an integer"
     );
-    let ty = match self.value_type(src).kind() {
-      TypeKind::Pointer(ty) => match ty.kind() {
-        TypeKind::Array(base, _) => Type::get_pointer(base.clone()),
-        _ => panic!("`src` must be a pointer of array"),
-      },
-      _ => panic!("`src` must be a pointer of array"),
+    let src_ty = self.value_type(src);
+    let TypeKind::Pointer(array_ty) = src_ty.kind() else {
+      panic!("`src` must be a pointer of array");
     };
+    let TypeKind::Array(base, _) = array_ty.kind() else {
+      panic!("`src` must be a pointer of array");
+    };
+    let ty = Type::get_pointer(base.clone());
     self.insert_value(GetElemPtr::new_data(src, index, ty))
   }
 
@@ -304,29 +304,27 @@ pub trait LocalInstBuilder: ValueBuilder {
   ///
   /// Panics if the argument types of the callee do not match.
   fn call(mut self, callee: Function, args: Vec<Value>) -> Value {
-    let ty = match self.func_type(callee).kind() {
-      TypeKind::Function(params, ret) => {
-        assert!(
-          params.len() == args.len(),
-          "argument count mismatch: expected {} arguments, but got {}",
-          params.len(),
-          args.len()
-        );
-        for (i, (expected, arg)) in params.iter().zip(args.iter()).enumerate() {
-          let actual = self.value_type(*arg);
-          assert!(
-            expected == &actual,
-            "argument type mismatch at parameter {}: expected {}, but got {}",
-            i,
-            expected,
-            actual
-          );
-        }
-        ret.clone()
-      }
-      t => panic!("expected a function type, but got {}", t),
+    let callee_ty = self.func_type(callee);
+    let TypeKind::Function(params, ret) = callee_ty.kind() else {
+      panic!("expected a function type, but got {}", callee_ty);
     };
-    self.insert_value(Call::new_data(callee, args, ty))
+    assert!(
+      params.len() == args.len(),
+      "argument count mismatch: expected {} arguments, but got {}",
+      params.len(),
+      args.len()
+    );
+    for (i, (expected, arg)) in params.iter().zip(args.iter()).enumerate() {
+      let actual = self.value_type(*arg);
+      assert!(
+        expected == &actual,
+        "argument type mismatch at parameter {}: expected {}, but got {}",
+        i,
+        expected,
+        actual
+      );
+    }
+    self.insert_value(Call::new_data(callee, args, ret.clone()))
   }
 
   /// Creates a new return instruction.

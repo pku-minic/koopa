@@ -43,12 +43,12 @@ type ValueResult = Result<Value, Error>;
 
 /// Unwraps the given AST by its kind.
 macro_rules! unwrap_ast {
-  ($ast:expr, $kind:ident) => {
-    match &$ast.kind {
-      AstKind::$kind(ast) => ast,
-      _ => panic!("invalid `{}` AST", stringify!($kind)),
-    }
-  };
+  ($ast:expr, $kind:ident) => {{
+    let AstKind::$kind(ast) = &$ast.kind else {
+      panic!("invalid `{}` AST", stringify!($kind));
+    };
+    ast
+  }};
 }
 
 /// Generates global/local initializer, used in method
@@ -751,11 +751,11 @@ impl Builder {
       .get(&ast.fun)
       .ok_or_else(|| log_error!(span, "function '{}' not found", ast.fun))?;
     // get arguments
-    let args_ty = match self.program.func(callee).ty().kind() {
-      TypeKind::Function(args, _) => args.clone(),
-      _ => panic!("invalid function"),
+    let callee_ty = self.program.func(callee).ty().clone();
+    let TypeKind::Function(args_ty, _) = callee_ty.kind() else {
+      panic!("invalid function");
     };
-    let args = self.generate_args(func, span, bb_name, &ast.args, &args_ty)?;
+    let args = self.generate_args(func, span, bb_name, &ast.args, args_ty)?;
     Ok(self.dfg_mut(func).new_value().call(callee, args))
   }
 
