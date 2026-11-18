@@ -35,6 +35,7 @@ pub struct Builder {
   global_vars: HashMap<String, Value>,
   global_funcs: HashMap<String, Function>,
   local_bbs: HashMap<String, BasicBlockInfo>,
+  entry_bb: String,
   local_symbols: HashSet<String>,
 }
 
@@ -337,9 +338,8 @@ impl Builder {
     // add argument references local symbols
     self.local_symbols.extend(args.keys().cloned());
     // add argument references to the entry basic block
-    let entry_bb_name = &bbs[0].name;
-    let entry_info = &mut self.local_bbs.get_mut(entry_bb_name).unwrap();
-    entry_info.local_defs = args;
+    self.entry_bb.clone_from(&bbs[0].name);
+    self.local_bbs.get_mut(&self.entry_bb).unwrap().local_defs = args;
     // Collect names before generating instructions, so diagnostics do not
     // depend on which arm of a branch is visited first. A name only becomes
     // usable once its instruction is inserted into the block's local_defs.
@@ -483,7 +483,17 @@ impl Builder {
 
   /// Generates the symbol locally by the symbol name.
   fn generate_local_symbol(&self, bb_name: &str, symbol: &str) -> Option<Value> {
-    let mut pending = vec![bb_name];
+    let current = &self.local_bbs[bb_name];
+    // Only generated instructions are present in local_defs. An entry
+    // definition is therefore visible in every reachable block at this point.
+    if let Some(value) = current
+      .local_defs
+      .get(symbol)
+      .or_else(|| self.local_bbs[&self.entry_bb].local_defs.get(symbol))
+    {
+      return Some(*value);
+    }
+    let mut pending: Vec<_> = current.preds.iter().map(String::as_str).collect();
     let mut visited = HashSet::new();
     let mut definition = None;
     // A definition must dominate the use: every path back to the entry must
