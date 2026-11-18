@@ -13,7 +13,8 @@ All notable changes to the Koopa will be documented in this file.
 * The frontend resolves definitions in the current and entry blocks directly, avoiding repeated predecessor walks for function arguments and other entry-block values.
 * The `interpreter` example calls external functions through `libffi` using the declared C signature. Building the bundled `libffi` requires a C compiler, Make, Autoconf and Automake.
 * Updated `key-node-list` to 0.0.7.
-* CI now runs the `interpreter` and `opt` example tests, including their Miri suites.
+* CI now tests `libkoopa` on Windows and runs the `interpreter` and `opt` example tests on Linux, including their Miri suites.
+* Removed the Cargo cache from CI and kept the nightly toolchain cache on Linux.
 
 ### Fixed
 
