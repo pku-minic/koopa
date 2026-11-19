@@ -12,4 +12,4 @@ cargo add koopa
 
 ## License
 
-Copyright (C) 2021-2025 MaxXing. Licensed under GPLv3.
+Copyright (C) 2021-2026 MaxXing. Licensed under GPLv3.
